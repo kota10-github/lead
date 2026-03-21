@@ -55,17 +55,53 @@
     .kpi-num.kpi-done   .kpi-num-val { color: var(--orange); }
     .kpi-divider { width: 1px; height: 22px; background: var(--border); align-self: center; flex-shrink: 0; }
 
-    /* ─── TABS ─── */
-    .tab-bar { background: var(--white); border-bottom: 1px solid var(--border); padding: 0 16px; display: flex; align-items: stretch; gap: 0; overflow-x: auto; scrollbar-width: none; position: sticky; top: calc(52px + 58px); z-index: 80; }
+    /* ─── TABS (mobile: horizontal) ─── */
+    .page-body { display: flex; flex-direction: column; }
+    .tab-bar { background: var(--white); border-bottom: 1px solid var(--border); padding: 0 16px; display: flex; align-items: stretch; gap: 0; overflow-x: auto; scrollbar-width: none; position: sticky; top: calc(52px + 74px); z-index: 80; }
     .tab-bar::-webkit-scrollbar { display: none; }
-    .tab { flex-shrink: 0; padding: 0 12px; height: 38px; display: flex; align-items: center; font-size: 12px; font-weight: 600; color: var(--sub); cursor: pointer; border-bottom: 2.5px solid transparent; transition: all 0.15s; white-space: nowrap; }
+    .tab { flex-shrink: 0; padding: 0 14px; height: 40px; display: flex; align-items: center; font-size: 12px; font-weight: 600; color: var(--sub); cursor: pointer; border-bottom: 2.5px solid transparent; transition: all 0.15s; white-space: nowrap; }
     .tab:hover { color: var(--text); }
     .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-    .tab-add { flex-shrink: 0; padding: 0 10px; height: 38px; display: flex; align-items: center; font-size: 14px; font-weight: 600; color: var(--green); cursor: pointer; border-bottom: 2.5px solid transparent; }
+    .tab-add { flex-shrink: 0; padding: 0 10px; height: 40px; display: flex; align-items: center; font-size: 14px; font-weight: 600; color: var(--green); cursor: pointer; border-bottom: 2.5px solid transparent; }
     .tab-add:hover { color: #065f46; }
 
-    /* ─── CONTENT ─── */
-    .content { padding: 20px; max-width: 860px; margin: 0 auto; }
+    /* ─── CONTENT (mobile) ─── */
+    .content { padding: 20px 16px; }
+
+    /* ─── DESKTOP LAYOUT (≥900px) ─── */
+    @media (min-width: 900px) {
+      .page-body { flex-direction: row; align-items: flex-start; min-height: calc(100vh - 126px); }
+
+      .tab-bar {
+        flex-direction: column; align-items: stretch;
+        width: 156px; flex-shrink: 0;
+        padding: 10px 0;
+        border-right: 1px solid var(--border); border-bottom: none;
+        overflow-x: visible; overflow-y: auto;
+        position: sticky; top: 126px;
+        height: calc(100vh - 126px);
+        z-index: 80; box-shadow: none;
+      }
+      .tab {
+        border-bottom: none; border-left: 3px solid transparent;
+        height: auto; padding: 10px 16px;
+        border-radius: 0 8px 8px 0; margin-right: 8px;
+        font-size: 13px;
+      }
+      .tab.active {
+        border-bottom-color: transparent; border-left-color: var(--accent);
+        background: var(--a-bg); border-radius: 0 8px 8px 0;
+      }
+      .tab-add {
+        border-bottom: none; border-left: 3px solid transparent;
+        height: auto; padding: 10px 16px;
+      }
+      .content { flex: 1; min-width: 0; padding: 24px 32px; max-width: none; }
+
+      /* KPI bar: 1行に収める */
+      .kpi-grid { grid-template-columns: repeat(5, 1fr); }
+      .kpi-num-val { font-size: 20px; }
+    }
 
     /* ─── DAY CARD ─── */
     .day-card { background: var(--white); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
@@ -231,8 +267,10 @@
   <div class="kpi-grid" id="kpi-grid"></div>
 </div>
 
-<div class="tab-bar" id="tab-bar"></div>
-<div class="content" id="content"></div>
+<div class="page-body">
+  <div class="tab-bar" id="tab-bar"></div>
+  <div class="content" id="content"></div>
+</div>
 
 <!-- History Popover -->
 <div class="hist-popover" id="hist-popover">
