@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>なまいきくんエバー導線</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:      #f4f5f7;
+      --white:   #ffffff;
+      --border:  #e5e7eb;
+      --border2: #f0f1f4;
+      --text:    #111827;
+      --sub:     #6b7280;
+      --muted:   #9ca3af;
+      --accent:  #4f46e5;
+      --a-bg:    #eef2ff;
+      --plus:    #0369a1;
+      --plus-bg: #e0f2fe;
+      --add:     #c2410c;
+      --add-bg:  #fff7ed;
+      --fail:    #b91c1c;
+      --fail-bg: #fef2f2;
+      --green:   #047857;
+      --green-bg:#ecfdf5;
+      --purple:  #6d28d9;
+      --pur-bg:  #f5f3ff;
+      --orange:  #d97706;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter','Noto Sans JP',sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 13px; }
+
+    /* ─── HEADER ─── */
+    .top-header { background: var(--white); border-bottom: 1px solid var(--border); height: 52px; display: flex; align-items: center; padding: 0 20px; gap: 10px; position: sticky; top: 0; z-index: 100; }
+    .logo { width: 30px; height: 30px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+    .top-header h1 { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+    .header-badge { margin-left: auto; font-size: 11px; font-weight: 500; color: var(--sub); background: var(--bg); border: 1px solid var(--border); padding: 3px 10px; border-radius: 100px; }
+
+    /* ─── KPI BAR ─── */
+    .kpi-bar { background: var(--white); border-bottom: 1px solid var(--border); padding: 8px 16px; position: sticky; top: 52px; z-index: 90; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+    .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+    .kpi-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; min-width: 0; }
+    .kpi-title { font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 5px; line-height: 1.4; word-break: keep-all; }
+    @media (max-width: 540px) {
+      .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+      .kpi-title { font-size: 9.5px; }
+    }
+    .kpi-nums { display: flex; gap: 5px; align-items: flex-end; }
+    .kpi-num { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; flex: 1; }
+    .kpi-num-label { font-size: 8.5px; font-weight: 600; color: var(--muted); letter-spacing: 0.2px; }
+    .kpi-num-val { font-size: 16px; font-weight: 700; line-height: 1.1; }
+    .kpi-num.kpi-total  .kpi-num-val { color: var(--text); }
+    .kpi-num.kpi-actual .kpi-num-val { color: var(--accent); }
+    .kpi-num.kpi-done   .kpi-num-val { color: var(--orange); }
+    .kpi-divider { width: 1px; height: 22px; background: var(--border); align-self: center; flex-shrink: 0; }
+
+    /* ─── TABS ─── */
+    .tab-bar { background: var(--white); border-bottom: 1px solid var(--border); padding: 0 16px; display: flex; align-items: stretch; gap: 0; overflow-x: auto; scrollbar-width: none; position: sticky; top: calc(52px + 58px); z-index: 80; }
+    .tab-bar::-webkit-scrollbar { display: none; }
+    .tab { flex-shrink: 0; padding: 0 12px; height: 38px; display: flex; align-items: center; font-size: 12px; font-weight: 600; color: var(--sub); cursor: pointer; border-bottom: 2.5px solid transparent; transition: all 0.15s; white-space: nowrap; }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-add { flex-shrink: 0; padding: 0 10px; height: 38px; display: flex; align-items: center; font-size: 14px; font-weight: 600; color: var(--green); cursor: pointer; border-bottom: 2.5px solid transparent; }
+    .tab-add:hover { color: #065f46; }
+
+    /* ─── CONTENT ─── */
+    .content { padding: 20px; max-width: 860px; margin: 0 auto; }
+
+    /* ─── DAY CARD ─── */
+    .day-card { background: var(--white); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .day-card.today-card { border-color: #c7d2fe; box-shadow: 0 0 0 3px #eef2ff; }
+    .card-head { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: #fafafa; border-bottom: 1px solid var(--border2); }
+    .today-card .card-head { background: var(--a-bg); }
+    .card-date { font-size: 14px; font-weight: 700; color: var(--sub); }
+    .today-card .card-date { color: var(--accent); }
+    .today-tag { font-size: 10px; font-weight: 700; background: var(--accent); color: white; padding: 1px 7px; border-radius: 5px; }
+    .weekend-label { color: var(--fail); }
+    .card-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+
+    /* ─── METRIC BOXES ─── */
+    .metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .metric-box { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px; position: relative; }
+    .metric-box.views-btn { cursor: pointer; border-color: #c7d2fe; background: var(--a-bg); }
+    .metric-box.views-btn:hover { background: #dde4fc; }
+    .metric-label { font-size: 9.5px; font-weight: 700; color: var(--muted); letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 5px; }
+    .views-btn .metric-label { color: var(--accent); }
+    .metric-val { font-size: 22px; font-weight: 700; color: var(--text); min-height: 28px; line-height: 1.2; }
+    .metric-val.empty { font-size: 18px; color: var(--muted); font-weight: 400; }
+    .metric-val[contenteditable="true"] { outline: none; }
+    .metric-val[contenteditable="true"]:focus { color: var(--accent); }
+    .views-hint { display: block; font-size: 10px; font-weight: 500; color: var(--accent); margin-top: 3px; }
+
+    /* ─── HISTORY META (under metric values) ─── */
+    .field-meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; min-height: 16px; }
+    .field-ts { font-size: 10px; color: var(--muted); }
+    .hist-btn {
+      display: inline-flex; align-items: center; gap: 2px;
+      font-size: 10px; font-weight: 600; color: var(--accent);
+      background: var(--a-bg); border: 1px solid #c7d2fe;
+      border-radius: 4px; padding: 1px 5px; cursor: pointer;
+      line-height: 1.4; flex-shrink: 0;
+    }
+    .hist-btn:hover { background: #dde4fc; }
+
+    /* ─── MINI TABLE ─── */
+    .mini-table-wrap { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .mini-table { width: 100%; border-collapse: collapse; }
+    .mini-table th, .mini-table td { padding: 6px 8px; text-align: center; border-right: 1px solid var(--border2); border-bottom: 1px solid var(--border2); }
+    .mini-table tr:last-child td { border-bottom: none; }
+    .mini-table th:last-child, .mini-table td:last-child { border-right: none; }
+    .mini-table thead tr { background: #fafafa; }
+    .mini-table th { font-size: 10.5px; font-weight: 600; color: var(--muted); }
+    .mini-table th.th-label { text-align: left; width: 90px; color: var(--sub); }
+    .mini-table th.th-total { color: var(--purple); }
+    .mini-table th.th-plus  { color: var(--plus); }
+    .mini-table th.th-add   { color: var(--add); }
+    .mini-table th.th-fail  { color: var(--fail); }
+    .mini-table td.row-label { text-align: left; font-size: 11.5px; font-weight: 600; color: var(--sub); background: #fafafa; width: 90px; }
+
+    /* Data cell with history */
+    .data-cell { position: relative; min-width: 60px; vertical-align: middle; }
+    .data-cell.cell-total { background: var(--pur-bg); }
+    .data-cell.cell-plus  { }
+    .data-cell.cell-add   { }
+    .data-cell.cell-fail  { }
+    .cell-inner { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .cv {
+      font-size: 13px; font-weight: 700; display: block;
+      min-width: 30px; text-align: center; outline: none;
+      border-radius: 4px; padding: 1px 4px;
+    }
+    .cv:focus { background: #eff6ff; box-shadow: inset 0 0 0 1.5px #93c5fd; }
+    .data-cell.cell-total .cv { color: var(--purple); }
+    .data-cell.cell-plus  .cv { color: var(--plus); }
+    .data-cell.cell-add   .cv { color: var(--add); }
+    .data-cell.cell-fail  .cv { color: var(--fail); }
+    .cv-ts { font-size: 9px; color: var(--muted); line-height: 1; }
+    .cv-hist { font-size: 9px; font-weight: 600; color: var(--accent); background: var(--a-bg); border: 1px solid #c7d2fe; border-radius: 3px; padding: 0px 4px; cursor: pointer; line-height: 1.6; }
+    .cv-hist:hover { background: #dde4fc; }
+
+    /* ─── APPLY ROW ─── */
+    .apply-row { display: flex; align-items: flex-start; gap: 10px; background: var(--green-bg); border: 1px solid #a7f3d0; border-radius: 10px; padding: 10px 14px; flex-wrap: wrap; }
+    .apply-row-label { font-size: 10px; font-weight: 700; color: var(--green); text-transform: uppercase; letter-spacing: 0.4px; padding-top: 2px; }
+    .apply-item { display: flex; flex-direction: column; gap: 2px; align-items: center; }
+    .apply-item-label { font-size: 10px; color: var(--green); font-weight: 600; }
+    .apply-val-wrap { display: flex; align-items: center; gap: 4px; }
+    .apply-val { font-size: 18px; font-weight: 700; color: var(--green); min-width: 36px; text-align: center; background: white; border: 1px solid #a7f3d0; border-radius: 6px; padding: 2px 8px; outline: none; }
+    .apply-val:focus { box-shadow: inset 0 0 0 1.5px var(--green); }
+    .apply-divider { width: 1px; height: 32px; background: #a7f3d0; align-self: center; }
+
+    /* ─── GLOBAL CARD ─── */
+    .global-card { background: var(--white); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .global-head { padding: 12px 18px; background: #fafafa; border-bottom: 1px solid var(--border2); font-size: 13px; font-weight: 700; color: var(--sub); }
+    .global-body { padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+    .global-row { display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 12px; padding: 12px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; }
+    .global-row-label { font-size: 12px; font-weight: 700; color: var(--sub); margin-bottom: 2px; }
+    .global-note { font-size: 10.5px; color: var(--muted); }
+    .global-input-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+    .global-input { font-size: 26px; font-weight: 700; color: var(--text); background: var(--white); border: 1.5px solid var(--border); border-radius: 8px; padding: 6px 12px; width: 130px; text-align: center; font-family: inherit; outline: none; }
+    .global-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,70,229,0.1); }
+
+    /* ─── HISTORY POPOVER ─── */
+    .hist-popover {
+      position: fixed; z-index: 600;
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,0.15);
+      padding: 12px; min-width: 210px; max-width: 280px;
+      display: none;
+    }
+    .hist-popover.show { display: block; }
+    .hist-popover-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+    .hist-entry { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--border2); gap: 12px; }
+    .hist-entry:last-child { border-bottom: none; }
+    .hist-entry-val { font-size: 16px; font-weight: 700; color: var(--text); }
+    .hist-entry-time { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+    .hist-entry.hist-latest .hist-entry-val { color: var(--accent); }
+    .hist-entry.hist-latest .hist-entry-time::before { content: '最新 · '; color: var(--accent); font-weight: 600; }
+    .hist-empty { font-size: 12px; color: var(--muted); text-align: center; padding: 8px 0; }
+
+    /* ─── BUTTONS ─── */
+    .btn { display: inline-flex; align-items: center; gap: 5px; padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit; transition: all 0.12s; }
+    .btn-accent  { background: var(--accent); color: white; box-shadow: 0 2px 8px rgba(79,70,229,0.25); }
+    .btn-accent:hover  { background: #4338ca; }
+    .btn-ghost   { background: var(--white); color: var(--sub); border: 1.5px solid var(--border); }
+    .btn-ghost:hover   { color: var(--text); background: var(--bg); }
+    .btn-green  { background: var(--green); color: white; }
+    .btn-green:hover { background: #065f46; }
+    .btn-red    { background: var(--fail); color: white; font-size: 12px; padding: 7px 14px; }
+    .btn-red:hover { background: #991b1b; }
+    .btn-add-time { width: 100%; justify-content: center; background: var(--white); color: var(--accent); border: 1.5px dashed #c4b5fd; border-radius: 10px; padding: 9px; margin-bottom: 12px; }
+    .btn-add-time:hover { background: var(--a-bg); }
+    .action-bar { margin-top: 16px; display: flex; gap: 8px; }
+
+    /* ─── MODAL ─── */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(17,24,39,0.4); backdrop-filter: blur(3px); z-index: 300; align-items: center; justify-content: center; }
+    .modal-overlay.active { display: flex; }
+    .modal { background: var(--white); border: 1px solid var(--border); border-radius: 18px; padding: 24px; width: 480px; max-width: 95vw; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 50px rgba(0,0,0,0.15); }
+    .modal-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; }
+    .modal-head h2 { font-size: 15px; font-weight: 700; }
+    .modal-head p { font-size: 11.5px; color: var(--sub); margin-top: 3px; }
+    .modal-close { background: var(--bg); border: 1.5px solid var(--border); color: var(--sub); width: 28px; height: 28px; border-radius: 7px; cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .modal-close:hover { background: var(--border); color: var(--text); }
+    .time-empty { text-align: center; color: var(--muted); font-size: 13px; padding: 20px 0; border: 1.5px dashed var(--border); border-radius: 10px; margin-bottom: 12px; }
+    .time-entry { display: grid; grid-template-columns: 1fr 1fr 80px 32px; gap: 8px; align-items: end; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; }
+    .time-entry label { display: block; font-size: 10.5px; color: var(--sub); margin-bottom: 4px; font-weight: 500; }
+    .time-entry input { background: var(--white); border: 1.5px solid var(--border); border-radius: 7px; padding: 6px 8px; font-size: 12.5px; color: var(--text); width: 100%; font-family: inherit; }
+    .time-entry input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,70,229,0.1); }
+    .time-entry input[type="number"] { text-align: center; }
+    .remove-btn { background: var(--fail-bg); border: 1.5px solid #fecaca; color: var(--fail); border-radius: 7px; width: 32px; height: 32px; cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center; }
+    .remove-btn:hover { background: #fee2e2; }
+    .modal-total { display: flex; align-items: center; justify-content: space-between; background: var(--a-bg); border: 1.5px solid #c4b5fd; border-radius: 10px; padding: 10px 16px; margin: 12px 0; }
+    .modal-total-label { font-size: 12px; color: var(--accent); font-weight: 500; }
+    .modal-total-val { font-size: 24px; font-weight: 700; color: var(--accent); }
+    .modal-total-unit { font-size: 12px; color: var(--accent); margin-left: 2px; }
+    .modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+  </style>
+</head>
+<body>
+
+<header class="top-header">
+  <div class="logo">📊</div>
+  <h1>なまいきくんエバー導線</h1>
+</header>
+
+<div class="kpi-bar">
+  <div class="kpi-grid" id="kpi-grid"></div>
+</div>
+
+<div class="tab-bar" id="tab-bar"></div>
+<div class="content" id="content"></div>
+
+<!-- History Popover -->
+<div class="hist-popover" id="hist-popover">
+  <div class="hist-popover-title" id="hist-popover-title">入力履歴</div>
+  <div id="hist-popover-list"></div>
+</div>
+
+<!-- Views Modal -->
+<div class="modal-overlay" id="modal" onclick="handleOverlay(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <div><h2>ウェビナー視聴数</h2><p id="modal-date-label"></p></div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="time-list"></div>
+    <button class="btn btn-add-time" onclick="addEntry()">＋ 時間帯を追加</button>
+    <div class="modal-total">
+      <span class="modal-total-label">視聴合計</span>
+      <span><span class="modal-total-val" id="time-total">0</span><span class="modal-total-unit">人</span></span>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-accent" onclick="saveModal()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════
+// DATA LAYER
+// ═══════════════════════════════════
+let db = (() => { try { return JSON.parse(localStorage.getItem('funnel_v6')||'{}'); } catch { return {}; } })();
+function persist() { localStorage.setItem('funnel_v6', JSON.stringify(db)); }
+
+// History helpers
+// Each field stores: [{v: "50", ts: 1234567890}, ...] newest first
+function getLatest(data) {
+  if (!data) return '';
+  if (typeof data === 'string') return data;
+  return Array.isArray(data) && data.length > 0 ? data[0].v : '';
+}
+function getHistory(data) {
+  if (!data) return [];
+  if (typeof data === 'string') return data ? [{v: data, ts: Date.now()}] : [];
+  return Array.isArray(data) ? data : [];
+}
+function pushEntry(data, newVal) {
+  const arr = getHistory(data);
+  return [{v: String(newVal), ts: Date.now()}, ...arr];
+}
+function fmtTs(ts) {
+  const d = new Date(ts);
+  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+function getRow(date) {
+  if (!db[date]) db[date] = {
+    views_entries:[], reservation:[], line:[], survey:[],
+    pass_total:[], pass_plus:[], pass_add:[], pass_fail:[],
+    meet_total:[], meet_plus:[], meet_add:[], meet_fail:[],
+    apply_all:[], apply_done:[],
+    rem_total:[], rem_plus:[], rem_add:[], rem_fail:[]
+  };
+  return db[date];
+}
+function getGlobal() {
+  if (!db.__global) db.__global = { webinar:[], views:[], line:[], survey:[], meet:[] };
+  return db.__global;
+}
+
+// ═══════════════════════════════════
+// DATE UTILS
+// ═══════════════════════════════════
+function fmt(d) { return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`; }
+function isToday(s) { return s === fmt(new Date()); }
+function isWeekend(s) { const [y,m,d]=s.split('/').map(Number); return [0,6].includes(new Date(y,m-1,d).getDay()); }
+function getBaseDates() {
+  const s=new Date('2026-03-18'), e=new Date(); e.setHours(23,59,59,0);
+  const a=[]; for(let d=new Date(s);d<=e;d.setDate(d.getDate()+1)) a.push(fmt(new Date(d))); return a;
+}
+function getAllDates() {
+  const base=getBaseDates();
+  return [...base,...(db.__extra||[]).filter(d=>!base.includes(d))].sort();
+}
+function fmtShort(s) { const [,m,d]=s.split('/'); return `${parseInt(m)}/${parseInt(d)}`; }
+
+// ═══════════════════════════════════
+// KPI CALCULATIONS
+// ═══════════════════════════════════
+function dailySum(field) {
+  return getAllDates().reduce((sum,date) => {
+    const r=db[date]; if(!r) return sum;
+    return sum + (parseInt(getLatest(r[field]))||0);
+  },0);
+}
+function viewsSum() {
+  return getAllDates().reduce((sum,date) => {
+    const r=db[date]; if(!r||!r.views_entries) return sum;
+    return sum + r.views_entries.reduce((s,e)=>s+(parseInt(e.count)||0),0);
+  },0);
+}
+
+// ═══════════════════════════════════
+// KPI BAR
+// ═══════════════════════════════════
+function renderKPI() {
+  const g = getGlobal();
+  const kpis = [
+    { label:'ウェビナー予約', total: parseInt(getLatest(g.webinar))||0, done: dailySum('reservation') },
+    { label:'ウェビナー視聴', total: parseInt(getLatest(g.views))||0,   done: viewsSum() },
+    { label:'LINE 登録',      total: parseInt(getLatest(g.line))||0,    done: dailySum('line') },
+    { label:'アンケート回答', total: parseInt(getLatest(g.survey))||0,  done: dailySum('survey') },
+    { label:'面談確定',       total: parseInt(getLatest(g.meet))||0,    done: dailySum('meet_total') },
+  ];
+  document.getElementById('kpi-grid').innerHTML = kpis.map(k => {
+    const shoka = k.total ? Math.max(0, k.total - k.done) : '—';
+    return `
+      <div class="kpi-card">
+        <div class="kpi-title">${k.label}</div>
+        <div class="kpi-nums">
+          <div class="kpi-num kpi-total"><span class="kpi-num-label">全体</span><span class="kpi-num-val">${k.total||'—'}</span></div>
+          <div class="kpi-divider"></div>
+          <div class="kpi-num kpi-actual"><span class="kpi-num-label">実績</span><span class="kpi-num-val">${k.done}</span></div>
+          <div class="kpi-divider"></div>
+          <div class="kpi-num kpi-done"><span class="kpi-num-label">消化</span><span class="kpi-num-val">${shoka}</span></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════
+// TABS
+// ═══════════════════════════════════
+let activeTab = fmt(new Date());
+function renderTabs() {
+  const bar = document.getElementById('tab-bar');
+  bar.innerHTML = '';
+  const globalTab = mkEl('div', 'tab'+(activeTab==='__global'?' active':''), '全体入力');
+  globalTab.onclick = () => switchTab('__global');
+  bar.appendChild(globalTab);
+  getAllDates().forEach(date => {
+    const t = mkEl('div', 'tab'+(activeTab===date?' active':'')+(isToday(date)?' today-tab':''),
+      fmtShort(date)+(isToday(date)?' ★':''));
+    t.onclick = () => switchTab(date);
+    bar.appendChild(t);
+  });
+  const addTab = mkEl('div','tab-add','＋');
+  addTab.onclick = addRow;
+  bar.appendChild(addTab);
+}
+function mkEl(tag, cls, text) {
+  const el = document.createElement(tag);
+  el.className = cls; el.textContent = text; return el;
+}
+function switchTab(tab) { activeTab=tab; renderTabs(); renderContent(); }
+
+// ═══════════════════════════════════
+// CONTENT ROUTER
+// ═══════════════════════════════════
+function renderContent() {
+  const el = document.getElementById('content');
+  el.innerHTML = '';
+  el.appendChild(activeTab==='__global' ? buildGlobalCard() : buildDayCard(activeTab));
+}
+
+// ═══════════════════════════════════
+// GLOBAL CARD
+// ═══════════════════════════════════
+function buildGlobalCard() {
+  const g = getGlobal();
+  const card = document.createElement('div');
+  card.className = 'global-card';
+  card.innerHTML = `<div class="global-head">全体数値の入力</div><div class="global-body" id="global-body"></div>`;
+  const body = card.querySelector('#global-body');
+  const fields = [
+    { key:'webinar', label:'ウェビナー予約数（全体）',   hint:'ウェビナーの総予約目標数' },
+    { key:'views',   label:'ウェビナー視聴者数（全体）', hint:'視聴者の総目標数' },
+    { key:'line',    label:'LINE 登録者数（全体）',       hint:'LINEへの総登録目標数' },
+    { key:'survey',  label:'アンケート回答者数（全体）', hint:'アンケートの総回答目標数' },
+    { key:'meet',    label:'面談確定者数（全体）',         hint:'面談確定の総目標数' },
+  ];
+  fields.forEach(f => {
+    const hist = getHistory(g[f.key]);
+    const latest = getLatest(g[f.key]);
+    const row = document.createElement('div');
+    row.className = 'global-row';
+    row.innerHTML = `
+      <div>
+        <div class="global-row-label">${f.label}</div>
+        <div class="global-note">${f.hint}</div>
+      </div>
+      <div class="global-input-wrap">
+        <input class="global-input" type="number" min="0" value="${latest||''}" data-key="${f.key}" placeholder="0">
+        <div class="field-meta">
+          ${hist.length>0 ? `<span class="field-ts">${fmtTs(hist[0].ts)}</span>` : ''}
+          ${hist.length>1 ? `<button class="hist-btn" data-hist-key="global:${f.key}">↺ ${hist.length}件</button>` : ''}
+        </div>
+      </div>
+    `;
+    body.appendChild(row);
+    row.querySelector('.global-input').addEventListener('change', e => {
+      g[f.key] = pushEntry(g[f.key], e.target.value);
+      persist(); renderKPI(); renderContent();
+    });
+    const hb = row.querySelector('.hist-btn');
+    if (hb) hb.addEventListener('click', e => { e.stopPropagation(); showHistPopover(e.target, hist, f.label); });
+  });
+  return card;
+}
+
+// ═══════════════════════════════════
+// DAY CARD
+// ═══════════════════════════════════
+function buildDayCard(date) {
+  const row = getRow(date);
+  const vt = row.views_entries.length>0 ? row.views_entries.reduce((s,e)=>s+(parseInt(e.count)||0),0) : null;
+  const card = document.createElement('div');
+  card.className = 'day-card'+(isToday(date)?' today-card':'');
+
+  // header
+  const head = document.createElement('div');
+  head.className = 'card-head';
+  head.innerHTML = `<span class="card-date ${isWeekend(date)?'weekend-label':''}">${date}</span>${isToday(date)?'<span class="today-tag">TODAY</span>':''}`;
+  card.appendChild(head);
+
+  const body = document.createElement('div');
+  body.className = 'card-body';
+
+  // ── top 4 metrics ──
+  const mrow = document.createElement('div');
+  mrow.className = 'metrics-row';
+  const metricFields = [
+    { field:'reservation', label:'ウェビナー予約数', cls:'' },
+    { field:'__views',     label:'ウェビナー視聴数', cls:'views-btn' },
+    { field:'line',        label:'LINE 登録者数', cls:'' },
+    { field:'survey',      label:'アンケート回答', cls:'' },
+  ];
+  metricFields.forEach(mf => {
+    const box = document.createElement('div');
+    box.className = 'metric-box ' + mf.cls;
+    if (mf.field === '__views') {
+      // special: time-slot entry
+      box.innerHTML = `
+        <div class="metric-label">ウェビナー視聴数</div>
+        <div class="metric-val ${vt===null?'empty':''}">${vt!==null?vt:'—'}</div>
+        <span class="views-hint">▾ 時間帯別入力</span>
+      `;
+      box.addEventListener('click', () => openModal(date));
+    } else {
+      const hist = getHistory(row[mf.field]);
+      const latest = getLatest(row[mf.field]);
+      box.innerHTML = `
+        <div class="metric-label">${mf.label}</div>
+        <div class="metric-val ${latest?'':'empty'}" contenteditable="true" spellcheck="false" data-date="${date}" data-field="${mf.field}">${latest||''}</div>
+        <div class="field-meta">
+          ${hist.length>0 ? `<span class="field-ts">${fmtTs(hist[0].ts)}</span>` : ''}
+          ${hist.length>1 ? `<button class="hist-btn" data-hist>↺ ${hist.length}件</button>` : ''}
+        </div>
+      `;
+      const cv = box.querySelector('.metric-val');
+      const hb = box.querySelector('.hist-btn');
+      if (hb) hb.addEventListener('click', e => { e.stopPropagation(); showHistPopover(hb, hist, mf.label); });
+      bindMetricEdit(cv, date, mf.field);
+    }
+    mrow.appendChild(box);
+  });
+  body.appendChild(mrow);
+
+  // ── mini table ──
+  const tableWrap = document.createElement('div');
+  tableWrap.className = 'mini-table-wrap';
+  const groups = [
+    { label:'合格者数', fields:['pass_total','pass_plus','pass_add','pass_fail'] },
+    { label:'面談確定', fields:['meet_total','meet_plus','meet_add','meet_fail'] },
+    { label:'残り面談', fields:['rem_total','rem_plus','rem_add','rem_fail'] },
+  ];
+  const colClasses = ['cell-total','cell-plus','cell-add','cell-fail'];
+  const colLabels = ['合計','0点以上','追加合格<br><span style="font-weight:400;font-size:9px;opacity:.75">(-1/-2)</span>','不合格<br><span style="font-weight:400;font-size:9px;opacity:.75">(-3/-4)</span>'];
+  const thClasses = ['th-total','th-plus','th-add','th-fail'];
+
+  let html = `<table class="mini-table"><thead><tr>
+    <th class="th-label"></th>
+    ${colLabels.map((l,i)=>`<th class="${thClasses[i]}">${l}</th>`).join('')}
+  </tr></thead><tbody>`;
+  groups.forEach(g => {
+    html += `<tr><td class="row-label">${g.label}</td>`;
+    g.fields.forEach((f,i) => {
+      const hist = getHistory(row[f]);
+      const latest = getLatest(row[f]);
+      const ts = hist.length>0 ? `<div class="cv-ts">${fmtTs(hist[0].ts)}</div>` : '';
+      const hb = hist.length>1 ? `<button class="cv-hist" data-date="${date}" data-field="${f}" data-label="${g.label}/${colLabels[i].replace(/<[^>]+>/g,'')}">${hist.length}件</button>` : '';
+      html += `<td class="data-cell ${colClasses[i]}" data-date="${date}" data-field="${f}">
+        <div class="cell-inner">
+          <span class="cv" contenteditable="true" spellcheck="false" data-date="${date}" data-field="${f}">${latest||''}</span>
+          ${ts}${hb}
+        </div>
+      </td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  tableWrap.innerHTML = html;
+  body.appendChild(tableWrap);
+
+  // ── apply row ──
+  const applyRow = document.createElement('div');
+  applyRow.className = 'apply-row';
+  [['apply_all','全体'],['apply_done','消化済']].forEach(([f, label], idx) => {
+    const hist = getHistory(row[f]);
+    const latest = getLatest(row[f]);
+    if (idx===0) {
+      const lbl = document.createElement('span');
+      lbl.className='apply-row-label'; lbl.textContent='申し込み';
+      applyRow.appendChild(lbl);
+    }
+    const item = document.createElement('div');
+    item.className = 'apply-item';
+    item.innerHTML = `
+      <span class="apply-item-label">${label}</span>
+      <div class="apply-val-wrap">
+        <span class="apply-val" contenteditable="true" spellcheck="false" data-date="${date}" data-field="${f}">${latest||''}</span>
+        ${hist.length>1 ? `<button class="hist-btn" style="font-size:9px">↺${hist.length}</button>` : ''}
+      </div>
+      ${hist.length>0 ? `<div class="cv-ts" style="color:var(--green)">${fmtTs(hist[0].ts)}</div>` : ''}
+    `;
+    const hb = item.querySelector('.hist-btn');
+    if (hb) hb.addEventListener('click', e => { e.stopPropagation(); showHistPopover(hb, hist, label); });
+    if (idx===1) {
+      const div2 = document.createElement('div');
+      div2.className='apply-divider'; applyRow.appendChild(div2);
+    }
+    applyRow.appendChild(item);
+  });
+  body.appendChild(applyRow);
+  card.appendChild(body);
+
+  // ── bind events ──
+  card.querySelectorAll('.cv[contenteditable="true"], .metric-val[contenteditable="true"], .apply-val[contenteditable="true"]').forEach(el => {
+    bindEdit(el, date);
+  });
+  tableWrap.querySelectorAll('.cv-hist').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const f = btn.dataset.field;
+      const lbl = btn.dataset.label;
+      showHistPopover(btn, getHistory(getRow(btn.dataset.date)[f]), lbl);
+    });
+  });
+
+  return card;
+}
+
+// ═══════════════════════════════════
+// EDIT BINDINGS
+// ═══════════════════════════════════
+function bindEdit(el, date) {
+  let originalVal = el.textContent.trim();
+  el.addEventListener('focus', () => { originalVal = el.textContent.trim(); });
+  el.addEventListener('keydown', e => { if (e.key==='Enter'){e.preventDefault(); el.blur();} });
+  el.addEventListener('blur', () => {
+    const newVal = el.textContent.trim();
+    if (newVal === originalVal) return;
+    const row = getRow(date);
+    row[el.dataset.field] = pushEntry(row[el.dataset.field], newVal);
+    persist(); renderKPI(); renderContent();
+  });
+}
+function bindMetricEdit(el, date, field) {
+  let originalVal = el.textContent.trim();
+  el.addEventListener('focus', () => { originalVal = el.textContent.trim(); });
+  el.addEventListener('keydown', e => { if (e.key==='Enter'){e.preventDefault(); el.blur();} });
+  el.addEventListener('blur', () => {
+    const newVal = el.textContent.trim();
+    if (newVal === originalVal) return;
+    const row = getRow(date);
+    row[field] = pushEntry(row[field], newVal);
+    persist(); renderKPI(); renderContent();
+  });
+}
+
+// ═══════════════════════════════════
+// HISTORY POPOVER
+// ═══════════════════════════════════
+function showHistPopover(anchor, hist, label) {
+  const pop = document.getElementById('hist-popover');
+  document.getElementById('hist-popover-title').textContent = label + ' の入力履歴';
+  const list = document.getElementById('hist-popover-list');
+  if (hist.length===0) {
+    list.innerHTML = '<div class="hist-empty">履歴なし</div>';
+  } else {
+    list.innerHTML = hist.map((h,i) => `
+      <div class="hist-entry ${i===0?'hist-latest':''}">
+        <span class="hist-entry-val">${h.v||'—'}</span>
+        <span class="hist-entry-time">${fmtTs(h.ts)}</span>
+      </div>`).join('');
+  }
+  // position near anchor
+  const rect = anchor.getBoundingClientRect();
+  pop.style.left = Math.min(rect.left, window.innerWidth-290) + 'px';
+  pop.style.top  = (rect.bottom + 6) + 'px';
+  pop.classList.add('show');
+}
+function closeHistPopover() { document.getElementById('hist-popover').classList.remove('show'); }
+document.addEventListener('click', e => {
+  if (!e.target.closest('#hist-popover') && !e.target.closest('.hist-btn') && !e.target.closest('.cv-hist')) {
+    closeHistPopover();
+  }
+});
+
+// ═══════════════════════════════════
+// VIEWS MODAL
+// ═══════════════════════════════════
+let currentDate=null, tempEntries=[];
+function openModal(date) {
+  currentDate=date;
+  tempEntries=JSON.parse(JSON.stringify(getRow(date).views_entries||[]));
+  document.getElementById('modal-date-label').textContent=date;
+  renderEntries();
+  document.getElementById('modal').classList.add('active');
+}
+function closeModal() { document.getElementById('modal').classList.remove('active'); currentDate=null; }
+function handleOverlay(e) { if(e.target===document.getElementById('modal')) closeModal(); }
+function renderEntries() {
+  const list=document.getElementById('time-list');
+  list.innerHTML='';
+  if(tempEntries.length===0){
+    list.innerHTML='<div class="time-empty">まだ時間帯が追加されていません</div>';
+  } else {
+    tempEntries.forEach((entry,i)=>{
+      const div=document.createElement('div'); div.className='time-entry';
+      div.innerHTML=`
+        <div><label>開始時間</label><input type="time" value="${entry.time_start||''}" data-idx="${i}" data-key="time_start"></div>
+        <div><label>終了時間（任意）</label><input type="time" value="${entry.time_end||''}" data-idx="${i}" data-key="time_end"></div>
+        <div><label>視聴人数</label><input type="number" min="0" value="${entry.count||''}" data-idx="${i}" data-key="count" placeholder="0"></div>
+        <button class="remove-btn" data-idx="${i}">✕</button>
+      `;
+      list.appendChild(div);
+    });
+    list.querySelectorAll('input').forEach(inp=>{
+      inp.addEventListener('input',()=>{ tempEntries[+inp.dataset.idx][inp.dataset.key]=inp.value; calcTotal(); });
+    });
+    list.querySelectorAll('.remove-btn').forEach(btn=>{
+      btn.addEventListener('click',()=>{ tempEntries.splice(+btn.dataset.idx,1); renderEntries(); });
+    });
+  }
+  calcTotal();
+}
+function calcTotal() {
+  document.getElementById('time-total').textContent=tempEntries.reduce((s,e)=>s+(parseInt(e.count)||0),0);
+}
+function addEntry() { tempEntries.push({time_start:'',time_end:'',count:''}); renderEntries(); }
+function saveModal() {
+  if(!currentDate) return;
+  getRow(currentDate).views_entries=JSON.parse(JSON.stringify(tempEntries));
+  persist(); closeModal(); renderContent(); renderKPI();
+}
+
+// ═══════════════════════════════════
+// ROW MANAGEMENT
+// ═══════════════════════════════════
+function addRow() {
+  const v=prompt('追加する日付を入力 (例: 2026/03/28)');
+  if(!v) return;
+  if(!/^\d{4}\/\d{2}\/\d{2}$/.test(v.trim())){alert('形式: YYYY/MM/DD');return;}
+  if(!db.__extra) db.__extra=[];
+  const d=v.trim();
+  if(!db.__extra.includes(d)&&!getBaseDates().includes(d)){db.__extra.push(d);persist();}
+  renderTabs(); switchTab(d);
+}
+
+// ═══════════════════════════════════
+// INIT
+// ═══════════════════════════════════
+const allDates=getAllDates();
+const todayStr=fmt(new Date());
+activeTab = allDates.includes(todayStr) ? todayStr : (allDates[0]||'__global');
+
+renderKPI();
+renderTabs();
+renderContent();
+</script>
+</body>
+</html>
