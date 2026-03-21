@@ -39,7 +39,7 @@
 
     /* ─── KPI BAR ─── */
     .kpi-bar { background: var(--white); border-bottom: 1px solid var(--border); padding: 8px 16px; position: sticky; top: 52px; z-index: 90; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-    .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 6px; }
     .kpi-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; min-width: 0; }
     .kpi-title { font-size: 9px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 5px; line-height: 1.4; word-break: keep-all; }
     @media (max-width: 540px) {
@@ -99,7 +99,7 @@
       .content { flex: 1; min-width: 0; padding: 24px 32px; max-width: none; }
 
       /* KPI bar: 1行に収める */
-      .kpi-grid { grid-template-columns: repeat(5, 1fr); }
+      .kpi-grid { grid-template-columns: repeat(7, 1fr); }
       .kpi-num-val { font-size: 20px; }
     }
 
@@ -115,7 +115,7 @@
     .card-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
 
     /* ─── METRIC BOXES ─── */
-    .metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .metrics-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .metric-box { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px; position: relative; }
     .metric-box.views-btn { cursor: pointer; border-color: #c7d2fe; background: var(--a-bg); }
     .metric-box.views-btn:hover { background: #dde4fc; }
@@ -378,6 +378,7 @@ function fmtTs(ts) {
 
 function getRow(date) {
   if (!db[date]) db[date] = {
+    note_view:[], line_tanaka:[],
     views_entries:[], reservation:[], line:[], survey:[],
     pass_total:[], pass_plus:[], pass_add:[], pass_fail:[],
     meet_total:[], meet_plus:[], meet_add:[], meet_fail:[],
@@ -387,7 +388,7 @@ function getRow(date) {
   return db[date];
 }
 function getGlobal() {
-  if (!db.__global) db.__global = { webinar:[], views:[], line:[], survey:[], meet:[] };
+  if (!db.__global) db.__global = { note_view:[], line_tanaka:[], webinar:[], views:[], line:[], survey:[], meet:[] };
   return db.__global;
 }
 
@@ -430,11 +431,13 @@ function renderKPI() {
   const g = getGlobal();
   const vs = viewsSum();
   const kpis = [
-    { label:'ウェビナー予約', total: parseInt(getLatest(g.webinar))||0, done: dailySum('reservation'), viewsMode: false },
-    { label:'ウェビナー視聴', total: vs,                                 done: vs,                      viewsMode: true  },
-    { label:'LINE 登録',      total: parseInt(getLatest(g.line))||0,    done: dailySum('line'),         viewsMode: false },
-    { label:'アンケート回答', total: parseInt(getLatest(g.survey))||0,  done: dailySum('survey'),       viewsMode: false },
-    { label:'面談確定',       total: parseInt(getLatest(g.meet))||0,    done: dailySum('meet_total'),   viewsMode: false },
+    { label:'BM note視聴',        total: parseInt(getLatest(g.note_view))||0,   done: dailySum('note_view'),    viewsMode: false },
+    { label:'LINE登録 田中note',   total: parseInt(getLatest(g.line_tanaka))||0, done: dailySum('line_tanaka'),  viewsMode: false },
+    { label:'ウェビナー予約',      total: parseInt(getLatest(g.webinar))||0,     done: dailySum('reservation'),  viewsMode: false },
+    { label:'ウェビナー視聴',      total: vs,                                    done: vs,                       viewsMode: true  },
+    { label:'LINE 登録',           total: parseInt(getLatest(g.line))||0,        done: dailySum('line'),         viewsMode: false },
+    { label:'アンケート回答',      total: parseInt(getLatest(g.survey))||0,      done: dailySum('survey'),       viewsMode: false },
+    { label:'面談確定',            total: parseInt(getLatest(g.meet))||0,        done: dailySum('meet_total'),   viewsMode: false },
   ];
   document.getElementById('kpi-grid').innerHTML = kpis.map(k => {
     const zansuu = k.viewsMode ? '—' : (k.total ? Math.max(0, k.total - k.done) : '—');
@@ -499,11 +502,13 @@ function buildGlobalCard() {
   card.innerHTML = `<div class="global-head">全体数値の入力</div><div class="global-body" id="global-body"></div>`;
   const body = card.querySelector('#global-body');
   const fields = [
-    { key:'webinar', label:'ウェビナー予約数（全体）',   hint:'ウェビナーの総予約目標数' },
-    { key:'views',   label:'ウェビナー視聴者数（全体）', hint:'視聴者の総目標数' },
-    { key:'line',    label:'LINE 登録者数（全体）',       hint:'LINEへの総登録目標数' },
-    { key:'survey',  label:'アンケート回答者数（全体）', hint:'アンケートの総回答目標数' },
-    { key:'meet',    label:'面談確定者数（全体）',         hint:'面談確定の総目標数' },
+    { key:'note_view',   label:'ビジネスモデルnote視聴（全体）',     hint:'BMnote視聴の総目標数' },
+    { key:'line_tanaka', label:'LINE登録・田中note視聴（全体）',      hint:'田中note経由LINE登録の総目標数' },
+    { key:'webinar',     label:'ウェビナー予約数（全体）',            hint:'ウェビナーの総予約目標数' },
+    { key:'views',       label:'ウェビナー視聴者数（全体）',          hint:'視聴者の総目標数' },
+    { key:'line',        label:'LINE 登録者数（全体）',               hint:'LINEへの総登録目標数' },
+    { key:'survey',      label:'アンケート回答者数（全体）',          hint:'アンケートの総回答目標数' },
+    { key:'meet',        label:'面談確定者数（全体）',                 hint:'面談確定の総目標数' },
   ];
   fields.forEach(f => {
     const hist = getHistory(g[f.key]);
@@ -556,10 +561,12 @@ function buildDayCard(date) {
   const mrow = document.createElement('div');
   mrow.className = 'metrics-row';
   const metricFields = [
-    { field:'reservation', label:'ウェビナー予約数', cls:'' },
-    { field:'__views',     label:'ウェビナー視聴数', cls:'views-btn' },
-    { field:'line',        label:'LINE 登録者数', cls:'' },
-    { field:'survey',      label:'アンケート回答', cls:'' },
+    { field:'note_view',   label:'BMビジネスモデルnote視聴', cls:'' },
+    { field:'line_tanaka', label:'LINE登録（田中note視聴）',  cls:'' },
+    { field:'reservation', label:'ウェビナー予約数',           cls:'' },
+    { field:'__views',     label:'ウェビナー視聴数',           cls:'views-btn' },
+    { field:'line',        label:'LINE 登録者数',              cls:'' },
+    { field:'survey',      label:'アンケート回答',             cls:'' },
   ];
   metricFields.forEach(mf => {
     const box = document.createElement('div');
