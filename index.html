@@ -267,6 +267,56 @@
 let db = (() => { try { return JSON.parse(localStorage.getItem('funnel_v6')||'{}'); } catch { return {}; } })();
 function persist() { localStorage.setItem('funnel_v6', JSON.stringify(db)); }
 
+// ── 初期シードデータ（LINEメッセージより） ──
+(function seedInitialData() {
+  const hasData = Object.keys(db).some(k => !k.startsWith('__'));
+  if (hasData) return; // すでにデータあり → スキップ
+  const ts319  = new Date('2026-03-20T01:17:00+09:00').getTime(); // 3/19ウェビナー 最終報告
+  const ts320a = new Date('2026-03-21T00:37:00+09:00').getTime(); // 3/20ウェビナー 第1報
+  const ts320b = new Date('2026-03-21T01:48:00+09:00').getTime(); // 3/20ウェビナー 最終報
+  const e1 = (v, ts) => [{v: String(v), ts}];
+  const e2 = (v2, ts2, v1, ts1) => [{v: String(v2), ts: ts2}, {v: String(v1), ts: ts1}];
+
+  db.__global = {
+    webinar: e1(585, ts319),
+    views: [], line: [], survey: [], meet: []
+  };
+
+  // 3/19 ウェビナーデータ
+  db['2026/03/19'] = {
+    views_entries: [],
+    reservation: [], line: e1(43, ts319), survey: e1(38, ts319),
+    pass_total: e1(36, ts319), pass_plus: e1(17, ts319), pass_add: e1(19, ts319), pass_fail: e1(2, ts319),
+    meet_total: e1(30, ts319), meet_plus: [], meet_add: [], meet_fail: [],
+    apply_all: [], apply_done: [],
+    rem_total: [], rem_plus: [], rem_add: [], rem_fail: []
+  };
+
+  // 3/20 ウェビナーデータ（2回分の履歴あり）
+  db['2026/03/20'] = {
+    views_entries: [
+      {time_start:'00:30', time_end:'', count:'39'},
+      {time_start:'00:36', time_end:'', count:'46'},
+      {time_start:'01:42', time_end:'', count:'60'}
+    ],
+    reservation: e1(143, ts320a),
+    line:        e2(46, ts320b, 36, ts320a),
+    survey:      e2(38, ts320b, 28, ts320a),
+    pass_total:  e2(38, ts320b, 28, ts320a),
+    pass_plus:   e2(22, ts320b, 18, ts320a),
+    pass_add:    e2(16, ts320b, 10, ts320a),
+    pass_fail:   e1(3,  ts320b),
+    meet_total:  e2(26, ts320b, 17, ts320a),
+    meet_plus:   e2(17, ts320b, 11, ts320a),
+    meet_add:    e2(9,  ts320b,  6, ts320a),
+    meet_fail:   [],
+    apply_all: [], apply_done: [],
+    rem_total: [], rem_plus: [], rem_add: [], rem_fail: []
+  };
+
+  persist();
+})();
+
 // History helpers
 // Each field stores: [{v: "50", ts: 1234567890}, ...] newest first
 function getLatest(data) {
