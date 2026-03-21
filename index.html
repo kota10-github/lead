@@ -390,24 +390,27 @@ function viewsSum() {
 // ═══════════════════════════════════
 function renderKPI() {
   const g = getGlobal();
+  const vs = viewsSum();
   const kpis = [
-    { label:'ウェビナー予約', total: parseInt(getLatest(g.webinar))||0, done: dailySum('reservation') },
-    { label:'ウェビナー視聴', total: parseInt(getLatest(g.views))||0,   done: viewsSum() },
-    { label:'LINE 登録',      total: parseInt(getLatest(g.line))||0,    done: dailySum('line') },
-    { label:'アンケート回答', total: parseInt(getLatest(g.survey))||0,  done: dailySum('survey') },
-    { label:'面談確定',       total: parseInt(getLatest(g.meet))||0,    done: dailySum('meet_total') },
+    { label:'ウェビナー予約', total: parseInt(getLatest(g.webinar))||0, done: dailySum('reservation'), viewsMode: false },
+    { label:'ウェビナー視聴', total: vs,                                 done: vs,                      viewsMode: true  },
+    { label:'LINE 登録',      total: parseInt(getLatest(g.line))||0,    done: dailySum('line'),         viewsMode: false },
+    { label:'アンケート回答', total: parseInt(getLatest(g.survey))||0,  done: dailySum('survey'),       viewsMode: false },
+    { label:'面談確定',       total: parseInt(getLatest(g.meet))||0,    done: dailySum('meet_total'),   viewsMode: false },
   ];
   document.getElementById('kpi-grid').innerHTML = kpis.map(k => {
-    const shoka = k.total ? Math.max(0, k.total - k.done) : '—';
+    const zansuu = k.viewsMode ? '—' : (k.total ? Math.max(0, k.total - k.done) : '—');
+    const shoka  = k.viewsMode ? '—' : k.done;
+    const zenTai = k.viewsMode ? (vs || '—') : (k.total || '—');
     return `
       <div class="kpi-card">
         <div class="kpi-title">${k.label}</div>
         <div class="kpi-nums">
-          <div class="kpi-num kpi-total"><span class="kpi-num-label">全体</span><span class="kpi-num-val">${k.total||'—'}</span></div>
+          <div class="kpi-num kpi-total"><span class="kpi-num-label">全体</span><span class="kpi-num-val">${zenTai}</span></div>
           <div class="kpi-divider"></div>
-          <div class="kpi-num kpi-actual"><span class="kpi-num-label">実績</span><span class="kpi-num-val">${k.done}</span></div>
+          <div class="kpi-num kpi-actual"><span class="kpi-num-label">消化</span><span class="kpi-num-val">${shoka}</span></div>
           <div class="kpi-divider"></div>
-          <div class="kpi-num kpi-done"><span class="kpi-num-label">消化</span><span class="kpi-num-val">${shoka}</span></div>
+          <div class="kpi-num kpi-done"><span class="kpi-num-label">残数</span><span class="kpi-num-val">${zansuu}</span></div>
         </div>
       </div>`;
   }).join('');
