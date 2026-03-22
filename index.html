@@ -254,6 +254,19 @@
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+    /* ─── SYNC ─── */
+    .sync-btn { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--white); color: var(--sub); font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; flex-shrink: 0; }
+    .sync-btn:hover { color: var(--text); background: var(--bg); }
+    .sync-tabs { display: flex; gap: 0; border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 14px; }
+    .sync-tab { flex: 1; padding: 8px 0; text-align: center; font-size: 12px; font-weight: 600; color: var(--sub); background: var(--bg); cursor: pointer; border: none; font-family: inherit; }
+    .sync-tab.active { background: var(--accent); color: white; }
+    .sync-panel { display: none; }
+    .sync-panel.active { display: block; }
+    .sync-code-area { width: 100%; height: 90px; font-size: 11px; font-family: monospace; border: 1.5px solid var(--border); border-radius: 8px; padding: 10px; resize: none; color: var(--sub); background: var(--bg); word-break: break-all; }
+    .sync-status { font-size: 12px; font-weight: 600; margin-top: 8px; min-height: 18px; }
+    .sync-status.ok { color: var(--green); }
+    .sync-status.err { color: var(--fail); }
   </style>
 </head>
 <body>
@@ -261,6 +274,7 @@
 <header class="top-header">
   <div class="logo">📊</div>
   <h1>なまいきくんエバー導線</h1>
+  <button class="sync-btn" onclick="openSyncModal()">↕ 同期</button>
 </header>
 
 <div class="kpi-bar">
@@ -276,6 +290,36 @@
 <div class="hist-popover" id="hist-popover">
   <div class="hist-popover-title" id="hist-popover-title">入力履歴</div>
   <div id="hist-popover-list"></div>
+</div>
+
+<!-- Sync Modal -->
+<div class="modal-overlay" id="sync-modal" onclick="handleSyncOverlay(event)">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-head">
+      <div><h2>データ同期</h2><p>PCとスマホの間でデータを同期します</p></div>
+      <button class="modal-close" onclick="closeSyncModal()">✕</button>
+    </div>
+    <div class="sync-tabs">
+      <button class="sync-tab active" onclick="switchSyncTab('export')">エクスポート</button>
+      <button class="sync-tab" onclick="switchSyncTab('import')">インポート</button>
+    </div>
+    <div id="sync-export-panel" class="sync-panel active">
+      <p style="font-size:12px;color:var(--sub);margin-bottom:10px">以下のコードをコピーして、別のデバイスに貼り付けてください。</p>
+      <textarea class="sync-code-area" id="sync-export-code" readonly></textarea>
+      <div class="action-bar" style="margin-top:10px">
+        <button class="btn btn-accent" style="flex:1;justify-content:center" onclick="copySyncCode()">コードをコピー</button>
+      </div>
+      <div class="sync-status" id="sync-export-status"></div>
+    </div>
+    <div id="sync-import-panel" class="sync-panel">
+      <p style="font-size:12px;color:var(--sub);margin-bottom:10px">他のデバイスのコードを貼り付けて「インポート」を押してください。<br><strong style="color:var(--fail)">注意: 現在のデータは上書きされます。</strong></p>
+      <textarea class="sync-code-area" id="sync-import-code" placeholder="ここにコードを貼り付け..."></textarea>
+      <div class="action-bar" style="margin-top:10px">
+        <button class="btn btn-green" style="flex:1;justify-content:center" onclick="doImport()">インポート</button>
+      </div>
+      <div class="sync-status" id="sync-import-status"></div>
+    </div>
+  </div>
 </div>
 
 <!-- Views Modal -->
@@ -799,6 +843,62 @@ function addRow() {
   const d=v.trim();
   if(!db.__extra.includes(d)&&!getBaseDates().includes(d)){db.__extra.push(d);persist();}
   renderTabs(); switchTab(d);
+}
+
+// ═══════════════════════════════════
+// SYNC (EXPORT / IMPORT)
+// ═══════════════════════════════════
+function exportSyncCode() {
+  const json = JSON.stringify(db);
+  const bytes = new TextEncoder().encode(json);
+  let binary = '';
+  bytes.forEach(b => { binary += String.fromCharCode(b); });
+  return btoa(binary);
+}
+function importSyncData(code) {
+  const bytes = Uint8Array.from(atob(code.trim()), c => c.charCodeAt(0));
+  const json = new TextDecoder().decode(bytes);
+  return JSON.parse(json);
+}
+function openSyncModal() {
+  document.getElementById('sync-export-code').value = exportSyncCode();
+  document.getElementById('sync-export-status').textContent = '';
+  document.getElementById('sync-import-status').textContent = '';
+  document.getElementById('sync-import-code').value = '';
+  switchSyncTab('export');
+  document.getElementById('sync-modal').classList.add('active');
+}
+function closeSyncModal() { document.getElementById('sync-modal').classList.remove('active'); }
+function handleSyncOverlay(e) { if(e.target===document.getElementById('sync-modal')) closeSyncModal(); }
+function switchSyncTab(tab) {
+  document.querySelectorAll('.sync-tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='export')||(i===1&&tab==='import')));
+  document.getElementById('sync-export-panel').classList.toggle('active', tab==='export');
+  document.getElementById('sync-import-panel').classList.toggle('active', tab==='import');
+}
+function copySyncCode() {
+  const code = document.getElementById('sync-export-code').value;
+  const el = document.getElementById('sync-export-status');
+  navigator.clipboard.writeText(code).then(() => {
+    el.textContent = 'コピーしました！'; el.className = 'sync-status ok';
+  }).catch(() => {
+    document.getElementById('sync-export-code').select();
+    el.textContent = 'コードを手動で選択・コピーしてください'; el.className = 'sync-status err';
+  });
+}
+function doImport() {
+  const code = document.getElementById('sync-import-code').value.trim();
+  const el = document.getElementById('sync-import-status');
+  if (!code) { el.textContent = 'コードを貼り付けてください'; el.className = 'sync-status err'; return; }
+  try {
+    const data = importSyncData(code);
+    if (typeof data !== 'object' || data === null) throw new Error('invalid');
+    Object.keys(data).forEach(k => { db[k] = data[k]; });
+    persist();
+    el.textContent = 'インポート成功！'; el.className = 'sync-status ok';
+    setTimeout(() => { closeSyncModal(); renderKPI(); renderTabs(); renderContent(); }, 800);
+  } catch(e) {
+    el.textContent = 'コードが無効です。正しいコードを貼り付けてください'; el.className = 'sync-status err';
+  }
 }
 
 // ═══════════════════════════════════
