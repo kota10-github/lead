@@ -254,6 +254,34 @@
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+    /* ─── VIRAL QUOTE TABLE ─── */
+    .viral-card { background: var(--white); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .viral-head { padding: 12px 18px; background: #fafafa; border-bottom: 1px solid var(--border2); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .viral-head-title { font-size: 13px; font-weight: 700; color: var(--sub); }
+    .viral-tweet-ref { font-size: 11px; color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 3px 10px; }
+    .viral-tweet-ref a { color: var(--accent); text-decoration: none; }
+    .viral-tweet-ref a:hover { text-decoration: underline; }
+    .viral-body { padding: 18px; overflow-x: auto; }
+    .viral-table { width: 100%; border-collapse: collapse; min-width: 580px; }
+    .viral-table th, .viral-table td { padding: 7px 10px; border: 1px solid var(--border2); vertical-align: middle; }
+    .viral-table thead tr { background: #fafafa; }
+    .viral-table th { font-size: 10.5px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+    .viral-table tbody tr:hover { background: var(--bg); }
+    .vt-rank { width: 36px; text-align: center; font-size: 13px; font-weight: 700; color: var(--muted); }
+    .vt-rank-1 { color: #b45309; }
+    .vt-rank-2 { color: #6b7280; }
+    .vt-rank-3 { color: #92400e; }
+    .vt-account { min-width: 160px; }
+    .vt-link { min-width: 200px; }
+    .vt-num { width: 80px; text-align: center; }
+    .vt-input { background: transparent; border: none; outline: none; font-family: inherit; font-size: 12px; width: 100%; color: var(--text); padding: 2px 4px; border-radius: 4px; }
+    .vt-input:focus { background: var(--a-bg); box-shadow: inset 0 0 0 1.5px #a5b4fc; }
+    .vt-link-input { color: var(--accent); }
+    .vt-num-input { text-align: center; font-weight: 700; }
+    .vt-likes .vt-num-input { color: var(--fail); }
+    .vt-rts .vt-num-input { color: var(--green); }
+    .vt-note { font-size: 11px; color: var(--muted); margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -352,6 +380,13 @@ function persist() { localStorage.setItem('funnel_v6', JSON.stringify(db)); }
     rem_total: [], rem_plus: [], rem_add: [], rem_fail: []
   };
 
+  persist();
+})();
+
+// ── バズ引用TOP10 初期化 ──
+(function seedViralData() {
+  if (db.__viral) return;
+  db.__viral = { accounts: Array.from({length:10}, () => ({ handle:'', link:'', likes:'', rts:'' })) };
   persist();
 })();
 
@@ -467,6 +502,9 @@ function renderTabs() {
   const globalTab = mkEl('div', 'tab'+(activeTab==='__global'?' active':''), '全体入力');
   globalTab.onclick = () => switchTab('__global');
   bar.appendChild(globalTab);
+  const viralTab = mkEl('div', 'tab'+(activeTab==='__viral'?' active':''), 'バズ引用TOP10');
+  viralTab.onclick = () => switchTab('__viral');
+  bar.appendChild(viralTab);
   getAllDates().forEach(date => {
     const t = mkEl('div', 'tab'+(activeTab===date?' active':'')+(isToday(date)?' today-tab':''),
       fmtShort(date)+(isToday(date)?' ★':''));
@@ -489,7 +527,9 @@ function switchTab(tab) { activeTab=tab; renderTabs(); renderContent(); }
 function renderContent() {
   const el = document.getElementById('content');
   el.innerHTML = '';
-  el.appendChild(activeTab==='__global' ? buildGlobalCard() : buildDayCard(activeTab));
+  if (activeTab === '__global') el.appendChild(buildGlobalCard());
+  else if (activeTab === '__viral') el.appendChild(buildViralCard());
+  else el.appendChild(buildDayCard(activeTab));
 }
 
 // ═══════════════════════════════════
@@ -787,6 +827,72 @@ function saveModal() {
   getRow(currentDate).views_entries=JSON.parse(JSON.stringify(tempEntries));
   persist(); closeModal(); renderContent(); renderKPI();
 }
+
+// ═══════════════════════════════════
+// VIRAL QUOTE TOP10 CARD
+// ═══════════════════════════════════
+const VIRAL_TWEET_URL = 'https://x.com/1namaiki/status/2033875280402780304';
+
+function buildViralCard() {
+  const v = db.__viral;
+  const card = document.createElement('div');
+  card.className = 'viral-card';
+  card.innerHTML = `
+    <div class="viral-head">
+      <span class="viral-head-title">バズ引用 TOP10</span>
+      <span class="viral-tweet-ref">元ポスト: <a href="${VIRAL_TWEET_URL}" target="_blank" rel="noopener">${VIRAL_TWEET_URL}</a></span>
+    </div>
+    <div class="viral-body">
+      <table class="viral-table">
+        <thead>
+          <tr>
+            <th style="width:36px;text-align:center">#</th>
+            <th class="vt-account">アカウント (@ハンドル)</th>
+            <th class="vt-link">引用ポストリンク</th>
+            <th class="vt-num vt-likes" style="color:var(--fail)">❤ いいね</th>
+            <th class="vt-num vt-rts" style="color:var(--green)">🔁 RT</th>
+          </tr>
+        </thead>
+        <tbody id="viral-tbody"></tbody>
+      </table>
+      <div class="vt-note">※ セルをクリックして直接入力できます。入力は自動保存されます。</div>
+    </div>
+  `;
+
+  const tbody = card.querySelector('#viral-tbody');
+  const rankLabels = ['🥇','🥈','🥉','4','5','6','7','8','9','10'];
+  const rankClass  = ['vt-rank-1','vt-rank-2','vt-rank-3','','','','','','',''];
+
+  v.accounts.forEach((acc, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="vt-rank ${rankClass[i]}">${rankLabels[i]}</td>
+      <td class="vt-account"><input class="vt-input" type="text" placeholder="@username" value="${esc(acc.handle)}" data-idx="${i}" data-key="handle"></td>
+      <td class="vt-link"><input class="vt-input vt-link-input" type="text" placeholder="https://x.com/..." value="${esc(acc.link)}" data-idx="${i}" data-key="link"></td>
+      <td class="vt-num vt-likes"><input class="vt-input vt-num-input" type="number" min="0" placeholder="0" value="${esc(acc.likes)}" data-idx="${i}" data-key="likes"></td>
+      <td class="vt-num vt-rts"><input class="vt-input vt-num-input" type="number" min="0" placeholder="0" value="${esc(acc.rts)}" data-idx="${i}" data-key="rts"></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('.vt-input').forEach(inp => {
+    inp.addEventListener('change', () => {
+      v.accounts[+inp.dataset.idx][inp.dataset.key] = inp.value.trim();
+      persist();
+    });
+    // linkをクリックできるように
+    if (inp.classList.contains('vt-link-input')) {
+      inp.addEventListener('dblclick', () => {
+        const url = inp.value.trim();
+        if (url.startsWith('http')) window.open(url, '_blank', 'noopener');
+      });
+    }
+  });
+
+  return card;
+}
+
+function esc(s) { return (s||'').replace(/"/g,'&quot;'); }
 
 // ═══════════════════════════════════
 // ROW MANAGEMENT
