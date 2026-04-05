@@ -254,6 +254,32 @@
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+    /* ─── SCORE PAGE ─── */
+    .score-page { background: var(--white); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+    .score-head { font-size: 15px; font-weight: 700; padding: 16px 20px; border-bottom: 1px solid var(--border); background: var(--bg); }
+    .score-body { padding: 20px; }
+    .score-textarea { width: 100%; min-height: 120px; max-height: 300px; border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 11px; font-family: 'Inter','Noto Sans JP',monospace; color: var(--text); resize: vertical; background: var(--bg); }
+    .score-textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,70,229,0.1); }
+    .score-textarea::placeholder { color: var(--muted); }
+    .score-actions { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+    .score-btn { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 8px 20px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .score-btn:hover { opacity: 0.9; }
+    .score-msg { font-size: 11px; color: var(--sub); }
+    .score-params { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin: 16px 0; }
+    .score-param { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+    .score-param-label { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 4px; }
+    .score-param-val { font-size: 16px; font-weight: 700; color: var(--text); }
+    .score-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12px; }
+    .score-table th { background: var(--bg); border: 1px solid var(--border); padding: 8px 10px; font-weight: 600; color: var(--sub); text-align: left; font-size: 11px; white-space: nowrap; }
+    .score-table td { border: 1px solid var(--border); padding: 8px 10px; }
+    .score-table tr:hover td { background: #fafbfc; }
+    .score-val { font-weight: 700; font-size: 14px; }
+    .score-good { color: var(--green); }
+    .score-bad { color: var(--fail); }
+    .score-money { text-align: right; font-variant-numeric: tabular-nums; }
+    .score-num { text-align: center; }
+    .score-rank { text-align: center; font-weight: 700; color: var(--accent); }
   </style>
 </head>
 <body>
@@ -304,6 +330,8 @@
 // ═══════════════════════════════════
 let db = (() => { try { return JSON.parse(localStorage.getItem('funnel_v6')||'{}'); } catch { return {}; } })();
 function persist() { localStorage.setItem('funnel_v6', JSON.stringify(db)); }
+function loadScoreTSV() { return localStorage.getItem('sales_score_tsv') || ''; }
+function saveScoreTSV(text) { localStorage.setItem('sales_score_tsv', text); }
 
 // ── 初期シードデータ（LINEメッセージより） ──
 (function seedInitialData() {
@@ -467,6 +495,9 @@ function renderTabs() {
   const globalTab = mkEl('div', 'tab'+(activeTab==='__global'?' active':''), '全体入力');
   globalTab.onclick = () => switchTab('__global');
   bar.appendChild(globalTab);
+  const scoreTab = mkEl('div', 'tab'+(activeTab==='__score'?' active':''), '営業スコア');
+  scoreTab.onclick = () => switchTab('__score');
+  bar.appendChild(scoreTab);
   getAllDates().forEach(date => {
     const t = mkEl('div', 'tab'+(activeTab===date?' active':'')+(isToday(date)?' today-tab':''),
       fmtShort(date)+(isToday(date)?' ★':''));
@@ -489,7 +520,9 @@ function switchTab(tab) { activeTab=tab; renderTabs(); renderContent(); }
 function renderContent() {
   const el = document.getElementById('content');
   el.innerHTML = '';
-  el.appendChild(activeTab==='__global' ? buildGlobalCard() : buildDayCard(activeTab));
+  if (activeTab === '__global') el.appendChild(buildGlobalCard());
+  else if (activeTab === '__score') el.appendChild(buildScorePage());
+  else el.appendChild(buildDayCard(activeTab));
 }
 
 // ═══════════════════════════════════
@@ -537,6 +570,143 @@ function buildGlobalCard() {
     if (hb) hb.addEventListener('click', e => { e.stopPropagation(); showHistPopover(e.target, hist, f.label); });
   });
   return card;
+}
+
+// ═══════════════════════════════════
+// SALES SCORE PAGE
+// ═══════════════════════════════════
+function buildScorePage() {
+  const page = document.createElement('div');
+  page.className = 'score-page';
+  page.innerHTML = `
+    <div class="score-head">営業スコア計算</div>
+    <div class="score-body">
+      <textarea class="score-textarea" id="score-tsv" placeholder="TSVデータを貼り付け（面談日 LINE登録名 姓 名 見込み度スコア 提携先 アフィリエイター 営業担当者 面談ステータス 成約金額 決済金額）"></textarea>
+      <div class="score-actions">
+        <button class="score-btn" id="score-calc-btn">計算</button>
+        <span class="score-msg" id="score-msg"></span>
+      </div>
+      <div id="score-results"></div>
+    </div>`;
+  const ta = page.querySelector('#score-tsv');
+  ta.value = loadScoreTSV();
+  ta.addEventListener('input', () => saveScoreTSV(ta.value));
+  page.querySelector('#score-calc-btn').addEventListener('click', () => {
+    saveScoreTSV(ta.value);
+    const rows = parseScoreTSV(ta.value);
+    if (!rows.length) {
+      page.querySelector('#score-msg').textContent = 'データが見つかりません';
+      page.querySelector('#score-results').innerHTML = '';
+      return;
+    }
+    const { results, params } = calcSalesScores(rows);
+    page.querySelector('#score-msg').textContent = `${rows.length}件の案件から${results.length}名のスコアを算出`;
+    renderScoreResults(page.querySelector('#score-results'), results, params);
+  });
+  // auto-calculate if data exists
+  if (ta.value.trim()) {
+    setTimeout(() => page.querySelector('#score-calc-btn').click(), 0);
+  }
+  return page;
+}
+
+function parseScoreTSV(text) {
+  const lines = text.trim().split(/\r?\n/).map(l => l.split('\t'));
+  if (lines.length < 2) return [];
+  // Detect header row: find index of line containing '営業担当者'
+  let headerIdx = 0;
+  for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    if (lines[i].some(c => c.includes('営業担当者'))) { headerIdx = i; break; }
+  }
+  // There may be multiple header rows in the pasted data; collect all data rows
+  const excludeStatuses = ['面談キャンセル', '未着席', 'システムエラーリスケ'];
+  const rows = [];
+  for (let i = 0; i < lines.length; i++) {
+    const cols = lines[i];
+    // Skip header-like rows
+    if (cols.some(c => c.includes('営業担当者') || c.includes('面談ステータス'))) continue;
+    if (cols.length < 9) continue;
+    const salesperson = (cols[7] || '').trim();
+    if (!salesperson) continue;
+    const status = (cols[8] || '').trim();
+    if (excludeStatuses.includes(status)) continue;
+    const payment = parseInt((cols[10] || '').replace(/[^0-9]/g, '')) || 0;
+    const contractAmt = parseInt((cols[9] || '').replace(/[^0-9]/g, '')) || 0;
+    const prospect = cols[4] !== undefined && cols[4].trim() !== '' ? parseInt(cols[4]) : 0;
+    if (isNaN(prospect)) continue;
+    // Exclude test data
+    if (payment === 7777777 || contractAmt === 7777777) continue;
+    if (salesperson === 'たくと') continue;
+    // For クーリングオフ, treat payment as 0
+    const effectivePayment = (status === 'クーリングオフ' || status === '入会拒否') ? 0 : payment;
+    rows.push({ salesperson, prospect, payment: effectivePayment, status, contractAmt });
+  }
+  return rows;
+}
+
+function calcSalesScores(rows) {
+  const beta = 0.3;
+  // Compute Base via calibration: Base = total_payment / sum(exp(beta*l))
+  const totalPayment = rows.reduce((s, r) => s + r.payment, 0);
+  const sumExp = rows.reduce((s, r) => s + Math.exp(beta * r.prospect), 0);
+  const base = sumExp > 0 ? totalPayment / sumExp : 0;
+  // mu: overall average payment per case
+  const mu = rows.length > 0 ? totalPayment / rows.length : 0;
+  // alpha: CV-based approach
+  const variance = rows.reduce((s, r) => s + Math.pow(r.payment - mu, 2), 0) / Math.max(rows.length - 1, 1);
+  const sigma = Math.sqrt(variance);
+  const cv = mu > 0 ? sigma / mu : 1;
+  let alpha = Math.ceil(Math.pow(cv / 0.1, 2));
+  alpha = Math.max(5, Math.min(20, alpha));
+
+  // Group by salesperson
+  const groups = {};
+  rows.forEach(r => {
+    if (!groups[r.salesperson]) groups[r.salesperson] = [];
+    groups[r.salesperson].push(r);
+  });
+
+  const results = Object.entries(groups).map(([name, cases]) => {
+    const n = cases.length;
+    const actualCollection = cases.reduce((s, r) => s + r.payment, 0);
+    const expectedCollection = cases.reduce((s, r) => s + base * Math.exp(beta * r.prospect), 0);
+    // Bayesian correction
+    const correctedActual = ((actualCollection + alpha * mu) / (n + alpha)) * n;
+    const score = expectedCollection > 0 ? 100 * correctedActual / expectedCollection : 0;
+    const avgPrice = n > 0 ? actualCollection / n : 0;
+    return { name, score: Math.round(score * 10) / 10, actualCollection, correctedActual: Math.round(correctedActual), expectedCollection: Math.round(expectedCollection), n, avgPrice: Math.round(avgPrice) };
+  });
+  results.sort((a, b) => b.score - a.score);
+  return { results, params: { base: Math.round(base), beta, mu: Math.round(mu), alpha } };
+}
+
+function renderScoreResults(container, results, params) {
+  const fmtMoney = v => v.toLocaleString('ja-JP');
+  let html = `<div class="score-params">
+    <div class="score-param"><div class="score-param-label">Base（基準単価）</div><div class="score-param-val">¥${fmtMoney(params.base)}</div></div>
+    <div class="score-param"><div class="score-param-label">β（傾き係数）</div><div class="score-param-val">${params.beta}</div></div>
+    <div class="score-param"><div class="score-param-label">μ（全体平均単価）</div><div class="score-param-val">¥${fmtMoney(params.mu)}</div></div>
+    <div class="score-param"><div class="score-param-label">α（収束件数）</div><div class="score-param-val">${params.alpha}</div></div>
+  </div>
+  <table class="score-table">
+    <thead><tr>
+      <th>#</th><th>営業担当者</th><th>営業スコア</th><th>実回収</th><th>補正実回収</th><th>期待回収</th><th>案件数</th><th>平均単価</th>
+    </tr></thead><tbody>`;
+  results.forEach((r, i) => {
+    const cls = r.score >= 100 ? 'score-good' : 'score-bad';
+    html += `<tr>
+      <td class="score-rank">${i + 1}</td>
+      <td>${r.name}</td>
+      <td class="score-val ${cls}">${r.score.toFixed(1)}</td>
+      <td class="score-money">¥${fmtMoney(r.actualCollection)}</td>
+      <td class="score-money">¥${fmtMoney(r.correctedActual)}</td>
+      <td class="score-money">¥${fmtMoney(r.expectedCollection)}</td>
+      <td class="score-num">${r.n}</td>
+      <td class="score-money">¥${fmtMoney(r.avgPrice)}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
 }
 
 // ═══════════════════════════════════
