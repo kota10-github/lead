@@ -36,6 +36,17 @@
     .logo { width: 30px; height: 30px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
     .top-header h1 { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
     .header-badge { margin-left: auto; font-size: 11px; font-weight: 500; color: var(--sub); background: var(--bg); border: 1px solid var(--border); padding: 3px 10px; border-radius: 100px; }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .btn-threads { font-size: 11px; font-weight: 600; color: var(--white); background: var(--accent); border: none; padding: 5px 12px; border-radius: 100px; cursor: pointer; transition: opacity 0.15s; }
+    .btn-threads:hover { opacity: 0.85; }
+    .btn-threads:disabled { opacity: 0.5; cursor: not-allowed; }
+    .threads-status { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .threads-status.connected { background: #22c55e; }
+    .threads-status.disconnected { background: var(--muted); }
+    .toast { position: fixed; bottom: 20px; right: 20px; padding: 10px 18px; border-radius: 8px; font-size: 12px; font-weight: 600; color: var(--white); z-index: 9999; opacity: 0; transform: translateY(10px); transition: all 0.3s; pointer-events: none; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { background: #22c55e; }
+    .toast.error { background: #ef4444; }
 
     /* ─── KPI BAR ─── */
     .kpi-bar { background: var(--white); border-bottom: 1px solid var(--border); padding: 8px 16px; position: sticky; top: 52px; z-index: 90; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
@@ -261,7 +272,12 @@
 <header class="top-header">
   <div class="logo">📊</div>
   <h1>なまいきくんエバー導線</h1>
+  <div class="header-right">
+    <div class="threads-status disconnected" id="threads-status" title="Threads未連携"></div>
+    <button class="btn-threads" id="btn-threads" onclick="postToThreads()">📤 Threadsに投稿</button>
+  </div>
 </header>
+<div class="toast" id="toast"></div>
 
 <div class="kpi-bar">
   <div class="kpi-grid" id="kpi-grid"></div>
@@ -802,6 +818,72 @@ function addRow() {
 }
 
 // ═══════════════════════════════════
+// THREADS連携
+// ═══════════════════════════════════
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type + ' show';
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+async function checkThreadsStatus() {
+  try {
+    const res = await fetch('/api/threads/status');
+    const data = await res.json();
+    const dot = document.getElementById('threads-status');
+    if (data.connected) {
+      dot.className = 'threads-status connected';
+      dot.title = `Threads連携済（残${data.days_left}日）`;
+    } else {
+      dot.className = 'threads-status disconnected';
+      dot.title = 'Threads未連携';
+    }
+  } catch { /* ファイル直接開き時は無視 */ }
+}
+
+async function postToThreads() {
+  const btn = document.getElementById('btn-threads');
+  btn.disabled = true;
+  btn.textContent = '投稿中...';
+
+  try {
+    const g = getGlobal();
+    const vs = viewsSum();
+    const kpiData = {
+      kpis: [
+        { label: 'BM note視聴',        total: parseInt(getLatest(g.note_view))||0,   done: dailySum('note_view') },
+        { label: 'LINE登録(田中note)',  total: parseInt(getLatest(g.line_tanaka))||0, done: dailySum('line_tanaka') },
+        { label: 'ウェビナー予約',      total: parseInt(getLatest(g.webinar))||0,     done: dailySum('reservation') },
+        { label: 'ウェビナー視聴',      total: vs,                                    done: vs },
+        { label: 'LINE登録',            total: parseInt(getLatest(g.line))||0,        done: dailySum('line') },
+        { label: 'アンケート回答',      total: parseInt(getLatest(g.survey))||0,      done: dailySum('survey') },
+        { label: '面談確定',            total: parseInt(getLatest(g.meet))||0,        done: dailySum('meet_total') },
+      ],
+      timestamp: new Date().toLocaleString('ja-JP')
+    };
+
+    const res = await fetch('/api/threads/post', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kpiData }),
+    });
+    const result = await res.json();
+
+    if (result.success) {
+      showToast('Threadsに投稿しました！', 'success');
+    } else {
+      showToast(result.error || '投稿に失敗しました', 'error');
+    }
+  } catch (err) {
+    showToast('通信エラー: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📤 Threadsに投稿';
+  }
+}
+
+// ═══════════════════════════════════
 // INIT
 // ═══════════════════════════════════
 const allDates=getAllDates();
@@ -811,6 +893,7 @@ activeTab = allDates.includes(todayStr) ? todayStr : (allDates[0]||'__global');
 renderKPI();
 renderTabs();
 renderContent();
+checkThreadsStatus();
 </script>
 </body>
 </html>
