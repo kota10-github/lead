@@ -1,5 +1,5 @@
 {
   "rewrites": [
-    { "source": "/", "destination": "/manual.html" }
+    { "source": "/", "destination": "/bo-manual/index.html" }
   ]
 }
