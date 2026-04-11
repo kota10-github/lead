@@ -324,13 +324,25 @@
         ]},
       ],
       todos: [
-        { id: 1, title: '週次問い合わせレポート作成', type: 'routine', done: false, assignee: '田中太郎', dueDay: '毎週月曜' },
-        { id: 2, title: 'FAQ記事の更新確認', type: 'routine', done: false, assignee: '田中太郎', dueDay: '毎週金曜' },
-        { id: 3, title: '新規リードへの初回コンタクト', type: 'routine', done: false, assignee: '佐藤花子', dueDay: '毎日' },
-        { id: 4, title: 'CRM商談データの更新', type: 'routine', done: false, assignee: '鈴木一郎', dueDay: '毎日' },
-        { id: 5, title: 'エスカレーション対応フロー見直し', type: 'new', done: false, assignee: '田中太郎', dueDay: '2026-04-20' },
-        { id: 6, title: '営業資料のテンプレート刷新', type: 'new', done: false, assignee: '佐藤花子', dueDay: '2026-04-25' },
-        { id: 7, title: '顧客アンケートフォーム作成', type: 'new', done: false, assignee: '鈴木一郎', dueDay: '2026-04-30' },
+        { id: 1, type: 'category', title: '定例タスク', children: [
+          { id: 11, type: 'subcategory', title: 'カスタマーサポート', children: [
+            { id: 111, type: 'task', title: '週次問い合わせレポート作成', done: false, assignee: '田中太郎', dueDay: '毎週月曜' },
+            { id: 112, type: 'task', title: 'FAQ記事の更新確認', done: false, assignee: '田中太郎', dueDay: '毎週金曜' },
+          ]},
+          { id: 12, type: 'subcategory', title: '営業チーム', children: [
+            { id: 121, type: 'task', title: '新規リードへの初回コンタクト', done: false, assignee: '佐藤花子', dueDay: '毎日' },
+            { id: 122, type: 'task', title: 'CRM商談データの更新', done: false, assignee: '鈴木一郎', dueDay: '毎日' },
+          ]},
+        ]},
+        { id: 2, type: 'category', title: '新規タスク', children: [
+          { id: 21, type: 'subcategory', title: '改善施策', children: [
+            { id: 211, type: 'task', title: 'エスカレーション対応フロー見直し', done: false, assignee: '田中太郎', dueDay: '2026-04-20' },
+            { id: 212, type: 'task', title: '営業資料のテンプレート刷新', done: false, assignee: '佐藤花子', dueDay: '2026-04-25' },
+          ]},
+          { id: 22, type: 'subcategory', title: 'アンケート', children: [
+            { id: 221, type: 'task', title: '顧客アンケートフォーム作成', done: false, assignee: '鈴木一郎', dueDay: '2026-04-30' },
+          ]},
+        ]},
       ],
       nextUserId: 4,
       nextProjectId: 3,
@@ -346,6 +358,10 @@
       // Ensure new fields exist for existing users
       if (!data.goals) data.goals = DEFAULT_DATA.goals;
       if (!data.todos) data.todos = DEFAULT_DATA.todos;
+      // Migrate flat todo format to tree format
+      if (data.todos.length > 0 && data.todos[0] && !data.todos[0].type) {
+        data.todos = DEFAULT_DATA.todos;
+      }
       if (!data.nextGoalId) data.nextGoalId = 300;
       if (!data.nextTodoId) data.nextTodoId = 8;
     } catch {
@@ -877,57 +893,119 @@
       saveData(); toast('目的を削除しました'); render();
     }
 
-    // TODOS
-    let todoFilter = 'all';
+    // TODOS (Tree format)
     function renderTodos(el) {
-      let html = `<div class="page-header"><h1 class="page-title">ToDo管理</h1><button class="btn btn-primary" onclick="showAddTodoDialog()">${icons.plus} タスク追加</button></div>`;
-      html += `<div class="todo-filters">
-        <button class="todo-filter-btn ${todoFilter === 'all' ? 'active' : ''}" onclick="todoFilter='all';render()">すべて</button>
-        <button class="todo-filter-btn ${todoFilter === 'routine' ? 'active' : ''}" onclick="todoFilter='routine';render()">定例タスク</button>
-        <button class="todo-filter-btn ${todoFilter === 'new' ? 'active' : ''}" onclick="todoFilter='new';render()">新規タスク</button>
-        <button class="todo-filter-btn ${todoFilter === 'done' ? 'active' : ''}" onclick="todoFilter='done';render()">完了済み</button>
-        <button class="todo-filter-btn ${todoFilter === 'undone' ? 'active' : ''}" onclick="todoFilter='undone';render()">未完了</button>
-      </div>`;
-      let filtered = data.todos || [];
-      if (todoFilter === 'routine') filtered = filtered.filter(t => t.type === 'routine');
-      else if (todoFilter === 'new') filtered = filtered.filter(t => t.type === 'new');
-      else if (todoFilter === 'done') filtered = filtered.filter(t => t.done);
-      else if (todoFilter === 'undone') filtered = filtered.filter(t => !t.done);
-
-      if (filtered.length === 0) {
-        html += `<div class="empty"><p>該当するタスクがありません</p></div>`;
+      let html = `<div class="page-header"><h1 class="page-title">ToDo管理</h1><button class="btn btn-primary" onclick="showAddTodoCategoryDialog()">${icons.plus} カテゴリ追加</button></div>`;
+      if (!data.todos || data.todos.length === 0) {
+        html += `<div class="empty"><p>ToDoがまだ登録されていません</p></div>`;
       } else {
-        filtered.forEach(t => {
-          html += `<div class="todo-item ${t.done ? 'done' : ''}">
-            <div class="todo-checkbox ${t.done ? 'checked' : ''}" onclick="toggleTodo(${t.id})">${t.done ? icons.check : ''}</div>
-            <div style="flex:1;min-width:0">
-              <div class="todo-title">${escapeHtml(t.title)}</div>
-              <div class="todo-meta">
-                <span class="todo-badge ${t.type === 'routine' ? 'todo-badge-routine' : 'todo-badge-new'}">${t.type === 'routine' ? '定例' : '新規'}</span>
-                <span>${icons.users} ${escapeHtml(t.assignee || '未割当')}</span>
-                <span>${icons.clock} ${escapeHtml(t.dueDay || '期限なし')}</span>
-              </div>
-            </div>
-            <button class="btn btn-ghost btn-icon btn-sm" style="color:var(--destructive)" onclick="deleteTodo(${t.id})" title="削除">${icons.trash}</button>
-          </div>`;
+        html += `<div class="goal-tree">`;
+        data.todos.forEach(cat => {
+          const totalTasks = (cat.children || []).reduce((s, sub) => s + (sub.children || []).length, 0);
+          const doneTasks = (cat.children || []).reduce((s, sub) => s + (sub.children || []).filter(t => t.done).length, 0);
+          html += `<div class="goal-large">
+            <div class="goal-large-title">${icons.target} ${escapeHtml(cat.title)} <span class="badge badge-secondary" style="margin-left:4px">${doneTasks}/${totalTasks}</span>
+              <button class="btn btn-ghost btn-icon btn-sm" style="color:var(--destructive);margin-left:4px" onclick="deleteTodoNode(${cat.id},'category')" title="削除">${icons.trash}</button>
+              <button class="btn btn-ghost btn-icon btn-sm" onclick="showAddTodoSubcategoryDialog(${cat.id})" title="サブカテゴリ追加">${icons.plus}</button>
+            </div>`;
+          if (cat.children && cat.children.length > 0) {
+            cat.children.forEach(sub => {
+              const subDone = (sub.children || []).filter(t => t.done).length;
+              const subTotal = (sub.children || []).length;
+              html += `<div class="goal-mid">
+                <div class="goal-mid-title">${escapeHtml(sub.title)} <span class="badge badge-outline" style="margin-left:4px">${subDone}/${subTotal}</span>
+                  <button class="btn btn-ghost btn-icon btn-sm" style="color:var(--destructive)" onclick="deleteTodoNode(${sub.id},'subcategory',${cat.id})" title="削除">${icons.trash}</button>
+                  <button class="btn btn-ghost btn-icon btn-sm" onclick="showAddTodoTaskDialog(${cat.id},${sub.id})" title="タスク追加">${icons.plus}</button>
+                </div>`;
+              if (sub.children && sub.children.length > 0) {
+                sub.children.forEach(task => {
+                  html += `<div class="goal-small">
+                    <div class="todo-item" style="margin:0;border:none;padding:4px 0">
+                      <div class="todo-checkbox ${task.done ? 'checked' : ''}" onclick="toggleTodoTree(${cat.id},${sub.id},${task.id})">${task.done ? icons.check : ''}</div>
+                      <div style="flex:1;min-width:0">
+                        <div class="todo-title" style="${task.done ? 'text-decoration:line-through;opacity:.5' : ''}">${escapeHtml(task.title)}</div>
+                        <div class="todo-meta">
+                          <span>${icons.users} ${escapeHtml(task.assignee || '未割当')}</span>
+                          <span>${icons.clock} ${escapeHtml(task.dueDay || '期限なし')}</span>
+                        </div>
+                      </div>
+                      <button class="btn btn-ghost btn-icon btn-sm" style="color:var(--destructive)" onclick="deleteTodoNode(${task.id},'task',${cat.id},${sub.id})" title="削除">${icons.trash}</button>
+                    </div>
+                  </div>`;
+                });
+              }
+              html += `</div>`;
+            });
+          }
+          html += `</div>`;
         });
+        html += `</div>`;
       }
       el.innerHTML = html;
     }
 
-    function toggleTodo(id) {
-      const t = (data.todos || []).find(t => t.id === id);
-      if (t) { t.done = !t.done; saveData(); render(); }
+    function toggleTodoTree(catId, subId, taskId) {
+      const cat = (data.todos || []).find(c => c.id === catId);
+      if (cat) {
+        const sub = (cat.children || []).find(s => s.id === subId);
+        if (sub) {
+          const task = (sub.children || []).find(t => t.id === taskId);
+          if (task) { task.done = !task.done; saveData(); render(); }
+        }
+      }
     }
-    function deleteTodo(id) {
-      data.todos = (data.todos || []).filter(t => t.id !== id);
-      saveData(); toast('タスクを削除しました'); render();
+
+    function deleteTodoNode(id, type, parentCatId, parentSubId) {
+      if (type === 'category') {
+        data.todos = (data.todos || []).filter(c => c.id !== id);
+      } else if (type === 'subcategory') {
+        const cat = (data.todos || []).find(c => c.id === parentCatId);
+        if (cat) cat.children = (cat.children || []).filter(s => s.id !== id);
+      } else if (type === 'task') {
+        const cat = (data.todos || []).find(c => c.id === parentCatId);
+        if (cat) {
+          const sub = (cat.children || []).find(s => s.id === parentSubId);
+          if (sub) sub.children = (sub.children || []).filter(t => t.id !== id);
+        }
+      }
+      saveData(); toast('削除しました'); render();
     }
-    function showAddTodoDialog() {
+
+    function showAddTodoCategoryDialog() {
+      showModal('カテゴリを追加',
+        `<div class="form-group"><label class="label">カテゴリ名</label><input class="input" id="d-todo-cat" placeholder="カテゴリ名を入力"></div>`,
+        [
+          { label: 'キャンセル', onClick: o => o.remove() },
+          { label: '追加', class: 'btn btn-primary', onClick: o => {
+            const title = document.getElementById('d-todo-cat').value.trim();
+            if (!title) { toast('カテゴリ名を入力してください'); return; }
+            data.todos.push({ id: data.nextTodoId++, type: 'category', title, children: [] });
+            saveData(); toast('カテゴリを追加しました'); o.remove(); render();
+          }}
+        ]
+      );
+    }
+
+    function showAddTodoSubcategoryDialog(catId) {
+      showModal('サブカテゴリを追加',
+        `<div class="form-group"><label class="label">サブカテゴリ名</label><input class="input" id="d-todo-sub" placeholder="サブカテゴリ名を入力"></div>`,
+        [
+          { label: 'キャンセル', onClick: o => o.remove() },
+          { label: '追加', class: 'btn btn-primary', onClick: o => {
+            const title = document.getElementById('d-todo-sub').value.trim();
+            if (!title) { toast('サブカテゴリ名を入力してください'); return; }
+            const cat = data.todos.find(c => c.id === catId);
+            if (cat) { if (!cat.children) cat.children = []; cat.children.push({ id: data.nextTodoId++, type: 'subcategory', title, children: [] }); }
+            saveData(); toast('サブカテゴリを追加しました'); o.remove(); render();
+          }}
+        ]
+      );
+    }
+
+    function showAddTodoTaskDialog(catId, subId) {
       let assigneeOpts = data.users.map(u => `<option value="${escapeHtml(u.name)}">${escapeHtml(u.name)}</option>`).join('');
       showModal('タスクを追加',
         `<div class="form-group"><label class="label">タスク名</label><input class="input" id="d-todo-title" placeholder="タスク名を入力"></div>
-        <div class="form-group"><label class="label">種別</label><select class="select" id="d-todo-type" style="width:100%"><option value="new">新規タスク</option><option value="routine">定例タスク</option></select></div>
         <div class="form-group"><label class="label">担当者</label><select class="select" id="d-todo-assignee" style="width:100%"><option value="">未割当</option>${assigneeOpts}</select></div>
         <div class="form-group"><label class="label">期限</label><input class="input" id="d-todo-due" placeholder="例: 毎週月曜 / 2026-04-30"></div>`,
         [
@@ -935,10 +1013,13 @@
           { label: '追加', class: 'btn btn-primary', onClick: o => {
             const title = document.getElementById('d-todo-title').value.trim();
             if (!title) { toast('タスク名を入力してください'); return; }
-            const type = document.getElementById('d-todo-type').value;
             const assignee = document.getElementById('d-todo-assignee').value;
             const dueDay = document.getElementById('d-todo-due').value.trim();
-            data.todos.push({ id: data.nextTodoId++, title, type, done: false, assignee, dueDay });
+            const cat = data.todos.find(c => c.id === catId);
+            if (cat) {
+              const sub = (cat.children || []).find(s => s.id === subId);
+              if (sub) { if (!sub.children) sub.children = []; sub.children.push({ id: data.nextTodoId++, type: 'task', title, done: false, assignee, dueDay }); }
+            }
             saveData(); toast('タスクを追加しました'); o.remove(); render();
           }}
         ]
