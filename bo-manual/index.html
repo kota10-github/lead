@@ -205,7 +205,19 @@
     .todo-badge{padding:1px 8px;border-radius:999px;font-size:10px;font-weight:500}
     .todo-badge-routine{background:#dbeafe;color:#1e40af}
     .todo-badge-new{background:#fef3c7;color:#92400e}
-    .hidden{display:none!important}
+    .todo-action-popup{position:absolute;top:100%;left:0;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,.12);z-index:50;display:flex;gap:2px;padding:4px;margin-top:4px;animation:fadeIn .15s}
+.todo-action-btn{display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:4px;font-size:12px;font-weight:500;white-space:nowrap;transition:all .15s}
+.todo-action-btn:hover{background:var(--bg-muted)}
+.todo-action-btn.complete{color:#059669}
+.todo-action-btn.delete{color:var(--destructive)}
+.todo-node{position:relative;margin-left:24px;margin-top:6px;padding-left:20px}
+.todo-node::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--border)}
+.todo-node-title{font-size:13px;font-weight:600;padding:6px 10px;border-radius:var(--radius);display:inline-flex;align-items:center;gap:6px;margin-bottom:4px}
+.todo-node-depth0{background:var(--primary-light);color:var(--primary-fg);font-size:15px;font-weight:600}
+.todo-node-depth1{background:rgba(37,99,235,.06);color:var(--primary-fg)}
+.todo-node-depth2{border:1px solid var(--border);color:var(--fg-muted);font-size:12px}
+.todo-node-leaf{border:1px solid var(--border);color:var(--fg-muted);font-size:12px}
+.hidden{display:none!important}
     .fade-in{animation:fadeIn .2s}
     @keyframes fadeIn{from{opacity:0}to{opacity:1}}
     .truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -895,95 +907,269 @@
 
     // TODOS (Tree format - linked to Goals)
     function getGoalTitle(goalId) {
-      for (const g of (data.goals || [])) {
-        if (g.id === goalId) return g.title;
-        for (const m of (g.children || [])) {
-          if (m.id === goalId) return m.title;
-          for (const s of (m.children || [])) {
-            if (s.id === goalId) return s.title;
-          }
+      function search(nodes) {
+        for (const n of (nodes || [])) {
+          if (n.id === goalId) return n.title;
+          const found = search(n.children);
+          if (found) return found;
         }
+        return null;
       }
-      return '(目的未設定)';
+      return search(data.goals) || '(目的未設定)';
+    }
+
+    // Active action popup tracking
+    let activeActionPopup = null;
+
+    function closeActionPopup() {
+      if (activeActionPopup) {
+        const el = document.getElementById('action-popup-' + activeActionPopup);
+        if (el) el.remove();
+        activeActionPopup = null;
+      }
+    }
+
+    document.addEventListener('click', function(e) {
+      if (activeActionPopup && !e.target.closest('.todo-action-popup') && !e.target.closest('.todo-checkbox')) {
+        closeActionPopup();
+      }
+    });
+
+    function showActionPopup(nodeId, path) {
+      closeActionPopup();
+      activeActionPopup = nodeId;
+      const checkbox = document.querySelector('[data-checkbox-id="' + nodeId + '"]');
+      if (!checkbox) return;
+      const popup = document.createElement('div');
+      popup.className = 'todo-action-popup';
+      popup.id = 'action-popup-' + nodeId;
+      popup.innerHTML = '<button class="todo-action-btn complete" onclick="event.stopPropagation();completeTask(\'' + path + '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> 完了</button>'
+        + '<button class="todo-action-btn delete" onclick="event.stopPropagation();deleteTaskFromPopup(\'' + path + '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg> 削除</button>';
+      checkbox.parentElement.style.position = 'relative';
+      checkbox.parentElement.appendChild(popup);
+    }
+
+    function findNodeByPath(pathStr) {
+      const ids = pathStr.split(',').map(Number);
+      let nodes = data.todos;
+      let node = null;
+      for (const id of ids) {
+        node = (nodes || []).find(n => n.id === id);
+        if (!node) return null;
+        nodes = node.children;
+      }
+      return node;
+    }
+
+    function completeTask(pathStr) {
+      const node = findNodeByPath(pathStr);
+      if (node) {
+        node.done = !node.done;
+        saveData();
+      }
+      closeActionPopup();
+      render();
+    }
+
+    function deleteTaskFromPopup(pathStr) {
+      const ids = pathStr.split(',').map(Number);
+      if (ids.length === 1) {
+        data.todos = (data.todos || []).filter(n => n.id !== ids[0]);
+      } else {
+        const parentPath = ids.slice(0, -1);
+        let nodes = data.todos;
+        let parent = null;
+        for (const id of parentPath) {
+          parent = (nodes || []).find(n => n.id === id);
+          if (!parent) return;
+          nodes = parent.children;
+        }
+        if (parent) parent.children = (parent.children || []).filter(n => n.id !== ids[ids.length - 1]);
+      }
+      saveData();
+      closeActionPopup();
+      toast('削除しました');
+      render();
     }
 
     function renderTodos(el) {
-      let html = `<div class="page-header"><h1 class="page-title">ToDo管理</h1><button class="btn btn-primary" onclick="showAddTodoCategoryDialog()">${icons.plus} 大目的を追加</button></div>`;
+      let html = '<div class="page-header"><h1 class="page-title">ToDo管理</h1><button class="btn btn-primary" onclick="showAddTodoCategoryDialog()">' + icons.plus + ' 大目的を追加</button></div>';
       if (!data.todos || data.todos.length === 0) {
-        html += `<div class="empty"><p>ToDoがまだ登録されていません。目的ツリーから大目的を選んで追加してください。</p></div>`;
+        html += '<div class="empty"><p>ToDoがまだ登録されていません。目的ツリーから大目的を選んで追加してください。</p></div>';
       } else {
-        html += `<div class="goal-tree">`;
+        html += '<div class="goal-tree">';
         data.todos.forEach(cat => {
-          const catTitle = cat.goalId ? getGoalTitle(cat.goalId) : (cat.title || '(カテゴリ)');
-          const totalTasks = (cat.children || []).reduce((s, sub) => s + (sub.children || []).length, 0);
-          const doneTasks = (cat.children || []).reduce((s, sub) => s + (sub.children || []).filter(t => t.done).length, 0);
-          html += `<div class="goal-large">
-            <div class="goal-large-title">${icons.target} ${escapeHtml(catTitle)} <span class="badge badge-secondary" style="margin-left:4px">${doneTasks}/${totalTasks}</span>
-              <button class="btn btn-ghost btn-icon btn-sm" style="color:var(--destructive);margin-left:4px" onclick="deleteTodoNode(${cat.id},'category')" title="削除">${icons.trash}</button>
-              <button class="btn btn-ghost btn-icon btn-sm" onclick="showAddTodoSubcategoryDialog(${cat.id})" title="中目的を追加">${icons.plus}</button>
-            </div>`;
-          if (cat.children && cat.children.length > 0) {
-            cat.children.forEach(sub => {
-              const subTitle = sub.goalId ? getGoalTitle(sub.goalId) : (sub.title || '(サブカテゴリ)');
-              const subDone = (sub.children || []).filter(t => t.done).length;
-              const subTotal = (sub.children || []).length;
-              html += `<div class="goal-mid">
-                <div class="goal-mid-title">${escapeHtml(subTitle)} <span class="badge badge-outline" style="margin-left:4px">${subDone}/${subTotal}</span>
-                  <button class="btn btn-ghost btn-icon btn-sm" style="color:var(--destructive)" onclick="deleteTodoNode(${sub.id},'subcategory',${cat.id})" title="削除">${icons.trash}</button>
-                  <button class="btn btn-ghost btn-icon btn-sm" onclick="showAddTodoTaskDialog(${cat.id},${sub.id})" title="タスク追加">${icons.plus}</button>
-                </div>`;
-              if (sub.children && sub.children.length > 0) {
-                sub.children.forEach(task => {
-                  html += `<div class="goal-small">
-                    <div class="todo-item" style="margin:0;border:none;padding:4px 0">
-                      <div class="todo-checkbox ${task.done ? 'checked' : ''}" onclick="toggleTodoTree(${cat.id},${sub.id},${task.id})">${task.done ? icons.check : ''}</div>
-                      <div style="flex:1;min-width:0">
-                        <div class="todo-title" style="${task.done ? 'text-decoration:line-through;opacity:.5' : ''}">${escapeHtml(task.title)}</div>
-                        <div class="todo-meta">
-                          <span>${icons.users} ${escapeHtml(task.assignee || '未割当')}</span>
-                          <span>${icons.clock} ${escapeHtml(task.dueDay || '期限なし')}</span>
-                        </div>
-                      </div>
-                      <button class="btn btn-ghost btn-icon btn-sm" style="color:var(--destructive)" onclick="deleteTodoNode(${task.id},'task',${cat.id},${sub.id})" title="削除">${icons.trash}</button>
-                    </div>
-                  </div>`;
-                });
-              }
-              html += `</div>`;
-            });
-          }
-          html += `</div>`;
+          html += renderTodoNode(cat, 0, String(cat.id));
         });
-        html += `</div>`;
+        html += '</div>';
       }
       el.innerHTML = html;
     }
 
-    function toggleTodoTree(catId, subId, taskId) {
-      const cat = (data.todos || []).find(c => c.id === catId);
-      if (cat) {
-        const sub = (cat.children || []).find(s => s.id === subId);
-        if (sub) {
-          const task = (sub.children || []).find(t => t.id === taskId);
-          if (task) { task.done = !task.done; saveData(); render(); }
+    function countTasks(node) {
+      let total = 0, done = 0;
+      if (node.type === 'task') {
+        return { total: 1, done: node.done ? 1 : 0 };
+      }
+      (node.children || []).forEach(child => {
+        const c = countTasks(child);
+        total += c.total;
+        done += c.done;
+      });
+      return { total, done };
+    }
+
+    function renderTodoNode(node, depth, path) {
+      let html = '';
+      if (node.type === 'task') {
+        // Leaf task node
+        html += '<div class="todo-node">';
+        html += '<div class="todo-item" style="margin:0;border:none;padding:4px 0">';
+        html += '<div class="todo-checkbox ' + (node.done ? 'checked' : '') + '" data-checkbox-id="' + node.id + '" onclick="event.stopPropagation();showActionPopup(' + node.id + ',\'' + path + '\')">' + (node.done ? icons.check : '') + '</div>';
+        html += '<div style="flex:1;min-width:0">';
+        html += '<div class="todo-title" style="' + (node.done ? 'text-decoration:line-through;opacity:.5' : '') + '">' + escapeHtml(node.title) + '</div>';
+        html += '<div class="todo-meta">';
+        html += '<span>' + icons.users + ' ' + escapeHtml(node.assignee || '未割当') + '</span>';
+        html += '<span>' + icons.clock + ' ' + escapeHtml(node.dueDay || '期限なし') + '</span>';
+        html += '</div></div></div></div>';
+      } else {
+        // Branch node (category, subcategory, or any intermediate level)
+        const title = node.goalId ? getGoalTitle(node.goalId) : (node.title || '(ノード)');
+        const counts = countTasks(node);
+        
+        if (depth === 0) {
+          html += '<div class="goal-large">';
+          html += '<div class="goal-large-title">' + icons.target + ' ' + escapeHtml(title);
+          html += ' <span class="badge badge-secondary" style="margin-left:4px">' + counts.done + '/' + counts.total + '</span>';
+          html += ' <button class="btn btn-ghost btn-icon btn-sm" style="color:var(--destructive);margin-left:4px" onclick="deleteTodoNodeByPath(\'' + path + '\')" title="削除">' + icons.trash + '</button>';
+          html += ' <button class="btn btn-ghost btn-icon btn-sm" onclick="showAddChildDialog(\'' + path + '\',' + depth + ')" title="子を追加">' + icons.plus + '</button>';
+          html += '</div>';
+        } else {
+          html += '<div class="todo-node">';
+          html += '<div class="todo-node-title todo-node-depth' + Math.min(depth, 2) + '">' + escapeHtml(title);
+          html += ' <span class="badge badge-outline" style="margin-left:4px">' + counts.done + '/' + counts.total + '</span>';
+          html += ' <button class="btn btn-ghost btn-icon btn-sm" style="color:var(--destructive)" onclick="deleteTodoNodeByPath(\'' + path + '\')" title="削除">' + icons.trash + '</button>';
+          html += ' <button class="btn btn-ghost btn-icon btn-sm" onclick="showAddChildDialog(\'' + path + '\',' + depth + ')" title="子を追加">' + icons.plus + '</button>';
+          html += '</div>';
         }
+
+        if (node.children && node.children.length > 0) {
+          node.children.forEach(child => {
+            html += renderTodoNode(child, depth + 1, path + ',' + child.id);
+          });
+        }
+
+        html += '</div>';
+      }
+      return html;
+    }
+
+    function deleteTodoNodeByPath(pathStr) {
+      const ids = pathStr.split(',').map(Number);
+      if (ids.length === 1) {
+        data.todos = (data.todos || []).filter(n => n.id !== ids[0]);
+      } else {
+        const parentIds = ids.slice(0, -1);
+        let nodes = data.todos;
+        let parent = null;
+        for (const id of parentIds) {
+          parent = (nodes || []).find(n => n.id === id);
+          if (!parent) return;
+          nodes = parent.children;
+        }
+        if (parent) parent.children = (parent.children || []).filter(n => n.id !== ids[ids.length - 1]);
+      }
+      saveData();
+      toast('削除しました');
+      render();
+    }
+
+    function showAddChildDialog(pathStr, depth) {
+      const node = findNodeByPath(pathStr);
+      if (!node) return;
+
+      // Depth 0: add subcategory from mid-goals
+      // Depth 1+: add either a sub-node or a task
+      if (depth === 0 && node.goalId) {
+        // Show option to add mid-goal subcategory or free task
+        showAddChildAtDepth0(node, pathStr);
+      } else {
+        // Show dialog to add child (sub-node or task)
+        showAddGenericChildDialog(node, pathStr, depth);
       }
     }
 
-    function deleteTodoNode(id, type, parentCatId, parentSubId) {
-      if (type === 'category') {
-        data.todos = (data.todos || []).filter(c => c.id !== id);
-      } else if (type === 'subcategory') {
-        const cat = (data.todos || []).find(c => c.id === parentCatId);
-        if (cat) cat.children = (cat.children || []).filter(s => s.id !== id);
-      } else if (type === 'task') {
-        const cat = (data.todos || []).find(c => c.id === parentCatId);
-        if (cat) {
-          const sub = (cat.children || []).find(s => s.id === parentSubId);
-          if (sub) sub.children = (sub.children || []).filter(t => t.id !== id);
-        }
+    function showAddChildAtDepth0(node, pathStr) {
+      const goal = (data.goals || []).find(g => g.id === node.goalId);
+      const hasMidGoals = goal && goal.children && goal.children.length > 0;
+      const usedMidIds = (node.children || []).filter(c => c.goalId).map(c => c.goalId);
+      const availableMids = hasMidGoals ? goal.children.filter(m => !usedMidIds.includes(m.id)) : [];
+
+      let bodyHtml = '<div style="margin-bottom:12px;font-size:13px;color:var(--fg-muted)">追加するタイプを選択してください</div>';
+      
+      if (availableMids.length > 0) {
+        let opts = availableMids.map(m => '<option value="' + m.id + '">' + escapeHtml(m.title) + '</option>').join('');
+        bodyHtml += '<div class="form-group"><label class="label">目的ツリーの中目的から選択</label><select class="select" id="d-child-goal" style="width:100%"><option value="">中目的を選んでください</option>' + opts + '</select></div>';
+        bodyHtml += '<div style="text-align:center;color:var(--fg-muted2);font-size:12px;margin:8px 0">── または ──</div>';
       }
-      saveData(); toast('削除しました'); render();
+      bodyHtml += '<div class="form-group"><label class="label">フリーテキストで子ノードを追加</label><input class="input" id="d-child-title" placeholder="ノード名を入力"></div>';
+
+      showModal('子を追加', bodyHtml, [
+        { label: 'キャンセル', onClick: o => o.remove() },
+        { label: '追加', class: 'btn btn-primary', onClick: o => {
+          const goalSelect = document.getElementById('d-child-goal');
+          const goalId = goalSelect ? Number(goalSelect.value) : 0;
+          const title = document.getElementById('d-child-title').value.trim();
+          
+          if (!goalId && !title) { toast('中目的を選択するかタイトルを入力してください'); return; }
+          
+          if (!node.children) node.children = [];
+          if (goalId) {
+            node.children.push({ id: data.nextTodoId++, type: 'subcategory', goalId, children: [] });
+          } else {
+            node.children.push({ id: data.nextTodoId++, type: 'subcategory', title, children: [] });
+          }
+          saveData(); toast('追加しました'); o.remove(); render();
+        }}
+      ]);
+    }
+
+    function showAddGenericChildDialog(node, pathStr, depth) {
+      let assigneeOpts = data.users.map(u => '<option value="' + escapeHtml(u.name) + '">' + escapeHtml(u.name) + '</option>').join('');
+      
+      let bodyHtml = '<div class="form-group"><label class="label">タイプ</label><select class="select" id="d-child-type" style="width:100%" onchange="toggleChildFields()">';
+      bodyHtml += '<option value="node">サブノード（子階層）</option>';
+      bodyHtml += '<option value="task">タスク（末端）</option>';
+      bodyHtml += '</select></div>';
+      bodyHtml += '<div class="form-group"><label class="label">タイトル</label><input class="input" id="d-child-title2" placeholder="名前を入力"></div>';
+      bodyHtml += '<div id="task-fields" style="display:none">';
+      bodyHtml += '<div class="form-group"><label class="label">担当者</label><select class="select" id="d-child-assignee" style="width:100%"><option value="">未割当</option>' + assigneeOpts + '</select></div>';
+      bodyHtml += '<div class="form-group"><label class="label">期限</label><input class="input" id="d-child-due" placeholder="例: 毎週月曜 / 2026-04-30"></div>';
+      bodyHtml += '</div>';
+
+      showModal('子を追加', bodyHtml, [
+        { label: 'キャンセル', onClick: o => o.remove() },
+        { label: '追加', class: 'btn btn-primary', onClick: o => {
+          const type = document.getElementById('d-child-type').value;
+          const title = document.getElementById('d-child-title2').value.trim();
+          if (!title) { toast('タイトルを入力してください'); return; }
+          if (!node.children) node.children = [];
+          if (type === 'task') {
+            const assignee = document.getElementById('d-child-assignee').value;
+            const dueDay = document.getElementById('d-child-due').value.trim();
+            node.children.push({ id: data.nextTodoId++, type: 'task', title, done: false, assignee, dueDay });
+          } else {
+            node.children.push({ id: data.nextTodoId++, type: 'node', title, children: [] });
+          }
+          saveData(); toast('追加しました'); o.remove(); render();
+        }}
+      ]);
+    }
+
+    function toggleChildFields() {
+      const type = document.getElementById('d-child-type').value;
+      const fields = document.getElementById('task-fields');
+      if (fields) fields.style.display = type === 'task' ? 'block' : 'none';
     }
 
     function showAddTodoCategoryDialog() {
@@ -993,9 +1179,9 @@
         toast('追加可能な大目的がありません（全て追加済み、または目的ツリーに大目的を追加してください）');
         return;
       }
-      let opts = available.map(g => `<option value="${g.id}">${escapeHtml(g.title)}</option>`).join('');
+      let opts = available.map(g => '<option value="' + g.id + '">' + escapeHtml(g.title) + '</option>').join('');
       showModal('大目的からカテゴリを追加',
-        `<div class="form-group"><label class="label">目的ツリーの大目的を選択</label><select class="select" id="d-todo-goal" style="width:100%"><option value="">大目的を選んでください</option>${opts}</select></div>`,
+        '<div class="form-group"><label class="label">目的ツリーの大目的を選択</label><select class="select" id="d-todo-goal" style="width:100%"><option value="">大目的を選んでください</option>' + opts + '</select></div>',
         [
           { label: 'キャンセル', onClick: o => o.remove() },
           { label: '追加', class: 'btn btn-primary', onClick: o => {
@@ -1008,59 +1194,7 @@
       );
     }
 
-    function showAddTodoSubcategoryDialog(catId) {
-      const cat = (data.todos || []).find(c => c.id === catId);
-      if (!cat || !cat.goalId) { toast('カテゴリが見つかりません'); return; }
-      const goal = (data.goals || []).find(g => g.id === cat.goalId);
-      if (!goal || !goal.children || goal.children.length === 0) {
-        toast('この大目的に中目的がありません。先に目的ツリーで中目的を追加してください。');
-        return;
-      }
-      const usedMidIds = (cat.children || []).map(s => s.goalId).filter(Boolean);
-      const available = goal.children.filter(m => !usedMidIds.includes(m.id));
-      if (available.length === 0) {
-        toast('追加可能な中目的がありません（全て追加済み）');
-        return;
-      }
-      let opts = available.map(m => `<option value="${m.id}">${escapeHtml(m.title)}</option>`).join('');
-      showModal('中目的からサブカテゴリを追加',
-        `<div class="form-group"><label class="label">「${escapeHtml(getGoalTitle(cat.goalId))}」の中目的を選択</label><select class="select" id="d-todo-mid" style="width:100%"><option value="">中目的を選んでください</option>${opts}</select></div>`,
-        [
-          { label: 'キャンセル', onClick: o => o.remove() },
-          { label: '追加', class: 'btn btn-primary', onClick: o => {
-            const goalId = Number(document.getElementById('d-todo-mid').value);
-            if (!goalId) { toast('中目的を選択してください'); return; }
-            if (!cat.children) cat.children = [];
-            cat.children.push({ id: data.nextTodoId++, type: 'subcategory', goalId, children: [] });
-            saveData(); toast('サブカテゴリを追加しました'); o.remove(); render();
-          }}
-        ]
-      );
-    }
-
-    function showAddTodoTaskDialog(catId, subId) {
-      let assigneeOpts = data.users.map(u => `<option value="${escapeHtml(u.name)}">${escapeHtml(u.name)}</option>`).join('');
-      showModal('タスクを追加',
-        `<div class="form-group"><label class="label">タスク名</label><input class="input" id="d-todo-title" placeholder="タスク名を入力"></div>
-        <div class="form-group"><label class="label">担当者</label><select class="select" id="d-todo-assignee" style="width:100%"><option value="">未割当</option>${assigneeOpts}</select></div>
-        <div class="form-group"><label class="label">期限</label><input class="input" id="d-todo-due" placeholder="例: 毎週月曜 / 2026-04-30"></div>`,
-        [
-          { label: 'キャンセル', onClick: o => o.remove() },
-          { label: '追加', class: 'btn btn-primary', onClick: o => {
-            const title = document.getElementById('d-todo-title').value.trim();
-            if (!title) { toast('タスク名を入力してください'); return; }
-            const assignee = document.getElementById('d-todo-assignee').value;
-            const dueDay = document.getElementById('d-todo-due').value.trim();
-            const cat = data.todos.find(c => c.id === catId);
-            if (cat) {
-              const sub = (cat.children || []).find(s => s.id === subId);
-              if (sub) { if (!sub.children) sub.children = []; sub.children.push({ id: data.nextTodoId++, type: 'task', title, done: false, assignee, dueDay }); }
-            }
-            saveData(); toast('タスクを追加しました'); o.remove(); render();
-          }}
-        ]
-      );
-    }
+    
 
     // USERS
     function renderUsers(el) {
