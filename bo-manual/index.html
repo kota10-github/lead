@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    *,*::before,*::after{box-sizing:border-box;margi:0;padding:0}
     :root{
       --bg:#ffffff;--bg-muted:#f8fafc;--bg-card:#ffffff;
       --fg:#0f172a;--fg-muted:#64748b;--fg-muted2:#94a3b8;
@@ -194,12 +194,12 @@
     .todo-filter-btn{padding:6px 14px;border-radius:999px;font-size:12px;font-weight:500;border:1px solid var(--border);color:var(--fg-muted);transition:all .15s}
     .todo-filter-btn:hover{background:var(--bg-muted)}
     .todo-filter-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
-    .todo-item{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;transition:all .15s}
-    .todo-item:hover{border-color:rgba(37,99,235,.3)}
+    .todo-item{display:flex;align-items:center;gap:12px;padding:8px 4px;border:none;border-radius:0;margin-bottom:2px;transition:all .15s}
+    .todo-item:hover{background:var(--bg-muted);border-radius:var(--radius)}
     .todo-item.done{opacity:.5}
     .todo-item.done .todo-title{text-decoration:line-through}
-    .todo-checkbox{width:18px;height:18px;border:2px solid var(--border);border-radius:4px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;margin-top:1px}
-    .todo-checkbox.checked{background:var(--primary);border-color:var(--primary);color:#fff}
+    .todo-checkbox{width:30px;height:30px;border:none;border-radius:50%;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;margin-top:1px;background:var(--primary);color:#fff}
+    .todo-checkbox.checked{background:#059669;border-color:#059669;color:#fff}
     .todo-title{font-size:13px;font-weight:500}
     .todo-meta{font-size:11px;color:var(--fg-muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap}
     .todo-badge{padding:1px 8px;border-radius:999px;font-size:10px;font-weight:500}
@@ -224,7 +224,7 @@
     .line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
     .flex{display:flex}.items-center{align-items:center}.gap-2{gap:8px}.gap-3{gap:12px}
     .mt-2{margin-top:8px}.mt-4{margin-top:16px}.mb-2{margin-bottom:8px}.mb-4{margin-bottom:16px}
-    .text-sm{font-size:13px}.text-xs{font-size:11px}
+    .text-sm{font-size:13px}.text-xs{font-size:11px}.goal-action-btn{opacity:0;transition:opacity .15s;pointer-events:none}.goal-large:hover>.goal-large-title .goal-action-btn,.goal-mid:hover>.goal-mid-title .goal-action-btn,.goal-small:hover>.goal-small-title .goal-action-btn{opacity:1;pointer-events:auto}.todo-hover-action{opacity:0;transition:opacity .15s;pointer-events:none}.todo-node:hover>.todo-node-title .todo-hover-action,.goal-large:hover>.goal-large-title .todo-hover-action{opacity:1;pointer-events:auto}.todo-play-btn{width:30px;height:30px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;transition:all .15s;border:none;padding:0}.todo-play-btn:hover{background:#1d4ed8;transform:scale(1.1)}.todo-play-btn.done{background:#059669}.todo-play-btn svg{margin-left:2px}
   </style>
 </head>
 <body>
@@ -839,14 +839,14 @@
           html += `<div class="goal-large">
             <div class="goal-large-title">${icons.target} ${escapeHtml(g.title)}
               <button class="btn btn-ghost btn-icon btn-sm" style="color:var(--destructive);margin-left:4px" onclick="deleteGoal(${g.id},'large')" title="削除">${icons.trash}</button>
-              <button class="btn btn-ghost btn-icon btn-sm" onclick="showAddGoalDialog('mid',${g.id})" title="中目的を追加">${icons.plus}</button>
+              <button class="btn btn-ghost btn-icon btn-sm goal-action-btn" onclick="showAddGoalDialog('mid',${g.id})" title="中目的を追加">${icons.plus}</button>
             </div>`;
           if (g.children && g.children.length > 0) {
             g.children.forEach(mid => {
               html += `<div class="goal-mid">
                 <div class="goal-mid-title">${escapeHtml(mid.title)}
                   <button class="btn btn-ghost btn-icon btn-sm" style="color:var(--destructive)" onclick="deleteGoal(${mid.id},'mid',${g.id})" title="削除">${icons.trash}</button>
-                  <button class="btn btn-ghost btn-icon btn-sm" onclick="showAddGoalDialog('small',${g.id},${mid.id})" title="小目的を追加">${icons.plus}</button>
+                  <button class="btn btn-ghost btn-icon btn-sm goal-action-btn" onclick="showAddGoalDialog('small',${g.id},${mid.id})" title="小目的を追加">${icons.plus}</button>
                 </div>`;
               if (mid.children && mid.children.length > 0) {
                 mid.children.forEach(sm => {
@@ -1025,7 +1025,7 @@
         // Leaf task node
         html += '<div class="todo-node">';
         html += '<div class="todo-item" style="margin:0;border:none;padding:4px 0">';
-        html += '<div class="todo-checkbox ' + (node.done ? 'checked' : '') + '" data-checkbox-id="' + node.id + '" onclick="event.stopPropagation();showActionPopup(' + node.id + ',\'' + path + '\')">' + (node.done ? icons.check : '') + '</div>';
+        html += '<div class="todo-checkbox ' + (node.done ? 'checked' : '') + '" data-checkbox-id="' + node.id + '" onclick="event.stopPropagation();showActionPopup(' + node.id + ',\'' + path + '\')">' + (node.done ? icons.check : '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
         html += '<div style="flex:1;min-width:0">';
         html += '<div class="todo-title" style="' + (node.done ? 'text-decoration:line-through;opacity:.5' : '') + '">' + escapeHtml(node.title) + '</div>';
         html += '<div class="todo-meta">';
@@ -1041,15 +1041,15 @@
           html += '<div class="goal-large">';
           html += '<div class="goal-large-title">' + icons.target + ' ' + escapeHtml(title);
           html += ' <span class="badge badge-secondary" style="margin-left:4px">' + counts.done + '/' + counts.total + '</span>';
-          html += ' <button class="btn btn-ghost btn-icon btn-sm" style="color:var(--destructive);margin-left:4px" onclick="deleteTodoNodeByPath(\'' + path + '\')" title="削除">' + icons.trash + '</button>';
-          html += ' <button class="btn btn-ghost btn-icon btn-sm" onclick="showAddChildDialog(\'' + path + '\',' + depth + ')" title="子を追加">' + icons.plus + '</button>';
+          html += ' <button class="btn btn-ghost btn-icon btn-sm todo-hover-action" style="color:var(--destructive);margin-left:4px" onclick="deleteTodoNodeByPath(\'' + path + '\')" title="削除">' + icons.trash + '</button>';
+          html += ' <button class="btn btn-ghost btn-icon btn-sm todo-hover-action" onclick="showAddChildDialog(\'' + path + '\',' + depth + ')" title="子を追加">' + icons.plus + '</button>';
           html += '</div>';
         } else {
           html += '<div class="todo-node">';
           html += '<div class="todo-node-title todo-node-depth' + Math.min(depth, 2) + '">' + escapeHtml(title);
           html += ' <span class="badge badge-outline" style="margin-left:4px">' + counts.done + '/' + counts.total + '</span>';
-          html += ' <button class="btn btn-ghost btn-icon btn-sm" style="color:var(--destructive)" onclick="deleteTodoNodeByPath(\'' + path + '\')" title="削除">' + icons.trash + '</button>';
-          html += ' <button class="btn btn-ghost btn-icon btn-sm" onclick="showAddChildDialog(\'' + path + '\',' + depth + ')" title="子を追加">' + icons.plus + '</button>';
+          html += ' <button class="btn btn-ghost btn-icon btn-sm todo-hover-action" style="color:var(--destructive)" onclick="deleteTodoNodeByPath(\'' + path + '\')" title="削除">' + icons.trash + '</button>';
+          html += ' <button class="btn btn-ghost btn-icon btn-sm todo-hover-action" onclick="showAddChildDialog(\'' + path + '\',' + depth + ')" title="子を追加">' + icons.plus + '</button>';
           html += '</div>';
         }
 
