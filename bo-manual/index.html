@@ -845,14 +845,14 @@
             g.children.forEach(mid => {
               html += `<div class="goal-mid">
                 <div class="goal-mid-title">${escapeHtml(mid.title)}
-                  <button class="btn btn-ghost btn-icon btn-sm" style="color:var(--destructive)" onclick="deleteGoal(${mid.id},'mid',${g.id})" title="削除">${icons.trash}</button>
+                  <button class="btn btn-ghost btn-icon btn-sm goal-action-btn" style="color:var(--destructive)" onclick="deleteGoal(${mid.id},'mid',${g.id})" title="削除">${icons.trash}</button>
                   <button class="btn btn-ghost btn-icon btn-sm goal-action-btn" onclick="showAddGoalDialog('small',${g.id},${mid.id})" title="小目的を追加">${icons.plus}</button>
                 </div>`;
               if (mid.children && mid.children.length > 0) {
                 mid.children.forEach(sm => {
                   html += `<div class="goal-small">
                     <div class="goal-small-title">${escapeHtml(sm.title)}
-                      <button class="btn btn-ghost btn-icon btn-sm" style="color:var(--destructive)" onclick="deleteGoal(${sm.id},'small',${g.id},${mid.id})" title="削除">${icons.trash}</button>
+                      <button class="btn btn-ghost btn-icon btn-sm goal-action-btn" style="color:var(--destructive)" onclick="deleteGoal(${sm.id},'small',${g.id},${mid.id})" title="削除">${icons.trash}</button>
                     </div>
                   </div>`;
                 });
