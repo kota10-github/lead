@@ -891,21 +891,21 @@
         html += `<div class="goal-tree">`;
         data.goals.forEach(g => {
           html += `<div class="goal-large">
-            <div class="goal-large-title" style="cursor:pointer" onclick="showGoalOverlay(${g.id},'large','${escapeHtml(g.name)}')">${icons.target} ${escapeHtml(g.title)}
+            <div class="goal-large-title" style="cursor:pointer" onclick="showGoalOverlay(${g.id},'large','${escapeHtml(g.title)}')">${icons.target} ${escapeHtml(g.title)}
              
              
             </div>`;
           if (g.children && g.children.length > 0) {
             g.children.forEach(mid => {
               html += `<div class="goal-mid">
-                <div class="goal-mid-title" style="cursor:pointer" onclick="showGoalOverlay(${mid.id},'mid','${escapeHtml(mid.name)}',${g.id})">${escapeHtml(mid.title)}
+                <div class="goal-mid-title" style="cursor:pointer" onclick="showGoalOverlay(${mid.id},'mid','${escapeHtml(mid.title)}',${g.id})">${escapeHtml(mid.title)}
                  
                  
                 </div>`;
               if (mid.children && mid.children.length > 0) {
                 mid.children.forEach(sm => {
                   html += `<div class="goal-small">
-                    <div class="goal-small-title" style="cursor:pointer" onclick="showGoalOverlay(${sm.id},'small','${escapeHtml(sm.name)}',${g.id},${mid.id})">${escapeHtml(sm.title)}
+                    <div class="goal-small-title" style="cursor:pointer" onclick="showGoalOverlay(${sm.id},'small','${escapeHtml(sm.title)}',${g.id},${mid.id})">${escapeHtml(sm.title)}
                      
                     </div>
                   </div>`;
@@ -1474,7 +1474,7 @@
         childrenHtml = '<div class="overlay-children">';
         children.forEach(c => {
           const childCount = c.children ? c.children.length : 0;
-          childrenHtml += '<div class="overlay-child"><span>' + escapeHtml(c.name) + '</span><span style="color:var(--fg-muted);font-size:12px">' + childCount + ' 子目的</span></div>';
+          childrenHtml += '<div class="overlay-child"><span>' + escapeHtml(c.title) + '</span><span style="color:var(--fg-muted);font-size:12px">' + childCount + ' 子目的</span></div>';
         });
         childrenHtml += '</div>';
       }
