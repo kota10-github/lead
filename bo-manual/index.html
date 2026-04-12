@@ -225,6 +225,16 @@
     .flex{display:flex}.items-center{align-items:center}.gap-2{gap:8px}.gap-3{gap:12px}
     .mt-2{margin-top:8px}.mt-4{margin-top:16px}.mb-2{margin-bottom:8px}.mb-4{margin-bottom:16px}
     .text-sm{font-size:13px}.text-xs{font-size:11px}.goal-action-btn{opacity:0;transition:opacity .15s;pointer-events:none}.goal-large:hover>.goal-large-title .goal-action-btn,.goal-mid:hover>.goal-mid-title .goal-action-btn,.goal-small:hover>.goal-small-title .goal-action-btn{opacity:1;pointer-events:auto}.todo-hover-action{opacity:0;transition:opacity .15s;pointer-events:none}.todo-node:hover>.todo-node-title .todo-hover-action,.goal-large:hover>.goal-large-title .todo-hover-action{opacity:1;pointer-events:auto}.todo-play-btn{width:30px;height:30px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;transition:all .15s;border:none;padding:0}.todo-play-btn:hover{background:#1d4ed8;transform:scale(1.1)}.todo-play-btn.done{background:#059669}.todo-play-btn svg{margin-left:2px}
+
+.task-action-bar{display:none;align-items:center;gap:4px;overflow:hidden;transition:all .3s ease;border-radius:999px;background:var(--primary);padding:0;height:30px}
+.task-action-bar.open{display:inline-flex;padding:0 4px;animation:expandBar .3s ease forwards}
+@keyframes expandBar{from{width:30px;opacity:0.5}to{width:auto;opacity:1}}
+.task-action-bar .action-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;color:#fff;flex-shrink:0}
+.task-action-bar .action-icon:hover{background:rgba(255,255,255,.2);transform:scale(1.1)}
+.task-action-bar .action-icon.check-icon{color:#fff}
+.task-action-bar .action-icon.delete-icon{color:#fff}
+.task-action-bar .action-icon.add-icon{color:#fff}
+.todo-checkbox.expanded{background:var(--primary);width:auto;border-radius:999px;padding:0 4px;gap:4px}
 .todo-detail-screen{padding:24px 32px;max-width:800px;animation:fadeIn .2s}
 .todo-detail-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
 .todo-detail-back{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--fg-muted);cursor:pointer;padding:6px 12px;border-radius:var(--radius);transition:all .15s}
@@ -864,21 +874,21 @@
         data.goals.forEach(g => {
           html += `<div class="goal-large">
             <div class="goal-large-title" style="cursor:pointer" onclick="navigate('goal-detail',{goalId:${g.id},type:'large'})">${icons.target} ${escapeHtml(g.title)}
-              <button class="btn btn-ghost btn-icon btn-sm goal-action-btn" style="color:var(--destructive);margin-left:4px" onclick="deleteGoal(${g.id},'large')" title="削除">${icons.trash}</button>
-              <button class="btn btn-ghost btn-icon btn-sm goal-action-btn" onclick="showAddGoalDialog('mid',${g.id})" title="中目的を追加">${icons.plus}</button>
+             
+             
             </div>`;
           if (g.children && g.children.length > 0) {
             g.children.forEach(mid => {
               html += `<div class="goal-mid">
                 <div class="goal-mid-title" style="cursor:pointer" onclick="navigate('goal-detail',{goalId:${mid.id},type:'mid',parentLargeId:${g.id}})">${escapeHtml(mid.title)}
-                  <button class="btn btn-ghost btn-icon btn-sm goal-action-btn" style="color:var(--destructive)" onclick="deleteGoal(${mid.id},'mid',${g.id})" title="削除">${icons.trash}</button>
-                  <button class="btn btn-ghost btn-icon btn-sm goal-action-btn" onclick="showAddGoalDialog('small',${g.id},${mid.id})" title="小目的を追加">${icons.plus}</button>
+                 
+                 
                 </div>`;
               if (mid.children && mid.children.length > 0) {
                 mid.children.forEach(sm => {
                   html += `<div class="goal-small">
                     <div class="goal-small-title" style="cursor:pointer" onclick="navigate('goal-detail',{goalId:${sm.id},type:'small',parentLargeId:${g.id},parentMidId:${mid.id}})">${escapeHtml(sm.title)}
-                      <button class="btn btn-ghost btn-icon btn-sm goal-action-btn" style="color:var(--destructive)" onclick="deleteGoal(${sm.id},'small',${g.id},${mid.id})" title="削除">${icons.trash}</button>
+                     
                     </div>
                   </div>`;
                 });
@@ -1051,7 +1061,7 @@
         // Leaf task node
         html += '<div class="todo-node">';
         html += '<div class="todo-item" style="margin:0;border:none;padding:4px 0">';
-        html += '<div class="todo-checkbox ' + (node.done ? 'checked' : '') + '" data-checkbox-id="' + node.id + '" onclick="event.stopPropagation();navigate(\'todo-detail\',{path:\'' + path + '\'})">' + (node.done ? icons.check : '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
+        html += '<div class="todo-checkbox ' + (node.done ? 'checked' : '') + '" data-checkbox-id="' + node.id + '" onclick="event.stopPropagation();toggleTaskActions(' + node.id + ',\'' + path + '\')">' + (node.done ? icons.check : '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
         html += '<div style="flex:1;min-width:0">';
         html += '<div class="todo-title" style="' + (node.done ? 'text-decoration:line-through;opacity:.5' : '') + '">' + escapeHtml(node.title) + '</div>';
         html += '<div class="todo-meta">';
@@ -1067,15 +1077,15 @@
           html += '<div class="goal-large">';
           html += '<div class="goal-large-title" style="cursor:pointer" onclick="navigate(\'todo-detail\',{path:\'' + path + '\'})">' + icons.target + ' ' + escapeHtml(title);
           html += ' <span class="badge badge-secondary" style="margin-left:4px">' + counts.done + '/' + counts.total + '</span>';
-          html += ' <button class="btn btn-ghost btn-icon btn-sm todo-hover-action" style="color:var(--destructive);margin-left:4px" onclick="deleteTodoNodeByPath(\'' + path + '\')" title="削除">' + icons.trash + '</button>';
-          html += ' <button class="btn btn-ghost btn-icon btn-sm todo-hover-action" onclick="showAddChildDialog(\'' + path + '\',' + depth + ')" title="子を追加">' + icons.plus + '</button>';
+          html += '';
+          html += '';
           html += '</div>';
         } else {
           html += '<div class="todo-node">';
           html += '<div class="todo-node-title todo-node-depth' + Math.min(depth, 2) + '" style="cursor:pointer" onclick="navigate(\'todo-detail\',{path:\'' + path + '\'})">' + escapeHtml(title);
           html += ' <span class="badge badge-outline" style="margin-left:4px">' + counts.done + '/' + counts.total + '</span>';
-          html += ' <button class="btn btn-ghost btn-icon btn-sm todo-hover-action" style="color:var(--destructive)" onclick="deleteTodoNodeByPath(\'' + path + '\')" title="削除">' + icons.trash + '</button>';
-          html += ' <button class="btn btn-ghost btn-icon btn-sm todo-hover-action" onclick="showAddChildDialog(\'' + path + '\',' + depth + ')" title="子を追加">' + icons.plus + '</button>';
+          html += '';
+          html += '';
           html += '</div>';
         }
 
@@ -1404,6 +1414,56 @@
       saveData(); toast('責任者を削除しました'); render();
     }
 
+
+
+    function toggleTaskActions(nodeId, path) {
+      var existing = document.getElementById('action-bar-' + nodeId);
+      if (existing) {
+        existing.remove();
+        return;
+      }
+      // Close any other open action bars
+      document.querySelectorAll('.task-action-bar').forEach(function(el) { el.remove(); });
+      
+      var checkbox = document.querySelector('[data-checkbox-id="' + nodeId + '"]');
+      if (!checkbox) return;
+      
+      var node = findNodeByPath(path);
+      if (!node) return;
+      
+      var bar = document.createElement('div');
+      bar.className = 'task-action-bar';
+      bar.id = 'action-bar-' + nodeId;
+      
+      // Check/complete button
+      var checkBtn = document.createElement('span');
+      checkBtn.className = 'action-icon check-icon';
+      checkBtn.title = node.done ? '未完了に戻す' : '完了';
+      checkBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
+      checkBtn.onclick = function(e) { e.stopPropagation(); completeTask(path); };
+      bar.appendChild(checkBtn);
+      
+      // Delete button
+      var delBtn = document.createElement('span');
+      delBtn.className = 'action-icon delete-icon';
+      delBtn.title = '削除';
+      delBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
+      delBtn.onclick = function(e) { e.stopPropagation(); deleteTaskFromPopup(path); };
+      bar.appendChild(delBtn);
+      
+      // Insert bar after checkbox
+      checkbox.parentElement.insertBefore(bar, checkbox.nextSibling);
+      
+      // Trigger animation
+      requestAnimationFrame(function() { bar.classList.add('open'); });
+    }
+    
+    // Close action bars on outside click
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.task-action-bar') && !e.target.closest('.todo-checkbox')) {
+        document.querySelectorAll('.task-action-bar').forEach(function(el) { el.remove(); });
+      }
+    });
 
     // TODO DETAIL SCREEN
     function renderTodoDetail(el) {
