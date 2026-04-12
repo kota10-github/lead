@@ -225,6 +225,30 @@
     .flex{display:flex}.items-center{align-items:center}.gap-2{gap:8px}.gap-3{gap:12px}
     .mt-2{margin-top:8px}.mt-4{margin-top:16px}.mb-2{margin-bottom:8px}.mb-4{margin-bottom:16px}
     .text-sm{font-size:13px}.text-xs{font-size:11px}.goal-action-btn{opacity:0;transition:opacity .15s;pointer-events:none}.goal-large:hover>.goal-large-title .goal-action-btn,.goal-mid:hover>.goal-mid-title .goal-action-btn,.goal-small:hover>.goal-small-title .goal-action-btn{opacity:1;pointer-events:auto}.todo-hover-action{opacity:0;transition:opacity .15s;pointer-events:none}.todo-node:hover>.todo-node-title .todo-hover-action,.goal-large:hover>.goal-large-title .todo-hover-action{opacity:1;pointer-events:auto}.todo-play-btn{width:30px;height:30px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;transition:all .15s;border:none;padding:0}.todo-play-btn:hover{background:#1d4ed8;transform:scale(1.1)}.todo-play-btn.done{background:#059669}.todo-play-btn svg{margin-left:2px}
+.todo-detail-screen{padding:24px 32px;max-width:800px;animation:fadeIn .2s}
+.todo-detail-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+.todo-detail-back{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--fg-muted);cursor:pointer;padding:6px 12px;border-radius:var(--radius);transition:all .15s}
+.todo-detail-back:hover{background:var(--bg-muted);color:var(--fg)}
+.todo-detail-title{font-size:20px;font-weight:600;margin-bottom:8px}
+.todo-detail-meta{font-size:13px;color:var(--fg-muted);display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px}
+.todo-detail-actions{display:flex;gap:12px;margin-top:32px;flex-wrap:wrap}
+.todo-detail-action-btn{display:flex;align-items:center;gap:8px;padding:12px 24px;border-radius:var(--radius);font-size:14px;font-weight:500;transition:all .15s;border:1px solid var(--border)}
+.todo-detail-action-btn:hover{transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.todo-detail-action-btn.check{background:#059669;color:#fff;border-color:#059669}
+.todo-detail-action-btn.check:hover{background:#047857}
+.todo-detail-action-btn.delete{background:#fff;color:var(--destructive);border-color:var(--destructive)}
+.todo-detail-action-btn.delete:hover{background:#fef2f2}
+.todo-detail-action-btn.add{background:var(--primary);color:#fff;border-color:var(--primary)}
+.todo-detail-action-btn.add:hover{background:#1d4ed8}
+.todo-detail-action-btn.undo{background:#fff;color:var(--fg-muted);border-color:var(--border)}
+.todo-detail-action-btn.undo:hover{background:var(--bg-muted)}
+.todo-detail-info{background:var(--bg-muted);border-radius:var(--radius);padding:16px 20px;margin-bottom:16px}
+.todo-detail-info-row{display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0}
+.todo-detail-info-label{color:var(--fg-muted);min-width:80px}
+.goal-detail-screen{padding:24px 32px;max-width:800px;animation:fadeIn .2s}
+.goal-detail-children{margin-top:24px}
+.goal-detail-child{padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;transition:all .15s;cursor:pointer}
+.goal-detail-child:hover{border-color:rgba(37,99,235,.3);background:var(--bg-muted)}
   </style>
 </head>
 <body>
@@ -497,6 +521,8 @@
         case 'tasks': renderMyTasks(main); break;
         case 'goals': renderGoals(main); break;
         case 'todos': renderTodos(main); break;
+      case 'todo-detail': renderTodoDetail(main); break;
+      case 'goal-detail': renderGoalDetail(main); break;
         case 'users': renderUsers(main); break;
         case 'permissions': renderPermissions(main); break;
         case 'member-page': renderMemberPage(main); break;
@@ -837,21 +863,21 @@
         html += `<div class="goal-tree">`;
         data.goals.forEach(g => {
           html += `<div class="goal-large">
-            <div class="goal-large-title">${icons.target} ${escapeHtml(g.title)}
+            <div class="goal-large-title" style="cursor:pointer" onclick="navigate('goal-detail',{goalId:${g.id},type:'large'})">${icons.target} ${escapeHtml(g.title)}
               <button class="btn btn-ghost btn-icon btn-sm goal-action-btn" style="color:var(--destructive);margin-left:4px" onclick="deleteGoal(${g.id},'large')" title="削除">${icons.trash}</button>
               <button class="btn btn-ghost btn-icon btn-sm goal-action-btn" onclick="showAddGoalDialog('mid',${g.id})" title="中目的を追加">${icons.plus}</button>
             </div>`;
           if (g.children && g.children.length > 0) {
             g.children.forEach(mid => {
               html += `<div class="goal-mid">
-                <div class="goal-mid-title">${escapeHtml(mid.title)}
+                <div class="goal-mid-title" style="cursor:pointer" onclick="navigate('goal-detail',{goalId:${mid.id},type:'mid',parentLargeId:${g.id}})">${escapeHtml(mid.title)}
                   <button class="btn btn-ghost btn-icon btn-sm goal-action-btn" style="color:var(--destructive)" onclick="deleteGoal(${mid.id},'mid',${g.id})" title="削除">${icons.trash}</button>
                   <button class="btn btn-ghost btn-icon btn-sm goal-action-btn" onclick="showAddGoalDialog('small',${g.id},${mid.id})" title="小目的を追加">${icons.plus}</button>
                 </div>`;
               if (mid.children && mid.children.length > 0) {
                 mid.children.forEach(sm => {
                   html += `<div class="goal-small">
-                    <div class="goal-small-title">${escapeHtml(sm.title)}
+                    <div class="goal-small-title" style="cursor:pointer" onclick="navigate('goal-detail',{goalId:${sm.id},type:'small',parentLargeId:${g.id},parentMidId:${mid.id}})">${escapeHtml(sm.title)}
                       <button class="btn btn-ghost btn-icon btn-sm goal-action-btn" style="color:var(--destructive)" onclick="deleteGoal(${sm.id},'small',${g.id},${mid.id})" title="削除">${icons.trash}</button>
                     </div>
                   </div>`;
@@ -1025,7 +1051,7 @@
         // Leaf task node
         html += '<div class="todo-node">';
         html += '<div class="todo-item" style="margin:0;border:none;padding:4px 0">';
-        html += '<div class="todo-checkbox ' + (node.done ? 'checked' : '') + '" data-checkbox-id="' + node.id + '" onclick="event.stopPropagation();showActionPopup(' + node.id + ',\'' + path + '\')">' + (node.done ? icons.check : '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
+        html += '<div class="todo-checkbox ' + (node.done ? 'checked' : '') + '" data-checkbox-id="' + node.id + '" onclick="event.stopPropagation();navigate(\'todo-detail\',{path:\'' + path + '\'})">' + (node.done ? icons.check : '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
         html += '<div style="flex:1;min-width:0">';
         html += '<div class="todo-title" style="' + (node.done ? 'text-decoration:line-through;opacity:.5' : '') + '">' + escapeHtml(node.title) + '</div>';
         html += '<div class="todo-meta">';
@@ -1039,14 +1065,14 @@
         
         if (depth === 0) {
           html += '<div class="goal-large">';
-          html += '<div class="goal-large-title">' + icons.target + ' ' + escapeHtml(title);
+          html += '<div class="goal-large-title" style="cursor:pointer" onclick="navigate(\'todo-detail\',{path:\'' + path + '\'})">' + icons.target + ' ' + escapeHtml(title);
           html += ' <span class="badge badge-secondary" style="margin-left:4px">' + counts.done + '/' + counts.total + '</span>';
           html += ' <button class="btn btn-ghost btn-icon btn-sm todo-hover-action" style="color:var(--destructive);margin-left:4px" onclick="deleteTodoNodeByPath(\'' + path + '\')" title="削除">' + icons.trash + '</button>';
           html += ' <button class="btn btn-ghost btn-icon btn-sm todo-hover-action" onclick="showAddChildDialog(\'' + path + '\',' + depth + ')" title="子を追加">' + icons.plus + '</button>';
           html += '</div>';
         } else {
           html += '<div class="todo-node">';
-          html += '<div class="todo-node-title todo-node-depth' + Math.min(depth, 2) + '">' + escapeHtml(title);
+          html += '<div class="todo-node-title todo-node-depth' + Math.min(depth, 2) + '" style="cursor:pointer" onclick="navigate(\'todo-detail\',{path:\'' + path + '\'})">' + escapeHtml(title);
           html += ' <span class="badge badge-outline" style="margin-left:4px">' + counts.done + '/' + counts.total + '</span>';
           html += ' <button class="btn btn-ghost btn-icon btn-sm todo-hover-action" style="color:var(--destructive)" onclick="deleteTodoNodeByPath(\'' + path + '\')" title="削除">' + icons.trash + '</button>';
           html += ' <button class="btn btn-ghost btn-icon btn-sm todo-hover-action" onclick="showAddChildDialog(\'' + path + '\',' + depth + ')" title="子を追加">' + icons.plus + '</button>';
@@ -1376,6 +1402,181 @@
     function removeAssignee(manualId, userId) {
       data.assignees = data.assignees.filter(a => !(a.manualId === manualId && a.userId === userId));
       saveData(); toast('責任者を削除しました'); render();
+    }
+
+
+    // TODO DETAIL SCREEN
+    function renderTodoDetail(el) {
+      const path = pageParams.path;
+      if (!path) { navigate('todos'); return; }
+      const node = findNodeByPath(path);
+      if (!node) { navigate('todos'); return; }
+
+      let html = '<div class="todo-detail-screen">';
+      html += '<div class="todo-detail-header">';
+      html += '<button class="todo-detail-back" onclick="navigate(\'todos\')">' + icons.arrowLeft + ' ToDo管理に戻る</button>';
+
+      // For category (depth 0) nodes, add + button in top right
+      if (node.type === 'category' || node.type === 'subcategory' || node.type === 'node') {
+        html += '<button class="todo-detail-action-btn add" onclick="showAddChildDialog(\'' + path + '\',' + (path.split(\',\').length - 1) + ')">' + icons.plus + ' 子を追加</button>';
+      }
+      html += '</div>';
+
+      if (node.type === 'task') {
+        // Task detail
+        var statusIcon = node.done
+          ? '<span style="color:#059669;font-size:24px">' + icons.check + '</span>'
+          : '<span style="color:var(--primary);font-size:24px"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg></span>';
+        html += '<div style="display:flex;align-items:center;gap:16px;margin-bottom:8px">' + statusIcon;
+        html += '<h1 class="todo-detail-title" style="margin:0">' + escapeHtml(node.title) + '</h1></div>';
+
+        if (node.done) {
+          html += '<div style="margin-bottom:16px"><span class="badge badge-secondary" style="font-size:12px;padding:4px 12px;background:#d1fae5;color:#059669">完了済み</span></div>';
+        }
+
+        html += '<div class="todo-detail-info">';
+        html += '<div class="todo-detail-info-row"><span class="todo-detail-info-label">' + icons.users + ' 担当者</span><span style="font-weight:500">' + escapeHtml(node.assignee || '未割当') + '</span></div>';
+        html += '<div class="todo-detail-info-row"><span class="todo-detail-info-label">' + icons.clock + ' 期限</span><span style="font-weight:500">' + escapeHtml(node.dueDay || '期限なし') + '</span></div>';
+        html += '</div>';
+
+        // Action buttons
+        html += '<div class="todo-detail-actions">';
+        if (node.done) {
+          html += '<button class="todo-detail-action-btn undo" onclick="completeTask(\'' + path + '\');navigate(\'todo-detail\',{path:\'' + path + '\'})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg> 未完了に戻す</button>';
+        } else {
+          html += '<button class="todo-detail-action-btn check" onclick="completeTask(\'' + path + '\');navigate(\'todo-detail\',{path:\'' + path + '\'})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> 完了にする</button>';
+        }
+        html += '<button class="todo-detail-action-btn delete" onclick="if(confirm(\'このタスクを削除しますか？\')){deleteTaskFromPopup(\'' + path + '\');navigate(\'todos\')}">' + icons.trash + ' 削除する</button>';
+        html += '</div>';
+
+      } else {
+        // Category/subcategory/node detail
+        var title = node.goalId ? getGoalTitle(node.goalId) : (node.title || '(ノード)');
+        var counts = countTasks(node);
+
+        html += '<h1 class="todo-detail-title">' + icons.target + ' ' + escapeHtml(title) + '</h1>';
+        html += '<div class="todo-detail-meta">';
+        html += '<span class="badge badge-secondary">' + counts.done + '/' + counts.total + ' 完了</span>';
+        html += '</div>';
+
+        // Show children as a list
+        if (node.children && node.children.length > 0) {
+          html += '<div class="goal-detail-children">';
+          node.children.forEach(function(child) {
+            var childPath = path + ',' + child.id;
+            if (child.type === 'task') {
+              var doneClass = child.done ? ' style="opacity:.5;text-decoration:line-through"' : '';
+              var icon = child.done
+                ? '<span style="color:#059669">' + icons.check + '</span>'
+                : '<span style="color:var(--primary)"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg></span>';
+              html += '<div class="goal-detail-child" onclick="navigate(\'todo-detail\',{path:\'' + childPath + '\'})">';
+              html += '<div style="display:flex;align-items:center;gap:12px">' + icon + '<span' + doneClass + '>' + escapeHtml(child.title) + '</span></div>';
+              html += '<span class="text-xs" style="color:var(--fg-muted)">' + escapeHtml(child.assignee || '') + '</span>';
+              html += '</div>';
+            } else {
+              var childTitle = child.goalId ? getGoalTitle(child.goalId) : (child.title || '(ノード)');
+              var childCounts = countTasks(child);
+              html += '<div class="goal-detail-child" onclick="navigate(\'todo-detail\',{path:\'' + childPath + '\'})">';
+              html += '<div style="display:flex;align-items:center;gap:8px">' + icons.folder + '<span style="font-weight:500">' + escapeHtml(childTitle) + '</span></div>';
+              html += '<span class="badge badge-outline">' + childCounts.done + '/' + childCounts.total + '</span>';
+              html += '</div>';
+            }
+          });
+          html += '</div>';
+        } else {
+          html += '<div class="empty" style="margin-top:24px"><p>まだ子要素がありません</p></div>';
+        }
+
+        // Action buttons
+        html += '<div class="todo-detail-actions">';
+        html += '<button class="todo-detail-action-btn add" onclick="showAddChildDialog(\'' + path + '\',' + (path.split(',').length - 1) + ')">' + icons.plus + ' 子を追加</button>';
+        html += '<button class="todo-detail-action-btn delete" onclick="if(confirm(\'このノードを削除しますか？\')){deleteTodoNodeByPath(\'' + path + '\');navigate(\'todos\')}">' + icons.trash + ' 削除する</button>';
+        html += '</div>';
+      }
+
+      html += '</div>';
+      el.innerHTML = html;
+    }
+
+    // GOAL DETAIL SCREEN
+    function renderGoalDetail(el) {
+      var goalId = pageParams.goalId;
+      var type = pageParams.type;
+      if (!goalId) { navigate('goals'); return; }
+
+      var goal = null;
+      var parentLarge = null;
+      var parentMid = null;
+
+      if (type === 'large') {
+        goal = data.goals.find(function(g) { return g.id === goalId; });
+      } else if (type === 'mid') {
+        parentLarge = data.goals.find(function(g) { return g.id === pageParams.parentLargeId; });
+        if (parentLarge) goal = (parentLarge.children || []).find(function(m) { return m.id === goalId; });
+      } else if (type === 'small') {
+        parentLarge = data.goals.find(function(g) { return g.id === pageParams.parentLargeId; });
+        if (parentLarge) {
+          parentMid = (parentLarge.children || []).find(function(m) { return m.id === pageParams.parentMidId; });
+          if (parentMid) goal = (parentMid.children || []).find(function(s) { return s.id === goalId; });
+        }
+      }
+
+      if (!goal) { navigate('goals'); return; }
+
+      var html = '<div class="goal-detail-screen">';
+      html += '<div class="todo-detail-header">';
+      html += '<button class="todo-detail-back" onclick="navigate(\'goals\')">' + icons.arrowLeft + ' 目的ツリーに戻る</button>';
+
+      // For large goals, + button in top-right
+      if (type === 'large') {
+        html += '<button class="todo-detail-action-btn add" onclick="showAddGoalDialog(\'mid\',' + goalId + ')">' + icons.plus + ' 中目的を追加</button>';
+      } else if (type === 'mid') {
+        html += '<button class="todo-detail-action-btn add" onclick="showAddGoalDialog(\'small\',' + pageParams.parentLargeId + ',' + goalId + ')">' + icons.plus + ' 小目的を追加</button>';
+      }
+      html += '</div>';
+
+      var typeLabel = type === 'large' ? '大目的' : type === 'mid' ? '中目的' : '小目的';
+      html += '<div style="margin-bottom:8px"><span class="badge badge-primary">' + typeLabel + '</span></div>';
+      html += '<h1 class="todo-detail-title">' + icons.target + ' ' + escapeHtml(goal.title) + '</h1>';
+
+      // Show children if any
+      if (goal.children && goal.children.length > 0) {
+        html += '<div class="goal-detail-children" style="margin-top:24px">';
+        goal.children.forEach(function(child) {
+          var childType = type === 'large' ? 'mid' : 'small';
+          var childLabel = childType === 'mid' ? '中目的' : '小目的';
+          html += '<div class="goal-detail-child" onclick="navigate(\'goal-detail\',{goalId:' + child.id + ',type:\'' + childType + '\',parentLargeId:' + (type === 'large' ? goalId : pageParams.parentLargeId) + (childType === 'small' ? ',parentMidId:' + goalId : '') + '})">';
+          html += '<div style="display:flex;align-items:center;gap:8px"><span class="badge badge-outline" style="font-size:10px">' + childLabel + '</span><span style="font-weight:500">' + escapeHtml(child.title) + '</span></div>';
+          if (child.children && child.children.length > 0) {
+            html += '<span class="text-xs" style="color:var(--fg-muted)">' + child.children.length + ' 子目的</span>';
+          }
+          html += '</div>';
+        });
+        html += '</div>';
+      } else if (type !== 'small') {
+        html += '<div class="empty" style="margin-top:24px"><p>子目的がまだありません</p></div>';
+      }
+
+      // Action buttons
+      html += '<div class="todo-detail-actions">';
+      if (type === 'large') {
+        html += '<button class="todo-detail-action-btn add" onclick="showAddGoalDialog(\'mid\',' + goalId + ')">' + icons.plus + ' 中目的を追加</button>';
+      } else if (type === 'mid') {
+        html += '<button class="todo-detail-action-btn add" onclick="showAddGoalDialog(\'small\',' + pageParams.parentLargeId + ',' + goalId + ')">' + icons.plus + ' 小目的を追加</button>';
+      }
+      html += '<button class="todo-detail-action-btn delete" onclick="if(confirm(\'この目的を削除しますか？\')){deleteGoal(' + goalId + ',\'' + type + '\'';
+      if (type === 'mid') html += ',' + pageParams.parentLargeId;
+      if (type === 'small') html += ',' + pageParams.parentLargeId + ',' + pageParams.parentMidId;
+      html += ');navigate(\'goals\')}">' + icons.trash + ' 削除する</button>';
+
+      // Check button for marking as complete (for small goals)
+      if (type === 'small') {
+        html += '<button class="todo-detail-action-btn check" onclick="toast(\'目的を達成済みにしました\');navigate(\'goals\')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> 達成済みにする</button>';
+      }
+
+      html += '</div>';
+      html += '</div>';
+      el.innerHTML = html;
     }
 
     // INIT
