@@ -838,7 +838,7 @@
         data.goals.forEach(g => {
           html += `<div class="goal-large">
             <div class="goal-large-title">${icons.target} ${escapeHtml(g.title)}
-              <button class="btn btn-ghost btn-icon btn-sm" style="color:var(--destructive);margin-left:4px" onclick="deleteGoal(${g.id},'large')" title="削除">${icons.trash}</button>
+              <button class="btn btn-ghost btn-icon btn-sm goal-action-btn" style="color:var(--destructive);margin-left:4px" onclick="deleteGoal(${g.id},'large')" title="削除">${icons.trash}</button>
               <button class="btn btn-ghost btn-icon btn-sm goal-action-btn" onclick="showAddGoalDialog('mid',${g.id})" title="中目的を追加">${icons.plus}</button>
             </div>`;
           if (g.children && g.children.length > 0) {
