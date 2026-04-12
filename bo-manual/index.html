@@ -1418,7 +1418,7 @@
 
       // For category (depth 0) nodes, add + button in top right
       if (node.type === 'category' || node.type === 'subcategory' || node.type === 'node') {
-        html += '<button class="todo-detail-action-btn add" onclick="showAddChildDialog(\'' + path + '\',' + (path.split(\',\').length - 1) + ')">' + icons.plus + ' 子を追加</button>';
+        html += '<button class="todo-detail-action-btn add" onclick="showAddChildDialog(\'' + path + '\',' + (path.split(',').length - 1) + ')">' + icons.plus + ' 子を追加</button>';
       }
       html += '</div>';
 
