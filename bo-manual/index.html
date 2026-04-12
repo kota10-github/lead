@@ -198,7 +198,7 @@
     .todo-item:hover{background:var(--bg-muted);border-radius:var(--radius)}
     .todo-item.done{opacity:.5}
     .todo-item.done .todo-title{text-decoration:line-through}
-    .todo-checkbox{width:30px;height:30px;border:none;border-radius:50%;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;margin-top:1px;background:var(--primary);color:#fff}
+    .todo-checkbox{width:30px;height:30px;border:none;border-radius:50%;transition:all .3s cubic-bezier(.34,1.56,.64,1);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;margin-top:1px;background:var(--primary);color:#fff}
     .todo-checkbox.checked{background:#059669;border-color:#059669;color:#fff}
     .todo-title{font-size:13px;font-weight:500}
     .todo-meta{font-size:11px;color:var(--fg-muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap}
@@ -234,9 +234,14 @@
 .task-action-bar .action-icon.check-icon{color:#fff}
 .task-action-bar .action-icon.delete-icon{color:#fff}
 .task-action-bar .action-icon.add-icon{color:#fff}
+
+.todo-checkbox:not(.expanded):not(.checked):hover{transform:scale(1.15);box-shadow:0 2px 8px rgba(37,99,235,.3)}
+
+.todo-checkbox:not(.expanded):active{transform:scale(.9)}
 .todo-checkbox.expanded{background:var(--primary);width:68px;height:34px;border-radius:999px;padding:0 8px;gap:8px;display:flex;align-items:center;justify-content:center}
 .todo-checkbox.expanded .action-icon{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;color:#fff;transition:transform .15s}
 .todo-checkbox.expanded .action-icon:hover{transform:scale(1.2)}
+.todo-checkbox.expanded .action-icon:active{transform:scale(.8);transition:transform .08s}
 .todo-detail-screen{padding:24px 32px;max-width:800px;animation:fadeIn .2s}
 .todo-detail-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
 .todo-detail-back{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--fg-muted);cursor:pointer;padding:6px 12px;border-radius:var(--radius);transition:all .15s}
@@ -262,14 +267,16 @@
 .goal-detail-child{padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;transition:all .15s;cursor:pointer}
 .goal-detail-child:hover{border-color:rgba(37,99,235,.3);background:var(--bg-muted)}
   
-.overlay-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;animation:fadeIn .2s ease}
-.overlay-panel{background:#fff;border-radius:16px;padding:24px 24px 32px;width:100%;max-width:600px;max-height:70vh;overflow-y:auto;animation:slideUp .3s ease;box-shadow:0 -4px 20px rgba(0,0,0,.15)}
-@keyframes slideUp{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
+.overlay-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;animation:fadeIn .15s ease}
+.overlay-panel{background:#fff;border-radius:16px;transition:transform .2s ease;padding:24px 24px 32px;width:100%;max-width:600px;max-height:70vh;overflow-y:auto;animation:slideUp .3s ease;box-shadow:0 -4px 20px rgba(0,0,0,.15)}
+@keyframes slideUp{0%{transform:scale(.85);opacity:0}60%{transform:scale(1.02);opacity:1}100%{transform:scale(1);opacity:1}}
 .overlay-panel .overlay-title{font-size:18px;font-weight:600;margin-bottom:16px}
 .overlay-panel .overlay-type{font-size:12px;color:var(--fg-muted);margin-bottom:4px}
 .overlay-panel .overlay-actions{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap}
 .overlay-panel .overlay-action-btn{display:flex;align-items:center;gap:8px;padding:12px 24px;border-radius:var(--radius);font-size:14px;cursor:pointer;border:1px solid var(--border);background:#fff;transition:all .2s}
 .overlay-panel .overlay-action-btn:hover{transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.overlay-panel .overlay-action-btn:active{transform:scale(.93);transition:transform .1s}
+
 .overlay-panel .overlay-action-btn.check{background:#059669;color:#fff;border-color:#059669}
 .overlay-panel .overlay-action-btn.check:hover{background:#047857}
 .overlay-panel .overlay-action-btn.delete{background:#fff;color:var(--destructive);border-color:var(--destructive)}
@@ -277,8 +284,11 @@
 .overlay-panel .overlay-action-btn.add{background:var(--primary);color:#fff;border-color:var(--primary)}
 .overlay-panel .overlay-action-btn.add:hover{background:#1d4ed8}
 .overlay-panel .overlay-children{margin-top:16px}
-.overlay-panel .overlay-child{padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
-.overlay-panel .overlay-child:hover{background:var(--bg-muted)}
+.overlay-panel .overlay-child{padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;transition:all .2s ease;cursor:pointer}
+.overlay-panel .overlay-child:hover{background:var(--bg-muted);transform:translateX(4px);transition:all .2s ease}
+
+.goal-large-title:hover,.goal-mid-title:hover,.goal-small-title:hover{transform:translateX(3px);transition:transform .2s ease}
+.todo-node-title:hover{transform:translateX(3px);transition:transform .2s ease}
 </style>
 </head>
 <body>
@@ -1439,22 +1449,28 @@
     function toggleTaskActions(nodeId, path) {
       const checkboxEl = event.currentTarget;
       
-      // If already showing actions, close them
       if (checkboxEl.classList.contains('expanded')) {
-        checkboxEl.classList.remove('expanded');
-        checkboxEl.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>';
+        checkboxEl.style.transform = 'scale(0.8)';
+        setTimeout(() => {
+          checkboxEl.classList.remove('expanded');
+          checkboxEl.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>';
+          checkboxEl.style.transform = '';
+        }, 120);
         return;
       }
       
-      // Close any other open action bars
       document.querySelectorAll('.todo-checkbox.expanded').forEach(el => {
         el.classList.remove('expanded');
         el.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>';
       });
       
-      // Replace play button content with action icons
-      checkboxEl.classList.add('expanded');
-      checkboxEl.innerHTML = '<span class="action-icon check-icon" onclick="event.stopPropagation(); toggleTodoDone(' + nodeId + '); return false;">&#10003;</span><span class="action-icon delete-icon" onclick="event.stopPropagation(); if(confirm(\'削除しますか？\')) { deleteTodoNodeByPath(\'' + path + '\'); saveData(); render(); } return false;">&#128465;</span>';
+      checkboxEl.style.transform = 'scale(0.85)';
+      setTimeout(() => {
+        checkboxEl.classList.add('expanded');
+        checkboxEl.innerHTML = '<span class="action-icon check-icon" onclick="event.stopPropagation(); completeTask(' + nodeId + '); return false;">&#10003;</span><span class="action-icon delete-icon" onclick="event.stopPropagation(); if(confirm(\'' + String.fromCharCode(21066,38500,12375,12414,12377,12363,65311) + '\')) { deleteTodoNodeByPath(\'' + path + '\'); saveData(); render(); } return false;">&#128465;</span>';
+        checkboxEl.style.transform = 'scale(1.05)';
+        setTimeout(() => { checkboxEl.style.transform = ''; }, 150);
+      }, 100);
     }
 
     function closeOverlay() {
@@ -1591,8 +1607,12 @@
     document.addEventListener('click', function(e) {
       if (!e.target.closest('.todo-checkbox')) {
         document.querySelectorAll('.todo-checkbox.expanded').forEach(el => {
-          el.classList.remove('expanded');
-          el.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>';
+          el.style.transform = 'scale(0.8)';
+          setTimeout(() => {
+            el.classList.remove('expanded');
+            el.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>';
+            el.style.transform = '';
+          }, 120);
         });
       }
     });
