@@ -259,7 +259,25 @@
 .goal-detail-children{margin-top:24px}
 .goal-detail-child{padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;transition:all .15s;cursor:pointer}
 .goal-detail-child:hover{border-color:rgba(37,99,235,.3);background:var(--bg-muted)}
-  </style>
+  
+.overlay-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .2s ease}
+.overlay-panel{background:#fff;border-radius:16px 16px 0 0;padding:24px 24px 32px;width:100%;max-width:600px;max-height:70vh;overflow-y:auto;animation:slideUp .3s ease;box-shadow:0 -4px 20px rgba(0,0,0,.15)}
+@keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
+.overlay-panel .overlay-title{font-size:18px;font-weight:600;margin-bottom:16px}
+.overlay-panel .overlay-type{font-size:12px;color:var(--fg-muted);margin-bottom:4px}
+.overlay-panel .overlay-actions{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap}
+.overlay-panel .overlay-action-btn{display:flex;align-items:center;gap:8px;padding:12px 24px;border-radius:var(--radius);font-size:14px;cursor:pointer;border:1px solid var(--border);background:#fff;transition:all .2s}
+.overlay-panel .overlay-action-btn:hover{transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.overlay-panel .overlay-action-btn.check{background:#059669;color:#fff;border-color:#059669}
+.overlay-panel .overlay-action-btn.check:hover{background:#047857}
+.overlay-panel .overlay-action-btn.delete{background:#fff;color:var(--destructive);border-color:var(--destructive)}
+.overlay-panel .overlay-action-btn.delete:hover{background:#fef2f2}
+.overlay-panel .overlay-action-btn.add{background:var(--primary);color:#fff;border-color:var(--primary)}
+.overlay-panel .overlay-action-btn.add:hover{background:#1d4ed8}
+.overlay-panel .overlay-children{margin-top:16px}
+.overlay-panel .overlay-child{padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.overlay-panel .overlay-child:hover{background:var(--bg-muted)}
+</style>
 </head>
 <body>
   <div class="app" id="app">
@@ -873,21 +891,21 @@
         html += `<div class="goal-tree">`;
         data.goals.forEach(g => {
           html += `<div class="goal-large">
-            <div class="goal-large-title" style="cursor:pointer" onclick="navigate('goal-detail',{goalId:${g.id},type:'large'})">${icons.target} ${escapeHtml(g.title)}
+            <div class="goal-large-title" style="cursor:pointer" onclick="showGoalOverlay(${g.id},'large','${escapeHtml(g.name)}')">${icons.target} ${escapeHtml(g.title)}
              
              
             </div>`;
           if (g.children && g.children.length > 0) {
             g.children.forEach(mid => {
               html += `<div class="goal-mid">
-                <div class="goal-mid-title" style="cursor:pointer" onclick="navigate('goal-detail',{goalId:${mid.id},type:'mid',parentLargeId:${g.id}})">${escapeHtml(mid.title)}
+                <div class="goal-mid-title" style="cursor:pointer" onclick="showGoalOverlay(${mid.id},'mid','${escapeHtml(mid.name)}',${g.id})">${escapeHtml(mid.title)}
                  
                  
                 </div>`;
               if (mid.children && mid.children.length > 0) {
                 mid.children.forEach(sm => {
                   html += `<div class="goal-small">
-                    <div class="goal-small-title" style="cursor:pointer" onclick="navigate('goal-detail',{goalId:${sm.id},type:'small',parentLargeId:${g.id},parentMidId:${mid.id}})">${escapeHtml(sm.title)}
+                    <div class="goal-small-title" style="cursor:pointer" onclick="showGoalOverlay(${sm.id},'small','${escapeHtml(sm.name)}',${g.id},${mid.id})">${escapeHtml(sm.title)}
                      
                     </div>
                   </div>`;
@@ -1075,14 +1093,14 @@
         
         if (depth === 0) {
           html += '<div class="goal-large">';
-          html += '<div class="goal-large-title" style="cursor:pointer" onclick="navigate(\'todo-detail\',{path:\'' + path + '\'})">' + icons.target + ' ' + escapeHtml(title);
+          html += '<div class="goal-large-title" style="cursor:pointer" onclick="showTodoOverlay(\'' + path + '\',\'' + escapeHtml(title) + '\')">' + icons.target + ' ' + escapeHtml(title);
           html += ' <span class="badge badge-secondary" style="margin-left:4px">' + counts.done + '/' + counts.total + '</span>';
           html += '';
           html += '';
           html += '</div>';
         } else {
           html += '<div class="todo-node">';
-          html += '<div class="todo-node-title todo-node-depth' + Math.min(depth, 2) + '" style="cursor:pointer" onclick="navigate(\'todo-detail\',{path:\'' + path + '\'})">' + escapeHtml(title);
+          html += '<div class="todo-node-title todo-node-depth' + Math.min(depth, 2) + '" style="cursor:pointer" onclick="showTodoOverlay(\'' + path + '\',\'' + escapeHtml(title) + '\')">' + escapeHtml(title);
           html += ' <span class="badge badge-outline" style="margin-left:4px">' + counts.done + '/' + counts.total + '</span>';
           html += '';
           html += '';
@@ -1417,51 +1435,163 @@
 
 
     function toggleTaskActions(nodeId, path) {
-      var existing = document.getElementById('action-bar-' + nodeId);
-      if (existing) {
-        existing.remove();
+      const checkboxEl = event.currentTarget;
+      
+      // If already showing actions, close them
+      if (checkboxEl.classList.contains('expanded')) {
+        checkboxEl.classList.remove('expanded');
+        checkboxEl.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>';
         return;
       }
+      
       // Close any other open action bars
-      document.querySelectorAll('.task-action-bar').forEach(function(el) { el.remove(); });
+      document.querySelectorAll('.todo-checkbox.expanded').forEach(el => {
+        el.classList.remove('expanded');
+        el.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>';
+      });
       
-      var checkbox = document.querySelector('[data-checkbox-id="' + nodeId + '"]');
-      if (!checkbox) return;
+      // Replace play button content with action icons
+      checkboxEl.classList.add('expanded');
+      checkboxEl.innerHTML = '<span class="action-icon check-icon" onclick="event.stopPropagation(); toggleTodoDone(' + nodeId + '); return false;">&#10003;</span><span class="action-icon delete-icon" onclick="event.stopPropagation(); if(confirm(\'削除しますか？\')) { deleteTodoNodeByPath(\'' + path + '\'); saveData(); render(); } return false;">&#128465;</span>';
+    }
+
+    function closeOverlay() {
+      const backdrop = document.querySelector('.overlay-backdrop');
+      if (backdrop) backdrop.remove();
+    }
+
+    function showGoalOverlay(goalId, type, name, parentLargeId, parentMidId) {
+      closeOverlay();
+      const goal = findGoalById(goalId);
+      if (!goal) return;
       
-      var node = findNodeByPath(path);
+      const typeLabels = {large: '大目的', mid: '中目的', small: '小目的'};
+      const childType = type === 'large' ? '中目的' : type === 'mid' ? '小目的' : null;
+      const children = goal.children || [];
+      
+      let childrenHtml = '';
+      if (children.length > 0) {
+        childrenHtml = '<div class="overlay-children">';
+        children.forEach(c => {
+          const childCount = c.children ? c.children.length : 0;
+          childrenHtml += '<div class="overlay-child"><span>' + escapeHtml(c.name) + '</span><span style="color:var(--fg-muted);font-size:12px">' + childCount + ' 子目的</span></div>';
+        });
+        childrenHtml += '</div>';
+      }
+      
+      let actionsHtml = '<div class="overlay-actions">';
+      if (childType) {
+        actionsHtml += '<button class="overlay-action-btn add" onclick="closeOverlay(); addGoalChild(' + goalId + ',\'' + type + '\')">+ ' + childType + 'を追加</button>';
+      }
+      actionsHtml += '<button class="overlay-action-btn delete" onclick="if(confirm(\'この目的を削除しますか？\')) { closeOverlay(); deleteGoal(' + goalId + '); saveData(); render(); }">&#128465; 削除する</button>';
+      actionsHtml += '</div>';
+      
+      const html = '<div class="overlay-backdrop" onclick="if(event.target===this) closeOverlay()">' +
+        '<div class="overlay-panel">' +
+        '<div class="overlay-type">' + typeLabels[type] + '</div>' +
+        '<div class="overlay-title">' + escapeHtml(name) + '</div>' +
+        childrenHtml +
+        actionsHtml +
+        '</div></div>';
+      
+      document.body.insertAdjacentHTML('beforeend', html);
+    }
+
+    function showTodoOverlay(path, title) {
+      closeOverlay();
+      const ids = path.split(',').map(Number);
+      const node = findTodoNodeByPath(ids);
       if (!node) return;
       
-      var bar = document.createElement('div');
-      bar.className = 'task-action-bar';
-      bar.id = 'action-bar-' + nodeId;
+      const children = node.children || [];
+      const isCategory = node.type !== 'task';
       
-      // Check/complete button
-      var checkBtn = document.createElement('span');
-      checkBtn.className = 'action-icon check-icon';
-      checkBtn.title = node.done ? '未完了に戻す' : '完了';
-      checkBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
-      checkBtn.onclick = function(e) { e.stopPropagation(); completeTask(path); };
-      bar.appendChild(checkBtn);
+      let childrenHtml = '';
+      if (children.length > 0) {
+        childrenHtml = '<div class="overlay-children">';
+        children.forEach(c => {
+          const label = c.type === 'task' ? (c.done ? '✅' : '⬜') : '';
+          const cTitle = c.goalId ? getGoalTitle(c.goalId) : (c.title || '');
+          childrenHtml += '<div class="overlay-child"><span>' + label + ' ' + escapeHtml(cTitle) + '</span></div>';
+        });
+        childrenHtml += '</div>';
+      }
       
-      // Delete button
-      var delBtn = document.createElement('span');
-      delBtn.className = 'action-icon delete-icon';
-      delBtn.title = '削除';
-      delBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
-      delBtn.onclick = function(e) { e.stopPropagation(); deleteTaskFromPopup(path); };
-      bar.appendChild(delBtn);
+      let actionsHtml = '<div class="overlay-actions">';
+      actionsHtml += '<button class="overlay-action-btn add" onclick="closeOverlay(); addTodoChild(\'' + path + '\')">+ 追加</button>';
+      actionsHtml += '<button class="overlay-action-btn delete" onclick="if(confirm(\'削除しますか？\')) { closeOverlay(); deleteTodoNodeByPath(\'' + path + '\'); saveData(); render(); }">&#128465; 削除</button>';
+      actionsHtml += '</div>';
       
-      // Insert bar after checkbox
-      checkbox.parentElement.insertBefore(bar, checkbox.nextSibling);
+      const html = '<div class="overlay-backdrop" onclick="if(event.target===this) closeOverlay()">' +
+        '<div class="overlay-panel">' +
+        '<div class="overlay-title">' + escapeHtml(title) + '</div>' +
+        childrenHtml +
+        actionsHtml +
+        '</div></div>';
       
-      // Trigger animation
-      requestAnimationFrame(function() { bar.classList.add('open'); });
+      document.body.insertAdjacentHTML('beforeend', html);
+    }
+
+    function findGoalById(goalId) {
+      if (!data.goals) return null;
+      for (const g of data.goals) {
+        if (g.id === goalId) return g;
+        if (g.children) {
+          for (const mid of g.children) {
+            if (mid.id === goalId) return mid;
+            if (mid.children) {
+              for (const sm of mid.children) {
+                if (sm.id === goalId) return sm;
+              }
+            }
+          }
+        }
+      }
+      return null;
+    }
+
+    function findTodoNodeByPath(ids) {
+      if (!data.todos || ids.length === 0) return null;
+      let nodes = data.todos;
+      let current = null;
+      for (const id of ids) {
+        current = nodes.find(n => n.id === id);
+        if (!current) return null;
+        nodes = current.children || [];
+      }
+      return current;
+    }
+
+    function addGoalChild(parentId, parentType) {
+      const name = prompt(parentType === 'large' ? '中目的の名前:' : '小目的の名前:');
+      if (!name) return;
+      const parent = findGoalById(parentId);
+      if (!parent) return;
+      if (!parent.children) parent.children = [];
+      parent.children.push({id: Date.now(), name: name, children: []});
+      saveData();
+      render();
+    }
+
+    function addTodoChild(pathStr) {
+      const title = prompt('タスク名:');
+      if (!title) return;
+      const ids = pathStr.split(',').map(Number);
+      const node = findTodoNodeByPath(ids);
+      if (!node) return;
+      if (!node.children) node.children = [];
+      node.children.push({id: Date.now(), type: 'task', title: title, done: false, assignee: '', dueDay: ''});
+      saveData();
+      render();
     }
     
     // Close action bars on outside click
     document.addEventListener('click', function(e) {
-      if (!e.target.closest('.task-action-bar') && !e.target.closest('.todo-checkbox')) {
-        document.querySelectorAll('.task-action-bar').forEach(function(el) { el.remove(); });
+      if (!e.target.closest('.todo-checkbox')) {
+        document.querySelectorAll('.todo-checkbox.expanded').forEach(el => {
+          el.classList.remove('expanded');
+          el.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>';
+        });
       }
     });
 
