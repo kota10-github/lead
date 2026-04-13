@@ -1716,26 +1716,39 @@
           break;
         }
         case 'code': {
-          const text = sel.toString() || '\u30B3\u30FC\u30C9';
-          const code = document.createElement('code');
-          code.textContent = text;
+          var text = sel.toString() || '';
+          var code = document.createElement('code');
+          if (text) code.textContent = text;
           if (range) {
             range.deleteContents();
             range.insertNode(code);
           }
+          // Place cursor inside
+          var r2 = document.createRange();
+          r2.selectNodeContents(code);
+          r2.collapse(text ? false : true);
+          sel.removeAllRanges();
+          sel.addRange(r2);
           break;
         }
         case 'codeblock': {
-          const text = sel.toString() || '\u30B3\u30FC\u30C9\u3092\u5165\u529B';
-          const pre = document.createElement('pre');
-          const code = document.createElement('code');
-          code.textContent = text;
+          var text = sel.toString() || '';
+          var pre = document.createElement('pre');
+          var code = document.createElement('code');
+          if (text) code.textContent = text;
           pre.appendChild(code);
           if (range) {
             range.deleteContents();
             range.insertNode(pre);
           }
+          // Place cursor inside
+          var r2 = document.createRange();
+          r2.selectNodeContents(code);
+          r2.collapse(text ? false : true);
+          sel.removeAllRanges();
+          sel.addRange(r2);
           break;
+        }
         }
         case 'quote': {
           const text = sel.toString() || '\u5F15\u7528\u30C6\u30AD\u30B9\u30C8';
@@ -2281,43 +2294,9 @@
       }
 
       function scanBlocks() {
-        // Memo rich editor blocks
-        var editor = document.getElementById('memo-rich-editor');
-        if (editor) {
-          editor.querySelectorAll('h1,h2,h3,blockquote,pre,ul,ol').forEach(addCopyBtn);
-          // Also wrap sections: from heading to next heading
-          var headings = editor.querySelectorAll('h1,h2,h3');
-          headings.forEach(function(h) {
-            // If the heading itself is copyable, also make the section (heading + following content until next heading) copyable
-            // We do this by adding copy to the heading which copies heading + subsequent siblings
-            var existingBtn = h.querySelector('.block-copy-btn');
-            if (existingBtn) {
-              existingBtn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                e.preventDefault();
-                var text = h.innerText.replace(/\u30B3\u30D4\u30FC(\u6E08)?$/, '').trim();
-                var sibling = h.nextElementSibling;
-                while (sibling && !['H1','H2','H3'].includes(sibling.tagName)) {
-                  text += '\n' + sibling.innerText.replace(/\u30B3\u30D4\u30FC(\u6E08)?$/, '').trim();
-                  sibling = sibling.nextElementSibling;
-                }
-                navigator.clipboard.writeText(text).catch(function(){});
-              }, true);
-            }
-          });
-        }
-        // Manual page blocks
-        var docMain = document.querySelector('.doc-main');
-        if (docMain) {
-          docMain.querySelectorAll('.prose > h2, .prose > blockquote, .prose > pre, .prose > ul, .prose > ol, .prose > p').forEach(addCopyBtn);
-        }
-        // Also scan any .content-area or .main-area blocks
-        var mainArea = document.querySelector('.main-area');
-        if (mainArea) {
-          mainArea.querySelectorAll('blockquote, pre, .card, .info-card').forEach(addCopyBtn);
-        }
+        // Only add copy buttons to code blocks (pre) 
+        document.querySelectorAll('.memo-rich-editor pre, .doc-main pre, .main-area pre').forEach(addCopyBtn);
       }
-
       // Run on page changes via MutationObserver
       var observer = new MutationObserver(function() {
         setTimeout(scanBlocks, 100);
