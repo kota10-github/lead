@@ -39,6 +39,9 @@
     /* Cards */
     .card{border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card);overflow:hidden;transition:all .15s}
     .card:hover{border-color:rgba(37,99,235,.3);box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.card-delete-btn{opacity:0;pointer-events:none;transition:opacity .2s}
+.card:hover .card-delete-btn,.card.show-delete .card-delete-btn{opacity:1;pointer-events:auto}
+
     .card-header{padding:16px 20px 8px}
     .card-body{padding:8px 20px 16px}
     .card-title{font-size:14px;font-weight:600;color:var(--fg)}
@@ -711,7 +714,7 @@
                 <span class="badge badge-secondary">${icons.book} ${count} マニュアル</span>
               </div>
             </div>
-            <button class="btn btn-ghost btn-icon btn-sm" style="position:absolute;top:8px;right:8px;color:var(--destructive)" onclick="event.stopPropagation();confirmDeleteProject(${p.id})" title="削除">${icons.trash}</button>
+            <button class="btn btn-ghost btn-icon btn-sm card-delete-btn" style="position:absolute;top:8px;right:8px;color:var(--destructive)" onclick="event.stopPropagation();confirmDeleteProject(${p.id})" title="削除">${icons.trash}</button>
           </div>`;
         });
         html += `</div>`;
@@ -764,7 +767,7 @@
                 </div>
               </div>
             </div>
-            <button class="btn btn-ghost btn-icon btn-sm" style="position:absolute;top:8px;right:8px;color:var(--destructive)" onclick="event.stopPropagation();confirmDeleteManual(${m.id})" title="削除">${icons.trash}</button>
+            <button class="btn btn-ghost btn-icon btn-sm card-delete-btn" style="position:absolute;top:8px;right:8px;color:var(--destructive)" onclick="event.stopPropagation();confirmDeleteManual(${m.id})" title="削除">${icons.trash}</button>
           </div>`;
         });
       }
@@ -1820,6 +1823,22 @@
       el.innerHTML = html;
     }
 
+    // Card tap-to-show-delete handler (for mobile)
+    document.addEventListener('click', function(e) {
+      var card = e.target.closest('.card');
+      if (card && card.querySelector('.card-delete-btn')) {
+        // If clicking the delete button itself, don't toggle
+        if (e.target.closest('.card-delete-btn')) return;
+        // Toggle show-delete on this card
+        var wasShowing = card.classList.contains('show-delete');
+        // Close all other show-delete cards
+        document.querySelectorAll('.card.show-delete').forEach(function(c) { c.classList.remove('show-delete'); });
+        if (!wasShowing) card.classList.add('show-delete');
+      } else {
+        // Clicked outside - close all
+        document.querySelectorAll('.card.show-delete').forEach(function(c) { c.classList.remove('show-delete'); });
+      }
+    });
     // INIT
     render();
   </script>
