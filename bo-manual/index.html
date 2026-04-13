@@ -2261,7 +2261,7 @@
         const el = node.nodeType === 3 ? node.parentElement : node;
         if (!el) return false;
         // Check if inside memo editor, manual content, or main content area
-        return el.closest('.memo-rich-editor') || el.closest('.manual-content') || el.closest('.content-area') || el.closest('.main');
+        return el.closest('.memo-rich-editor') || el.closest('.doc-main') || el.closest('.main-area') || el.closest('.content-area');
       }
 
       function showCopyBtn() {
