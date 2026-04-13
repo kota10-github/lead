@@ -117,6 +117,27 @@
     .project-col{display:flex;flex-direction:column;gap:12px}
     .project-branch{display:flex;align-items:flex-start;gap:24px}
     .project-items-col{display:flex;flex-direction:column;gap:8px}
+        /* Map branch add options */
+    .map-add-options{display:flex;gap:6px;margin-top:6px}
+    .map-add-branch{padding:5px 12px;border-radius:14px;font-size:11px;font-weight:500;border:1px dashed var(--border);background:transparent;color:var(--fg-muted);cursor:pointer;transition:all .2s;white-space:nowrap}
+    .map-add-branch:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
+    /* Project detail */
+    .project-memo-area{margin-top:24px}
+    .project-memo-area h3{font-size:15px;font-weight:600;margin-bottom:8px}
+    .project-memo-editor{width:100%;min-height:200px;padding:12px;border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font);font-size:14px;line-height:1.6;resize:vertical;background:var(--bg)}
+    .project-memo-editor:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+    .project-files-area{margin-top:24px}
+    .project-files-area h3{font-size:15px;font-weight:600;margin-bottom:8px}
+    .file-upload-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:24px;text-align:center;cursor:pointer;transition:all .2s;color:var(--fg-muted);font-size:13px}
+    .file-upload-zone:hover{border-color:var(--primary);background:var(--primary-light)}
+    .file-upload-zone.dragover{border-color:var(--primary);background:var(--primary-light)}
+    .file-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+    .file-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg)}
+    .file-item-name{flex:1;font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .file-item-size{font-size:11px;color:var(--fg-muted)}
+    .file-item-delete{cursor:pointer;color:var(--fg-muted);transition:color .2s}
+    .file-item-delete:hover{color:var(--destructive)}
+    .file-item-preview{max-width:60px;max-height:40px;border-radius:4px;object-fit:cover}
         /* Zoom controls */
     .zoom-controls{display:flex;align-items:center;gap:4px;background:var(--bg-muted);border:1px solid var(--border);border-radius:8px;padding:2px}
     .zoom-btn{padding:4px 8px;border-radius:6px;font-size:12px;color:var(--fg-muted);transition:all .15s}
@@ -446,6 +467,8 @@
       }
       if (!data.nextGoalId) data.nextGoalId = 300;
       if (!data.nextTodoId) data.nextTodoId = 8;
+      // Ensure project memo and files fields
+      (data.projects || []).forEach(p => { if (!p.memo) p.memo = ''; if (!p.files) p.files = []; });
     } catch {
       data = JSON.parse(JSON.stringify(DEFAULT_DATA));
     }
@@ -522,7 +545,14 @@
         function getProjectMap() {
       const map = new Map();
       data.projects.forEach(p => {
-        map.set(p.id, { projectId: p.id, projectName: p.name, manuals: [], users: [] });
+        if (!p.parentId) {
+          map.set(p.id, { projectId: p.id, projectName: p.name, manuals: [], users: [], subProjects: [] });
+        }
+      });
+      data.projects.forEach(p => {
+        if (p.parentId && map.has(p.parentId)) {
+          map.get(p.parentId).subProjects.push(p);
+        }
       });
       data.assignees.forEach(a => {
         const manual = getManual(a.manualId);
@@ -626,7 +656,16 @@
           });
           html += `</div>`;
         }
-        html += `<button class="map-add-btn" onclick="navigate('manual-form',{projectId:${proj.projectId}})">+ マニュアル追加</button>`;
+        proj.subProjects.forEach(sp => {
+          html += `<div class="node-manual" data-node="sp-${proj.projectId}-${sp.id}" onclick="navigate('project-detail',{id:${sp.id}})" style="border-left:3px solid var(--primary);background:var(--primary-light)">
+            <div class="node-manual-title" style="color:var(--primary)">${icons.folder} ${escapeHtml(sp.name)}</div>
+            <div class="node-manual-purpose">${sp.description ? `<span class="line-clamp-2">${escapeHtml(sp.description)}</span>` : '<span style="opacity:.5">プロジェクト</span>'}</div>
+          </div>`;
+        });
+        html += `<div class="map-add-options">
+          <button class="map-add-branch" onclick="navigate('manual-form',{projectId:${proj.projectId}})">+ マニュアル</button>
+          <button class="map-add-branch" onclick="showProjectDialog(${proj.projectId})">+ プロジェクト</button>
+        </div>`;
         html += `</div></div>`;
       });
       html += `</div></div></div>`;
@@ -670,7 +709,12 @@
           proj.manuals.forEach(m => {
             const manualNode = inner.querySelector(`[data-node="pm-${proj.projectId}-${m.id}"]`);
             const manualPos = getCenter(manualNode);
-            if (manualPos) { lines.push({ from: projPos, to: manualPos, color: c.bg, width: 1.5, opacity: 0.5 }); }
+            if (manualPos) { lines.push({ from: projPos, to: manualPos, color: c.bg, width: 1.5, opacity: 0.5 });
+          proj.subProjects.forEach(sp => {
+            const spNode = inner.querySelector(`[data-node="sp-${proj.projectId}-${sp.id}"]`);
+            const spPos = getCenter(spNode);
+            if (spPos) { lines.push({ from: projPos, to: spPos, color: c.bg, width: 1.5, opacity: 0.5 }); }
+          }); }
           });
         }
       });
@@ -714,26 +758,69 @@
     function renderProjectDetail(el) {
       const project = getProject(pageParams.id);
       if (!project) { el.innerHTML = '<p>プロジェクトが見つかりません</p>'; return; }
+      if (!project.memo) project.memo = '';
+      if (!project.files) project.files = [];
       const manuals = getManualsByProject(project.id);
+      const subProjects = data.projects.filter(p => p.parentId === project.id);
       let html = `<button class="btn btn-ghost btn-sm mb-4" onclick="navigate('home')">${icons.arrowLeft} 全体マップ</button>`;
-      html += `<div class="page-header"><div><h1 class="page-title">${escapeHtml(project.name)}</h1>${project.description ? `<p style="color:var(--fg-muted);margin-top:4px">${escapeHtml(project.description)}</p>` : ''}</div><button class="btn btn-primary" onclick="navigate('manual-form',{projectId:${project.id}})">${icons.plus} マニュアル作成</button></div>`;
-      if (manuals.length === 0) {
-        html += `<div class="empty">${icons.book}<p>マニュアルがまだありません</p></div>`;
-      } else {
+      html += `<div class="page-header"><div><h1 class="page-title">${escapeHtml(project.name)}</h1>${project.description ? `<p style="color:var(--fg-muted);margin-top:4px">${escapeHtml(project.description)}</p>` : ''}</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" onclick="navigate('manual-form',{projectId:${project.id}})">${icons.plus} マニュアル作成</button>
+          <button class="btn btn-ghost" onclick="showProjectDialog(getProject(${project.id}))">${icons.pencil} 編集</button>
+        </div></div>`;
+      // Memo section
+      html += `<div class="project-memo-area">
+        <h3>📝 メモ・思考整理</h3>
+        <textarea class="project-memo-editor" id="project-memo" placeholder="メモや思考の整理を自由に記入...">${escapeHtml(project.memo)}</textarea>
+        <button class="btn btn-sm" style="margin-top:8px" onclick="saveProjectMemo(${project.id})">保存</button>
+      </div>`;
+      // File upload section
+      html += `<div class="project-files-area">
+        <h3>📎 資料・ファイル</h3>
+        <div class="file-upload-zone" id="file-upload-zone" onclick="document.getElementById('file-input').click()">
+          クリックまたはドラッグ＆ドロップでファイルをアップロード
+          <input type="file" id="file-input" multiple style="display:none" onchange="handleFileUpload(${project.id}, this.files)">
+        </div>
+        <div class="file-list" id="file-list">`;
+      project.files.forEach((f, fi) => {
+        const isImage = f.type && f.type.startsWith('image/');
+        html += `<div class="file-item">
+          ${isImage ? `<img src="${f.dataUrl}" class="file-item-preview">` : ''}
+          <span class="file-item-name">${escapeHtml(f.name)}</span>
+          <span class="file-item-size">${formatFileSize(f.size)}</span>
+          ${isImage ? `<span class="file-item-delete" onclick="window.open('${f.dataUrl}','_blank')" title="開く">${icons.external}</span>` : ''}
+          <span class="file-item-delete" onclick="deleteProjectFile(${project.id},${fi})" title="削除">${icons.x}</span>
+        </div>`;
+      });
+      html += `</div></div>`;
+      // Manuals section
+      if (manuals.length > 0 || subProjects.length > 0) {
+        html += `<div style="margin-top:24px"><h3 style="font-size:15px;font-weight:600;margin-bottom:12px">マニュアル・サブプロジェクト</h3>`;
         html += `<div class="grid grid-2">`;
+        subProjects.forEach(sp => {
+          html += `<div class="card" onclick="navigate('project-detail',{id:${sp.id}})" style="cursor:pointer;border-left:3px solid var(--primary)">
+            <div class="card-header"><div class="flex items-center gap-2">${icons.folder}<span class="card-title">${escapeHtml(sp.name)}</span></div></div>
+            <div class="card-body">${sp.description ? `<p class="text-sm" style="color:var(--fg-muted)">${escapeHtml(sp.description)}</p>` : ''}</div>
+          </div>`;
+        });
         manuals.forEach(m => {
           const assignees = getAssigneesForManual(m.id);
           html += `<div class="card" onclick="navigate('manual-detail',{id:${m.id}})" style="cursor:pointer">
             <div class="card-header"><div class="flex items-center gap-2">${icons.book}<span class="card-title">${escapeHtml(m.title)}</span></div></div>
-            <div class="card-body"><div class="purpose-box"><div class="purpose-label">${icons.target} 果たすべき責任（目的）</div><p class="text-sm line-clamp-2">${escapeHtml(m.purpose)}</p></div><div class="mt-2"><span class="badge badge-secondary">${icons.users} ${assignees.length} 責任者</span></div></div>
+            <div class="card-body"><div class="purpose-box"><div class="purpose-label">${icons.target} 果たすべき責任（目的）</div><p class="text-sm line-clamp-2">${escapeHtml(m.purpose)}</p></div></div>
           </div>`;
         });
-        html += `</div>`;
+        html += `</div></div>`;
       }
       el.innerHTML = html;
+      // Setup drag & drop
+      const zone = document.getElementById('file-upload-zone');
+      if (zone) {
+        zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+        zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+        zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('dragover'); handleFileUpload(project.id, e.dataTransfer.files); });
+      }
     }
-
-    // MANUAL LIST - fixed typo (一訧→一覧), added delete button
     function renderManualList(el) {
       let html = `<div class="page-header"><h1 class="page-title">マニュアル一覧</h1></div>`;
       if (data.manuals.length === 0) {
@@ -1364,7 +1451,14 @@
     }
 
     // DIALOGS
-    function showProjectDialog(editProject) {
+    function showProjectDialog(editProjectOrParentId) {
+      let editProject = null;
+      let parentId = null;
+      if (typeof editProjectOrParentId === 'object' && editProjectOrParentId) {
+        editProject = editProjectOrParentId;
+      } else if (typeof editProjectOrParentId === 'number') {
+        parentId = editProjectOrParentId;
+      }
       const isEdit = !!editProject;
       showModal(isEdit ? 'プロジェクト編集' : '新規プロジェクト',
         `<div class="form-group"><label class="label">プロジェクト名</label><input class="input" id="d-proj-name" value="${escapeHtml(editProject?.name || '')}" placeholder="プロジェクト名を入力"></div>
@@ -1376,13 +1470,12 @@
             if (!name) { toast('プロジェクト名を入力してください'); return; }
             const desc = document.getElementById('d-proj-desc').value.trim();
             if (isEdit) { editProject.name = name; editProject.description = desc; toast('プロジェクトを更新しました'); }
-            else { data.projects.push({ id: data.nextProjectId++, name, description: desc, createdBy: 0 }); toast('プロジェクトを作成しました'); }
+            else { data.projects.push({ id: data.nextProjectId++, name, description: desc, createdBy: 0, memo: '', files: [], parentId: parentId || null }); toast('プロジェクトを作成しました'); }
             saveData(); o.remove(); render();
           }}
         ]
       );
     }
-
     function confirmDeleteProject(id) {
       const project = getProject(id);
       const manualCount = getManualCountForProject(id);
@@ -1399,6 +1492,45 @@
           }}
         ]
       );
+    }
+
+    function saveProjectMemo(projectId) {
+      const project = getProject(projectId);
+      if (!project) return;
+      const memo = document.getElementById('project-memo').value;
+      project.memo = memo;
+      saveData();
+      toast('メモを保存しました');
+    }
+
+    function handleFileUpload(projectId, files) {
+      const project = getProject(projectId);
+      if (!project) return;
+      if (!project.files) project.files = [];
+      Array.from(files).forEach(file => {
+        if (file.size > 5 * 1024 * 1024) { toast('ファイルサイズが5MBを超えています: ' + file.name); return; }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          project.files.push({ name: file.name, size: file.size, type: file.type, dataUrl: e.target.result });
+          saveData();
+          render();
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function deleteProjectFile(projectId, fileIndex) {
+      const project = getProject(projectId);
+      if (!project || !project.files) return;
+      project.files.splice(fileIndex, 1);
+      saveData();
+      render();
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     }
 
     function confirmDeleteManual(id) {
