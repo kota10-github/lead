@@ -343,7 +343,14 @@
 
 .goal-large-title:hover,.goal-mid-title:hover,.goal-small-title:hover{transform:translateX(3px);transition:transform .2s ease}
 .todo-node-title:hover{transform:translateX(3px);transition:transform .2s ease}
-</style>
+
+    /* Floating copy button */
+    .selection-copy-btn{position:absolute;z-index:9999;display:none;align-items:center;gap:4px;padding:5px 12px;background:var(--fg);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);white-space:nowrap;transition:opacity .15s,transform .15s;opacity:0;transform:translateY(4px)}
+    .selection-copy-btn.visible{display:flex;opacity:1;transform:translateY(0)}
+    .selection-copy-btn:hover{background:var(--primary)}
+    .selection-copy-btn svg{width:14px;height:14px;fill:currentColor}
+    .selection-copy-btn.copied{background:#16a34a}
+    </style>
 </head>
 <body>
   <div class="app" id="app">
@@ -2233,6 +2240,108 @@
     });
     // INIT
     render();
-  </script>
+  
+    // === Selection Copy Button ===
+    (function() {
+      const btn = document.createElement('button');
+      btn.className = 'selection-copy-btn';
+      btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg> \u30B3\u30D4\u30FC';
+      document.body.appendChild(btn);
+
+      let hideTimer = null;
+
+      function getSelectedText() {
+        const sel = window.getSelection();
+        if (!sel || sel.isCollapsed || !sel.toString().trim()) return '';
+        return sel.toString().trim();
+      }
+
+      function isInCopyArea(node) {
+        if (!node) return false;
+        const el = node.nodeType === 3 ? node.parentElement : node;
+        if (!el) return false;
+        // Check if inside memo editor, manual content, or main content area
+        return el.closest('.memo-rich-editor') || el.closest('.manual-content') || el.closest('.content-area') || el.closest('.main');
+      }
+
+      function showCopyBtn() {
+        const text = getSelectedText();
+        const sel = window.getSelection();
+        if (!text || !sel.rangeCount) {
+          hideCopyBtn();
+          return;
+        }
+        // Check if selection is in a valid area
+        if (!isInCopyArea(sel.anchorNode)) {
+          hideCopyBtn();
+          return;
+        }
+        const range = sel.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) {
+          hideCopyBtn();
+          return;
+        }
+        // Position above the selection, centered
+        const x = rect.left + rect.width / 2 - 40;
+        const y = rect.top - 40 + window.scrollY;
+        btn.style.left = Math.max(8, Math.min(x, window.innerWidth - 120)) + 'px';
+        btn.style.top = Math.max(8, y) + 'px';
+        btn.classList.add('visible');
+        btn.classList.remove('copied');
+        btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg> \u30B3\u30D4\u30FC';
+        clearTimeout(hideTimer);
+      }
+
+      function hideCopyBtn() {
+        btn.classList.remove('visible');
+      }
+
+      btn.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const text = getSelectedText();
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(function() {
+          btn.classList.add('copied');
+          btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg> \u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F';
+          if (typeof showToast === 'function') showToast('\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F');
+          hideTimer = setTimeout(function() { hideCopyBtn(); }, 1500);
+        }).catch(function() {
+          // Fallback
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          btn.classList.add('copied');
+          btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg> \u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F';
+          if (typeof showToast === 'function') showToast('\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F');
+          hideTimer = setTimeout(function() { hideCopyBtn(); }, 1500);
+        });
+      });
+
+      document.addEventListener('mouseup', function() {
+        setTimeout(showCopyBtn, 10);
+      });
+
+      document.addEventListener('mousedown', function(e) {
+        if (e.target !== btn && !btn.contains(e.target)) {
+          hideCopyBtn();
+        }
+      });
+
+      document.addEventListener('keydown', function() {
+        hideCopyBtn();
+      });
+
+      document.addEventListener('scroll', function() {
+        hideCopyBtn();
+      }, true);
+    })();
+    </script>
 </body>
 </html>
