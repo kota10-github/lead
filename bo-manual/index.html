@@ -817,7 +817,7 @@
         <button class="btn btn-sm" style="margin-top:8px" onclick="saveProjectMemo(${project.id})">保存</button>
       </div>`;
       // Load memo into rich editor after render
-      setTimeout(() => { loadMemoToEditor(${project.id}); }, 0);
+      setTimeout(function() { loadMemoToEditor(project.id); }, 0);
       // File upload section
       html += `<div class="project-files-area">
         <h3>📎 資料・ファイル</h3>
