@@ -124,8 +124,36 @@
     /* Project detail */
     .project-memo-area{margin-top:24px}
     .project-memo-area h3{font-size:15px;font-weight:600;margin-bottom:8px}
-    .project-memo-editor{width:100%;min-height:200px;padding:12px;border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font);font-size:14px;line-height:1.6;resize:vertical;background:var(--bg)}
+    .memo-toolbar{display:flex;gap:4px;padding:6px 8px;background:var(--bg-muted);border:1px solid var(--border);border-bottom:none;border-radius:var(--radius) var(--radius) 0 0;flex-wrap:wrap;align-items:center}
+    .memo-toolbar-btn{padding:4px 8px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg);cursor:pointer;transition:all .15s;font-weight:500;line-height:1.4}
+    .memo-toolbar-btn:hover{background:var(--primary-light);border-color:var(--primary);color:var(--primary)}
+    .memo-toolbar-btn.active{background:var(--primary);color:var(--primary-fg);border-color:var(--primary)}
+    .memo-toolbar-sep{width:1px;height:20px;background:var(--border);margin:0 4px}
+    .memo-mode-toggle{display:flex;gap:0;margin-left:auto}
+    .memo-mode-btn{padding:4px 10px;font-size:12px;border:1px solid var(--border);background:var(--bg);color:var(--fg-muted);cursor:pointer;transition:all .15s}
+    .memo-mode-btn:first-child{border-radius:4px 0 0 4px}
+    .memo-mode-btn:last-child{border-radius:0 4px 4px 0;border-left:none}
+    .memo-mode-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+    .project-memo-editor{width:100%;min-height:250px;padding:12px;border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius);font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:13px;line-height:1.7;resize:vertical;background:var(--bg);tab-size:2}
     .project-memo-editor:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+    .memo-preview{min-height:250px;padding:16px;border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius);background:var(--bg);font-size:14px;line-height:1.8;overflow-y:auto;display:none}
+    .memo-preview h1{font-size:22px;font-weight:700;margin:16px 0 8px;padding-bottom:6px;border-bottom:2px solid var(--border)}
+    .memo-preview h2{font-size:18px;font-weight:600;margin:14px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--border-light)}
+    .memo-preview h3{font-size:15px;font-weight:600;margin:12px 0 4px}
+    .memo-preview p{margin:8px 0}
+    .memo-preview strong{font-weight:700}
+    .memo-preview em{font-style:italic}
+    .memo-preview ul,.memo-preview ol{margin:8px 0;padding-left:24px}
+    .memo-preview li{margin:4px 0}
+    .memo-preview code{background:var(--bg-muted);padding:2px 6px;border-radius:3px;font-family:'SFMono-Regular',Consolas,monospace;font-size:13px}
+    .memo-preview pre{background:var(--bg-muted);padding:12px;border-radius:var(--radius);overflow-x:auto;margin:12px 0}
+    .memo-preview pre code{background:none;padding:0}
+    .memo-preview blockquote{border-left:3px solid var(--primary);padding:4px 12px;margin:8px 0;color:var(--fg-muted);background:var(--bg-muted);border-radius:0 var(--radius) var(--radius) 0}
+    .memo-preview a{color:var(--primary);text-decoration:underline}
+    .memo-preview hr{border:none;border-top:1px solid var(--border);margin:16px 0}
+    .memo-preview table{border-collapse:collapse;width:100%;margin:12px 0}
+    .memo-preview th,.memo-preview td{border:1px solid var(--border);padding:8px 12px;text-align:left}
+    .memo-preview th{background:var(--bg-muted);font-weight:600}
     .project-files-area{margin-top:24px}
     .project-files-area h3{font-size:15px;font-weight:600;margin-bottom:8px}
     .file-upload-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:24px;text-align:center;cursor:pointer;transition:all .2s;color:var(--fg-muted);font-size:13px}
@@ -771,7 +799,31 @@
       // Memo section
       html += `<div class="project-memo-area">
         <h3>📝 メモ・思考整理</h3>
-        <textarea class="project-memo-editor" id="project-memo" placeholder="メモや思考の整理を自由に記入...">${escapeHtml(project.memo)}</textarea>
+        <div class="memo-toolbar">
+          <button class="memo-toolbar-btn" onclick="insertMdFormat('h1')" title="見出し1">H1</button>
+          <button class="memo-toolbar-btn" onclick="insertMdFormat('h2')" title="見出し2">H2</button>
+          <button class="memo-toolbar-btn" onclick="insertMdFormat('h3')" title="見出し3">H3</button>
+          <div class="memo-toolbar-sep"></div>
+          <button class="memo-toolbar-btn" onclick="insertMdFormat('bold')" title="太字"><b>B</b></button>
+          <button class="memo-toolbar-btn" onclick="insertMdFormat('italic')" title="イタリック"><i>I</i></button>
+          <button class="memo-toolbar-btn" onclick="insertMdFormat('strike')" title="取り消し線"><s>S</s></button>
+          <div class="memo-toolbar-sep"></div>
+          <button class="memo-toolbar-btn" onclick="insertMdFormat('ul')" title="箇条書き">• リスト</button>
+          <button class="memo-toolbar-btn" onclick="insertMdFormat('ol')" title="番号リスト">1. リスト</button>
+          <button class="memo-toolbar-btn" onclick="insertMdFormat('check')" title="チェックリスト">☑ TODO</button>
+          <div class="memo-toolbar-sep"></div>
+          <button class="memo-toolbar-btn" onclick="insertMdFormat('code')" title="コード">&lt;/&gt;</button>
+          <button class="memo-toolbar-btn" onclick="insertMdFormat('codeblock')" title="コードブロック">📋 ブロック</button>
+          <button class="memo-toolbar-btn" onclick="insertMdFormat('quote')" title="引用">❮ 引用</button>
+          <button class="memo-toolbar-btn" onclick="insertMdFormat('link')" title="リンク">🔗 リンク</button>
+          <button class="memo-toolbar-btn" onclick="insertMdFormat('hr')" title="水平線">─ 線</button>
+          <div class="memo-mode-toggle">
+            <button class="memo-mode-btn active" onclick="switchMemoMode('edit')">編集</button>
+            <button class="memo-mode-btn" onclick="switchMemoMode('preview')">プレビュー</button>
+          </div>
+        </div>
+        <textarea class="project-memo-editor" id="project-memo" placeholder="マークダウンで記述できます。 # 見出し **太字** *イタリック* - リスト">${escapeHtml(project.memo)}</textarea>
+        <div class="memo-preview" id="memo-preview"></div>
         <button class="btn btn-sm" style="margin-top:8px" onclick="saveProjectMemo(${project.id})">保存</button>
       </div>`;
       // File upload section
@@ -1492,6 +1544,123 @@
           }}
         ]
       );
+    }
+
+    function parseMarkdown(text) {
+      if (!text) return '';
+      let html = escapeHtml(text);
+      // Code blocks (triple backtick)
+      html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+      // Inline code
+      html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+      // Headings
+      html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+      html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+      html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+      // Bold + Italic
+      html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+      // Bold
+      html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      // Italic
+      html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+      // Strikethrough
+      html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
+      // Blockquote
+      html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+      // Horizontal rule
+      html = html.replace(/^---$/gm, '<hr>');
+      // Checkbox list
+      html = html.replace(/^- \[x\] (.+)$/gm, '<li style="list-style:none">☑ $1</li>');
+      html = html.replace(/^- \[ \] (.+)$/gm, '<li style="list-style:none">☐ $1</li>');
+      // Unordered list
+      html = html.replace(/^[\-\*] (.+)$/gm, '<li>$1</li>');
+      // Ordered list
+      html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+      // Wrap consecutive <li> in <ul>
+      html = html.replace(/(<li>.*?<\/li>\n?)+/g, function(match) { return '<ul>' + match + '</ul>'; });
+      // Links [text](url)
+      html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+      // Images ![alt](url)
+      html = html.replace(/!\[([^\]]*?)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width:100%;border-radius:4px">');
+      // Line breaks - paragraphs
+      html = html.replace(/\n\n/g, '</p><p>');
+      html = html.replace(/\n/g, '<br>');
+      html = '<p>' + html + '</p>';
+      // Clean up empty paragraphs
+      html = html.replace(/<p><\/p>/g, '');
+      // Clean up paragraphs around block elements
+      html = html.replace(/<p>(<h[1-3]>)/g, '$1');
+      html = html.replace(/(<\/h[1-3]>)<\/p>/g, '$1');
+      html = html.replace(/<p>(<pre>)/g, '$1');
+      html = html.replace(/(<\/pre>)<\/p>/g, '$1');
+      html = html.replace(/<p>(<ul>)/g, '$1');
+      html = html.replace(/(<\/ul>)<\/p>/g, '$1');
+      html = html.replace(/<p>(<blockquote>)/g, '$1');
+      html = html.replace(/(<\/blockquote>)<\/p>/g, '$1');
+      html = html.replace(/<p>(<hr>)/g, '$1');
+      html = html.replace(/(<hr>)<\/p>/g, '$1');
+      return html;
+    }
+
+    function switchMemoMode(mode) {
+      const editor = document.getElementById('project-memo');
+      const preview = document.getElementById('memo-preview');
+      const btns = document.querySelectorAll('.memo-mode-btn');
+      const toolbar = document.querySelector('.memo-toolbar');
+      if (!editor || !preview) return;
+      btns.forEach(b => b.classList.remove('active'));
+      if (mode === 'preview') {
+        editor.style.display = 'none';
+        preview.style.display = 'block';
+        preview.innerHTML = parseMarkdown(editor.value);
+        btns[1].classList.add('active');
+        // Hide format buttons in preview
+        toolbar.querySelectorAll('.memo-toolbar-btn').forEach(b => b.style.display = 'none');
+        toolbar.querySelector('.memo-toolbar-sep') && toolbar.querySelectorAll('.memo-toolbar-sep').forEach(s => s.style.display = 'none');
+      } else {
+        editor.style.display = '';
+        preview.style.display = 'none';
+        btns[0].classList.add('active');
+        toolbar.querySelectorAll('.memo-toolbar-btn').forEach(b => b.style.display = '');
+        toolbar.querySelectorAll('.memo-toolbar-sep').forEach(s => s.style.display = '');
+      }
+    }
+
+    function insertMdFormat(type) {
+      const ta = document.getElementById('project-memo');
+      if (!ta) return;
+      ta.focus();
+      const start = ta.selectionStart;
+      const end = ta.selectionEnd;
+      const sel = ta.value.substring(start, end);
+      const before = ta.value.substring(0, start);
+      const after = ta.value.substring(end);
+      let insert = '';
+      let cursorOffset = 0;
+      switch(type) {
+        case 'h1': insert = '# ' + (sel || '見出し1'); cursorOffset = 2; break;
+        case 'h2': insert = '## ' + (sel || '見出し2'); cursorOffset = 3; break;
+        case 'h3': insert = '### ' + (sel || '見出し3'); cursorOffset = 4; break;
+        case 'bold': insert = '**' + (sel || '太字テキスト') + '**'; cursorOffset = 2; break;
+        case 'italic': insert = '*' + (sel || 'イタリック') + '*'; cursorOffset = 1; break;
+        case 'strike': insert = '~~' + (sel || '取り消し線') + '~~'; cursorOffset = 2; break;
+        case 'ul': insert = '\n- ' + (sel || 'リスト項目'); cursorOffset = 3; break;
+        case 'ol': insert = '\n1. ' + (sel || 'リスト項目'); cursorOffset = 4; break;
+        case 'check': insert = '\n- [ ] ' + (sel || 'タスク'); cursorOffset = 7; break;
+        case 'code': insert = '`' + (sel || 'コード') + '`'; cursorOffset = 1; break;
+        case 'codeblock': insert = '\n```\n' + (sel || 'コードを入力') + '\n```\n'; cursorOffset = 4; break;
+        case 'quote': insert = '\n> ' + (sel || '引用テキスト'); cursorOffset = 3; break;
+        case 'link': insert = '[' + (sel || 'リンクテキスト') + '](url)'; cursorOffset = 1; break;
+        case 'hr': insert = '\n---\n'; cursorOffset = 0; break;
+      }
+      ta.value = before + insert + after;
+      if (sel) {
+        ta.selectionStart = start;
+        ta.selectionEnd = start + insert.length;
+      } else {
+        ta.selectionStart = start + cursorOffset;
+        ta.selectionEnd = start + insert.length - cursorOffset;
+      }
     }
 
     function saveProjectMemo(projectId) {
