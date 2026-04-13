@@ -398,6 +398,32 @@
       .code-textbox-copy-btn.copied {
         color: #2eaadc;
       }
+      .code-textbox-delete-btn {
+        position: absolute;
+        top: 6px;
+        left: 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        font-size: 12px;
+        color: #9b9a97;
+        background: transparent;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .code-textbox-delete-btn:hover {
+        background: rgba(235, 87, 87, 0.08);
+        color: #eb5757;
+      }
+      .code-textbox-delete-btn svg {
+        width: 14px;
+        height: 14px;
+        fill: currentColor;
+        flex-shrink: 0;
+      }
       /* Block copy buttons */
     .copyable-block{position:relative}
     .copyable-block .block-copy-btn{position:absolute;top:4px;right:4px;display:flex;align-items:center;gap:3px;padding:3px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--fg-muted);cursor:pointer;opacity:0;transition:opacity .15s;z-index:10;white-space:nowrap}
@@ -1714,6 +1740,36 @@
       if (!project || !editor) return;
       if (project.memo) {
         editor.innerHTML = markdownToHtml(project.memo);
+      // Initialize delete buttons on existing code blocks
+      editor.querySelectorAll('.code-textbox-wrapper').forEach(function(wrapper) {
+        if (!wrapper.querySelector('.code-textbox-delete-btn')) {
+          var delBtn = document.createElement('button');
+          delBtn.className = 'code-textbox-delete-btn';
+          delBtn.type = 'button';
+          delBtn.innerHTML = '<svg viewBox="0 0 16 16"><path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"></path></svg>削除';
+          delBtn.onclick = function() {
+            if (confirm('このコードブロックを削除しますか？')) {
+              wrapper.remove();
+            }
+          };
+          wrapper.appendChild(delBtn);
+        }
+        // Re-attach copy button event
+        var copyBtn = wrapper.querySelector('.code-textbox-copy-btn');
+        var ta = wrapper.querySelector('.code-textbox');
+        if (copyBtn && ta) {
+          copyBtn.onclick = function() {
+            navigator.clipboard.writeText(ta.value).then(function() {
+              copyBtn.classList.add('copied');
+              copyBtn.innerHTML = '<svg viewBox="0 0 16 16"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path></svg> Copied!';
+              setTimeout(function() {
+                copyBtn.classList.remove('copied');
+                copyBtn.innerHTML = '<svg viewBox="0 0 16 16"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"></path></svg> Copy';
+              }, 1500);
+            });
+          };
+        }
+      });
       }
       // Copy event: output markdown to clipboard
       editor.addEventListener('copy', function(e) {
@@ -1803,12 +1859,22 @@
                   copyBtn.innerHTML = '<svg viewBox="0 0 16 16"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg>Copied!';
                   setTimeout(function() {
                     copyBtn.classList.remove('copied');
-                    copyBtn.innerHTML = '<svg viewBox="0 0 16 16"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg>Copy';
+                    copyBtn.innerHTML = '<svg viewBox="0 0 1616"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg>Copy';
                   }, 1500);
                 });
               };
               wrapper.appendChild(ta);
               wrapper.appendChild(copyBtn);
+            var delBtn = document.createElement('button');
+            delBtn.className = 'code-textbox-delete-btn';
+            delBtn.type = 'button';
+            delBtn.innerHTML = '<svg viewBox="0 0 16 16"><path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"></path></svg>削除';
+            delBtn.onclick = function() {
+              if (confirm('このコードブロックを削除しますか？')) {
+                wrapper.remove();
+              }
+            };
+            wrapper.appendChild(delBtn);
               range.deleteContents();
               range.insertNode(wrapper);
               var newRange = document.createRange();
