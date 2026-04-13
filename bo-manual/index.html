@@ -344,12 +344,13 @@
 .goal-large-title:hover,.goal-mid-title:hover,.goal-small-title:hover{transform:translateX(3px);transition:transform .2s ease}
 .todo-node-title:hover{transform:translateX(3px);transition:transform .2s ease}
 
-    /* Floating copy button */
-    .selection-copy-btn{position:absolute;z-index:9999;display:none;align-items:center;gap:4px;padding:5px 12px;background:var(--fg);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);white-space:nowrap;transition:opacity .15s,transform .15s;opacity:0;transform:translateY(4px)}
-    .selection-copy-btn.visible{display:flex;opacity:1;transform:translateY(0)}
-    .selection-copy-btn:hover{background:var(--primary)}
-    .selection-copy-btn svg{width:14px;height:14px;fill:currentColor}
-    .selection-copy-btn.copied{background:#16a34a}
+    /* Block copy buttons */
+    .copyable-block{position:relative}
+    .copyable-block .block-copy-btn{position:absolute;top:4px;right:4px;display:flex;align-items:center;gap:3px;padding:3px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--fg-muted);cursor:pointer;opacity:0;transition:opacity .15s;z-index:10;white-space:nowrap}
+    .copyable-block:hover .block-copy-btn{opacity:1}
+    .block-copy-btn:hover{background:var(--primary-light);border-color:var(--primary);color:var(--primary)}
+    .block-copy-btn svg{width:12px;height:12px;fill:currentColor}
+    .block-copy-btn.copied{background:#16a34a;border-color:#16a34a;color:#fff;opacity:1}
     </style>
 </head>
 <body>
@@ -2241,106 +2242,90 @@
     // INIT
     render();
   
-    // === Selection Copy Button ===
+    // === Block Copy Buttons ===
     (function() {
-      const btn = document.createElement('button');
-      btn.className = 'selection-copy-btn';
-      btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg> \u30B3\u30D4\u30FC';
-      document.body.appendChild(btn);
+      const COPY_ICON = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
+      const CHECK_ICON = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>';
 
-      let hideTimer = null;
-
-      function getSelectedText() {
-        const sel = window.getSelection();
-        if (!sel || sel.isCollapsed || !sel.toString().trim()) return '';
-        return sel.toString().trim();
-      }
-
-      function isInCopyArea(node) {
-        if (!node) return false;
-        const el = node.nodeType === 3 ? node.parentElement : node;
-        if (!el) return false;
-        // Check if inside memo editor, manual content, or main content area
-        return el.closest('.memo-rich-editor') || el.closest('.doc-main') || el.closest('.main-area') || el.closest('.content-area');
-      }
-
-      function showCopyBtn() {
-        const text = getSelectedText();
-        const sel = window.getSelection();
-        if (!text || !sel.rangeCount) {
-          hideCopyBtn();
-          return;
-        }
-        // Check if selection is in a valid area
-        if (!isInCopyArea(sel.anchorNode)) {
-          hideCopyBtn();
-          return;
-        }
-        const range = sel.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
-        if (rect.width === 0 && rect.height === 0) {
-          hideCopyBtn();
-          return;
-        }
-        // Position above the selection, centered
-        const x = rect.left + rect.width / 2 - 40;
-        const y = rect.top - 40 + window.scrollY;
-        btn.style.left = Math.max(8, Math.min(x, window.innerWidth - 120)) + 'px';
-        btn.style.top = Math.max(8, y) + 'px';
-        btn.classList.add('visible');
-        btn.classList.remove('copied');
-        btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg> \u30B3\u30D4\u30FC';
-        clearTimeout(hideTimer);
-      }
-
-      function hideCopyBtn() {
-        btn.classList.remove('visible');
-      }
-
-      btn.addEventListener('mousedown', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        const text = getSelectedText();
-        if (!text) return;
-        navigator.clipboard.writeText(text).then(function() {
-          btn.classList.add('copied');
-          btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg> \u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F';
-          if (typeof showToast === 'function') showToast('\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F');
-          hideTimer = setTimeout(function() { hideCopyBtn(); }, 1500);
-        }).catch(function() {
-          // Fallback
-          const ta = document.createElement('textarea');
-          ta.value = text;
-          ta.style.position = 'fixed';
-          ta.style.opacity = '0';
-          document.body.appendChild(ta);
-          ta.select();
-          document.execCommand('copy');
-          document.body.removeChild(ta);
-          btn.classList.add('copied');
-          btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg> \u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F';
-          if (typeof showToast === 'function') showToast('\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F');
-          hideTimer = setTimeout(function() { hideCopyBtn(); }, 1500);
+      function addCopyBtn(el) {
+        if (el.querySelector('.block-copy-btn')) return;
+        el.classList.add('copyable-block');
+        const btn = document.createElement('button');
+        btn.className = 'block-copy-btn';
+        btn.innerHTML = COPY_ICON + ' \u30B3\u30D4\u30FC';
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          e.preventDefault();
+          const text = el.innerText.replace(/\u30B3\u30D4\u30FC$/, '').trim();
+          navigator.clipboard.writeText(text).then(function() {
+            onCopied(btn);
+          }).catch(function() {
+            var ta = document.createElement('textarea');
+            ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+            document.body.appendChild(ta); ta.select();
+            document.execCommand('copy'); document.body.removeChild(ta);
+            onCopied(btn);
+          });
         });
-      });
+        el.appendChild(btn);
+      }
 
-      document.addEventListener('mouseup', function() {
-        setTimeout(showCopyBtn, 10);
-      });
+      function onCopied(btn) {
+        btn.classList.add('copied');
+        btn.innerHTML = CHECK_ICON + ' \u30B3\u30D4\u30FC\u6E08';
+        if (typeof showToast === 'function') showToast('\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F');
+        setTimeout(function() {
+          btn.classList.remove('copied');
+          btn.innerHTML = COPY_ICON + ' \u30B3\u30D4\u30FC';
+        }, 1500);
+      }
 
-      document.addEventListener('mousedown', function(e) {
-        if (e.target !== btn && !btn.contains(e.target)) {
-          hideCopyBtn();
+      function scanBlocks() {
+        // Memo rich editor blocks
+        var editor = document.getElementById('memo-rich-editor');
+        if (editor) {
+          editor.querySelectorAll('h1,h2,h3,blockquote,pre,ul,ol').forEach(addCopyBtn);
+          // Also wrap sections: from heading to next heading
+          var headings = editor.querySelectorAll('h1,h2,h3');
+          headings.forEach(function(h) {
+            // If the heading itself is copyable, also make the section (heading + following content until next heading) copyable
+            // We do this by adding copy to the heading which copies heading + subsequent siblings
+            var existingBtn = h.querySelector('.block-copy-btn');
+            if (existingBtn) {
+              existingBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                var text = h.innerText.replace(/\u30B3\u30D4\u30FC(\u6E08)?$/, '').trim();
+                var sibling = h.nextElementSibling;
+                while (sibling && !['H1','H2','H3'].includes(sibling.tagName)) {
+                  text += '\n' + sibling.innerText.replace(/\u30B3\u30D4\u30FC(\u6E08)?$/, '').trim();
+                  sibling = sibling.nextElementSibling;
+                }
+                navigator.clipboard.writeText(text).catch(function(){});
+              }, true);
+            }
+          });
         }
-      });
+        // Manual page blocks
+        var docMain = document.querySelector('.doc-main');
+        if (docMain) {
+          docMain.querySelectorAll('.prose > h2, .prose > blockquote, .prose > pre, .prose > ul, .prose > ol, .prose > p').forEach(addCopyBtn);
+        }
+        // Also scan any .content-area or .main-area blocks
+        var mainArea = document.querySelector('.main-area');
+        if (mainArea) {
+          mainArea.querySelectorAll('blockquote, pre, .card, .info-card').forEach(addCopyBtn);
+        }
+      }
 
-      document.addEventListener('keydown', function() {
-        hideCopyBtn();
+      // Run on page changes via MutationObserver
+      var observer = new MutationObserver(function() {
+        setTimeout(scanBlocks, 100);
       });
+      observer.observe(document.body, { childList: true, subtree: true });
 
-      document.addEventListener('scroll', function() {
-        hideCopyBtn();
-      }, true);
+      // Initial scan
+      setTimeout(scanBlocks, 300);
     })();
     </script>
 </body>
