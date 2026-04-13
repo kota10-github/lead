@@ -235,9 +235,15 @@
 .task-action-bar .action-icon.delete-icon{color:#fff}
 .task-action-bar .action-icon.add-icon{color:#fff}
 
-.todo-checkbox:hover{transform:scale(1.15);box-shadow:0 2px 8px rgba(37,99,235,.3)}
-.todo-checkbox:active{transform:scale(.9)}
-.todo-checkbox.checked:hover{box-shadow:0 2px 8px rgba(5,150,105,.3)}
+.todo-checkbox:not(.expanded):hover{transform:scale(1.15);box-shadow:0 2px 8px rgba(37,99,235,.3)}
+.todo-checkbox:not(.expanded):active{transform:scale(.9)}
+.todo-checkbox.checked:not(.expanded):hover{box-shadow:0 2px 8px rgba(5,150,105,.3)}
+.todo-checkbox.expanded{width:68px;height:34px;border-radius:999px;padding:0 6px;gap:6px;display:flex;align-items:center;justify-content:center;background:var(--primary);animation:expandPill .25s cubic-bezier(.34,1.56,.64,1)}
+@keyframes expandPill{from{width:30px;opacity:.7}to{width:68px;opacity:1}}
+.todo-checkbox.expanded .action-icon{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;transition:all .15s;flex-shrink:0}
+.todo-checkbox.expanded .action-icon:hover{background:rgba(255,255,255,.25);transform:scale(1.15)}
+.todo-checkbox.expanded .action-icon:active{transform:scale(.85)}
+.todo-checkbox.expanded .action-icon.delete-icon:hover{background:rgba(239,68,68,.6)}
 .todo-detail-screen{padding:24px 32px;max-width:800px;animation:fadeIn .2s}
 .todo-detail-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
 .todo-detail-back{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--fg-muted);cursor:pointer;padding:6px 12px;border-radius:var(--radius);transition:all .15s}
@@ -1087,7 +1093,7 @@
         // Leaf task node
         html += '<div class="todo-node">';
         html += '<div class="todo-item' + (node.done ? ' done' : '') + '" style="margin:0;border:none;padding:4px 0">';
-        html += '<div class="todo-checkbox ' + (node.done ? 'checked' : '') + '" data-checkbox-id="' + node.id + '" onclick="event.stopPropagation();completeTask(\'' + path + '\')">' + (node.done ? icons.check : '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
+        html += '<div class="todo-checkbox ' + (node.done ? 'checked' : '') + '" data-checkbox-id="' + node.id + '" data-path="' + path + '" onclick="event.stopPropagation();expandTodoActions(this,\'' + path + '\',' + node.done + ')">' + (node.done ? icons.check : '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
         html += '<div style="flex:1;min-width:0">';
         html += '<div class="todo-title">' + escapeHtml(node.title) + '</div>';
         html += '<div class="todo-meta">';
@@ -1442,6 +1448,46 @@
 
 
 
+    function expandTodoActions(el, path, isDone) {
+      // If already expanded, collapse
+      if (el.classList.contains('expanded')) {
+        collapseTodoCheckbox(el);
+        return;
+      }
+      // Collapse any other expanded checkboxes
+      document.querySelectorAll('.todo-checkbox.expanded').forEach(function(other) {
+        if (other !== el) collapseTodoCheckbox(other);
+      });
+      // Expand this one
+      el.classList.add('expanded');
+      el.innerHTML = '<span class="action-icon check-icon" onclick="event.stopPropagation();completeTaskFromBtn(this,\'' + path + '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>' +
+        '<span class="action-icon delete-icon" onclick="event.stopPropagation();deleteTodoFromBtn(this,\'' + path + '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></span>';
+    }
+    function collapseTodoCheckbox(el) {
+      el.classList.remove('expanded');
+      var isDone = el.classList.contains('checked');
+      if (isDone) {
+        el.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
+      } else {
+        el.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>';
+      }
+    }
+    function completeTaskFromBtn(iconEl, path) {
+      var node = findNodeByPath(path);
+      if (node) { node.done = !node.done; saveData(); }
+      render();
+    }
+    function deleteTodoFromBtn(iconEl, path) {
+      deleteTodoNodeByPath(path);
+    }
+    // Close expanded checkboxes on outside click
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.todo-checkbox')) {
+        document.querySelectorAll('.todo-checkbox.expanded').forEach(function(el) {
+          collapseTodoCheckbox(el);
+        });
+      }
+    });
     function toggleTaskActions(nodeId, path) {
       const checkboxEl = event.currentTarget;
       
