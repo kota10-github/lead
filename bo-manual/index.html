@@ -235,13 +235,9 @@
 .task-action-bar .action-icon.delete-icon{color:#fff}
 .task-action-bar .action-icon.add-icon{color:#fff}
 
-.todo-checkbox:not(.expanded):not(.checked):hover{transform:scale(1.15);box-shadow:0 2px 8px rgba(37,99,235,.3)}
-
-.todo-checkbox:not(.expanded):active{transform:scale(.9)}
-.todo-checkbox.expanded{background:var(--primary);width:68px;height:34px;border-radius:999px;padding:0 8px;gap:8px;display:flex;align-items:center;justify-content:center}
-.todo-checkbox.expanded .action-icon{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;color:#fff;transition:transform .15s}
-.todo-checkbox.expanded .action-icon:hover{transform:scale(1.2)}
-.todo-checkbox.expanded .action-icon:active{transform:scale(.8);transition:transform .08s}
+.todo-checkbox:hover{transform:scale(1.15);box-shadow:0 2px 8px rgba(37,99,235,.3)}
+.todo-checkbox:active{transform:scale(.9)}
+.todo-checkbox.checked:hover{box-shadow:0 2px 8px rgba(5,150,105,.3)}
 .todo-detail-screen{padding:24px 32px;max-width:800px;animation:fadeIn .2s}
 .todo-detail-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
 .todo-detail-back{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--fg-muted);cursor:pointer;padding:6px 12px;border-radius:var(--radius);transition:all .15s}
@@ -1090,10 +1086,10 @@
       if (node.type === 'task') {
         // Leaf task node
         html += '<div class="todo-node">';
-        html += '<div class="todo-item" style="margin:0;border:none;padding:4px 0">';
-        html += '<div class="todo-checkbox ' + (node.done ? 'checked' : '') + '" data-checkbox-id="' + node.id + '" onclick="event.stopPropagation();toggleTaskActions(' + node.id + ',\'' + path + '\')">' + (node.done ? icons.check : '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
+        html += '<div class="todo-item' + (node.done ? ' done' : '') + '" style="margin:0;border:none;padding:4px 0">';
+        html += '<div class="todo-checkbox ' + (node.done ? 'checked' : '') + '" data-checkbox-id="' + node.id + '" onclick="event.stopPropagation();completeTask(\'' + path + '\')">' + (node.done ? icons.check : '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
         html += '<div style="flex:1;min-width:0">';
-        html += '<div class="todo-title" style="' + (node.done ? 'text-decoration:line-through;opacity:.5' : '') + '">' + escapeHtml(node.title) + '</div>';
+        html += '<div class="todo-title">' + escapeHtml(node.title) + '</div>';
         html += '<div class="todo-meta">';
         html += '<span>' + icons.users + ' ' + escapeHtml(node.assignee || '未割当') + '</span>';
         html += '<span>' + icons.clock + ' ' + escapeHtml(node.dueDay || '期限なし') + '</span>';
@@ -1603,20 +1599,7 @@
       render();
     }
     
-    // Close action bars on outside click
-    document.addEventListener('click', function(e) {
-      if (!e.target.closest('.todo-checkbox')) {
-        document.querySelectorAll('.todo-checkbox.expanded').forEach(el => {
-          el.style.transform = 'scale(0.8)';
-          setTimeout(() => {
-            el.classList.remove('expanded');
-            el.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>';
-            el.style.transform = '';
-          }, 120);
-        });
-      }
-    });
-
+    
     // TODO DETAIL SCREEN
     function renderTodoDetail(el) {
       const path = pageParams.path;
