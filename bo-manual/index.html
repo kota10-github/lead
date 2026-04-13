@@ -348,6 +348,14 @@
     .copyable-block{position:relative}
     .copyable-block .block-copy-btn{position:absolute;top:4px;right:4px;display:flex;align-items:center;gap:3px;padding:3px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--fg-muted);cursor:pointer;opacity:0;transition:opacity .15s;z-index:10;white-space:nowrap}
     .copyable-block:hover .block-copy-btn{opacity:1}
+          /* Code textbox */
+          .code-textbox-wrapper{position:relative;margin:8px 0;border:1px solid var(--border);border-radius:var(--radius);background:#f6f8fa;padding:0}
+          .code-textbox{width:100%;min-height:80px;padding:12px;padding-right:80px;border:none;background:transparent;font-family:'Courier New',monospace;font-size:13px;line-height:1.5;resize:vertical;outline:none;color:var(--fg);box-sizing:border-box}
+          .code-textbox-copy-btn{position:absolute;top:4px;right:4px;display:flex;align-items:center;gap:3px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius);background:#fff;color:var(--fg-muted);font-size:11px;cursor:pointer;opacity:0;transition:opacity .2s}
+          .code-textbox-wrapper:hover .code-textbox-copy-btn{opacity:1}
+          .code-textbox-copy-btn:hover{background:var(--primary-light);border-color:var(--primary);color:var(--primary)}
+          .code-textbox-copy-btn svg{width:12px;height:12px;fill:currentColor}
+          .code-textbox-copy-btn.copied{background:#16a34a;border-color:#16a34a;color:#fff;opacity:1}
     .block-copy-btn:hover{background:var(--primary-light);border-color:var(--primary);color:var(--primary)}
     .block-copy-btn svg{width:12px;height:12px;fill:currentColor}
     .block-copy-btn.copied{background:#16a34a;border-color:#16a34a;color:#fff;opacity:1}
@@ -815,12 +823,10 @@
           <button class="memo-toolbar-btn" onclick="memoExecCmd('ol')" title="番号リスト">1. リスト</button>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('check')" title="チェックリスト">☑ TODO</button>
           <div class="memo-toolbar-sep"></div>
-          <button class="memo-toolbar-btn" onclick="memoExecCmd('code')" title="コード">&lt;/&gt;</button>
-          <button class="memo-toolbar-btn" onclick="memoExecCmd('codeblock')" title="コードブロック">📋 ブロック</button>
+          <button class="memo-toolbar-btn" onclick="memoExecCmd('codeblock')" title="コード">&lt;/&gt;</button>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('quote')" title="引用">❮ 引用</button>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('link')" title="リンク">🔗 リンク</button>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('hr')" title="水平線">─ 線</button>
-        </div>
         <div class="memo-rich-editor" id="memo-rich-editor" contenteditable="true" data-placeholder="見出しや太字を使って自由に記入できます"></div>
         <button class="btn btn-sm" style="margin-top:8px" onclick="saveProjectMemo(${project.id})">保存</button>
       </div>`;
@@ -1732,24 +1738,40 @@
           break;
         }
         case 'codeblock': {
-          var text = sel.toString() || '';
-          var pre = document.createElement('pre');
-          var code = document.createElement('code');
-          if (text) code.textContent = text;
-          pre.appendChild(code);
-          if (range) {
-            range.deleteContents();
-            range.insertNode(pre);
-          }
-          // Place cursor inside
-          var r2 = document.createRange();
-          r2.selectNodeContents(code);
-          r2.collapse(text ? false : true);
-          sel.removeAllRanges();
-          sel.addRange(r2);
-          break;
+                      var codeText = sel.toString() || '';
+                      var wrapper = document.createElement('div');
+                      wrapper.className = 'code-textbox-wrapper';
+                      wrapper.contentEditable = 'false';
+                      var ta = document.createElement('textarea');
+                      ta.className = 'code-textbox';
+                      ta.placeholder = 'コードを入力...';
+                      ta.value = codeText;
+                      ta.rows = 4;
+                      var copyBtn = document.createElement('button');
+                      copyBtn.className = 'code-textbox-copy-btn';
+                      copyBtn.type = 'button';
+                      copyBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg> コピー';
+                      copyBtn.onclick = function(e) {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      var val = ta.value;
+                                      navigator.clipboard.writeText(val).then(function() {
+                                                        copyBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg> コピー済';
+                                                        copyBtn.classList.add('copied');
+                                                        setTimeout(function() {
+                                                                            copyBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg> コピー';
+                                                                            copyBtn.classList.remove('copied');
+                                                        }, 1500);
+                                      });
+                      };
+                      wrapper.appendChild(ta);
+                      wrapper.appendChild(copyBtn);
+                      if (range) {
+                                      range.deleteContents();
+                                      range.insertNode(wrapper);
+                      }
+                      break;
         }
-        case 'quote': {
           const text = sel.toString() || '\u5F15\u7528\u30C6\u30AD\u30B9\u30C8';
           const bq = document.createElement('blockquote');
           bq.textContent = text;
