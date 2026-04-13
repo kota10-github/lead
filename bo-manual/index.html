@@ -112,13 +112,6 @@
     .user-col{display:flex;flex-direction:column;gap:12px}
     .project-row{display:flex;align-items:flex-start;gap:24px}
     .manuals-col{display:flex;flex-direction:column;gap:8px}
-    /* MindMap View Toggle */
-    .map-view-toggle{display:flex;gap:6px;margin-bottom:12px}
-    .map-view-btn{padding:6px 16px;border-radius:20px;font-size:13px;font-weight:500;border:1px solid var(--border);background:var(--bg);color:var(--fg-muted);cursor:pointer;transition:all .2s}
-    .map-view-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
-    .map-view-btn:hover:not(.active){background:var(--bg-muted)}
-    .map-add-btn{padding:4px 12px;border-radius:16px;font-size:11px;font-weight:500;border:1px dashed var(--border);background:transparent;color:var(--fg-muted);cursor:pointer;transition:all .2s;margin-left:8px}
-    .map-add-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
     .node-project-standalone{padding:8px 16px;border-radius:8px;font-weight:500;font-size:13px;border:2px solid var(--primary);background:var(--primary-light);color:var(--primary);cursor:pointer;transition:all .15s;white-space:nowrap;user-select:none}
     .node-project-standalone:hover{transform:scale(1.05);box-shadow:0 2px 8px rgba(37,99,235,.2)}
     .project-col{display:flex;flex-direction:column;gap:12px}
@@ -321,11 +314,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
           全体マップ
         </button>
-        <button class="nav-item" data-page="projects" onclick="navigate('projects')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 -4H4a2 2 0 0 0-2 2v14z"/><path d="M2 10h7l2-4"/></svg>
-          プロジェクト
-        </button>
-        <button class="nav-item" data-page="manuals" onclick="navigate('manuals')">
+                <button class="nav-item" data-page="manuals" onclick="navigate('manuals')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
           マニュアル一覧
         </button>
@@ -530,25 +519,7 @@
     function getManualsByProject(pid) { return data.manuals.filter(m => m.projectId === pid); }
     function getManualsByUser(uid) { return data.assignees.filter(a => a.userId === uid).map(a => ({ ...a, manual: getManual(a.manualId) })).filter(a => a.manual); }
     function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
-    function getFullMap() {
-      const map = new Map();
-      data.assignees.forEach(a => {
-        const user = getUser(a.userId);
-        const manual = getManual(a.manualId);
-        if (!user || !manual) return;
-        if (!map.has(a.userId)) map.set(a.userId, { userId: a.userId, userName: user.name, projects: new Map() });
-        const u = map.get(a.userId);
-        const project = getProject(manual.projectId);
-        if (!project) return;
-        if (!u.projects.has(project.id)) u.projects.set(project.id, { projectId: project.id, projectName: project.name, manuals: [] });
-        const p = u.projects.get(project.id);
-        if (!p.manuals.find(m => m.id === manual.id)) p.manuals.push(manual);
-      });
-      return Array.from(map.values()).map(u => ({ ...u, projects: Array.from(u.projects.values()) }));
-    }
-
-    // MODAL HELPER
-    function getProjectMap() {
+        function getProjectMap() {
       const map = new Map();
       data.projects.forEach(p => {
         map.set(p.id, { projectId: p.id, projectName: p.name, manuals: [], users: [] });
@@ -587,9 +558,8 @@
       const main = document.getElementById('main-area');
       switch (currentPage) {
         case 'home': renderHome(main); break;
-        case 'projects': renderProjects(main); break;
-        case 'project-detail': renderProjectDetail(main); break;
-        case 'manuals': renderManualList(main); break;
+      case 'project-detail': renderProjectDetail(main); break;
+            case 'manuals': renderManualList(main); break;
         case 'manual-detail': renderManualDetail(main); break;
         case 'manual-form': renderManualForm(main); break;
         case 'tasks': renderMyTasks(main); break;
@@ -605,7 +575,6 @@
     }
 
     // ZOOM STATE
-    let mapViewMode = 'person'; // 'person' or 'project'
     let mapZoom = 1;
     const MAP_ZOOM_MIN = 0.3;
     const MAP_ZOOM_MAX = 2;
@@ -622,110 +591,62 @@
 
     // HOME (Mind Map) - with delete buttons on project and manual nodes
     function renderHome(el) {
+      const projects = getProjectMap();
       let html = `<div class="page-header"><h1 class="page-title">全体マップ</h1>
         <div class="zoom-controls">
           <button class="zoom-btn" onclick="setMapZoom(mapZoom - MAP_ZOOM_STEP)" title="縮小">−</button>
           <span class="zoom-label" id="zoom-label" onclick="setMapZoom(1)" title="リセット">${Math.round(mapZoom * 100)}%</span>
           <button class="zoom-btn" onclick="setMapZoom(mapZoom + MAP_ZOOM_STEP)" title="拡大">+</button>
         </div></div>`;
-      html += `<div class="map-view-toggle">
-        <button class="map-view-btn ${mapViewMode==='person'?'active':''}" onclick="mapViewMode='person';render()">担当者ごと</button>
-        <button class="map-view-btn ${mapViewMode==='project'?'active':''}" onclick="mapViewMode='project';render()">プロジェクト起点</button>
-      </div>`;
-      if (mapViewMode === 'person') {
-        renderPersonView();
-      } else {
-        renderProjectView();
-      }
-      function renderPersonView() {
-        const grouped = getFullMap();
-        if (grouped.length === 0) {
-          html += `<div class="empty">責任者がアサインされたマニュアルがまだありません</div>`;
-          el.innerHTML = html;
-          return;
-        }
-        html += `<div class="mindmap-viewport" id="mindmap-viewport">`;
-        html += `<svg class="mindmap-svg" id="mindmap-svg"></svg>`;
-        html += `<div class="mindmap-inner" id="mindmap-inner" style="transform:scale(${mapZoom})">`;
-        html += `<div style="display:flex;flex-direction:column;justify-content:center;padding-top:32px"><div class="node-root" data-node="root">BOチーム</div></div>`;
-        html += `<div class="user-col">`;
-        grouped.forEach((user, ui) => {
-          const c = USER_COLORS[ui % USER_COLORS.length];
-          html += `<div style="display:flex;align-items:flex-start;gap:24px">`;
-          html += `<div class="node-user" data-node="user-${user.userId}" style="background:${c.bg}">${escapeHtml(user.userName || '名前未設定')} <span style="opacity:.75;font-size:11px">(${user.projects.length})</span></div>`;
-          html += `<div class="user-col">`;
-          user.projects.forEach(proj => {
-            html += `<div class="project-row">`;
-            html += `<div class="node-project" data-node="proj-${user.userId}-${proj.projectId}" style="background:${c.light};color:${c.text};border-color:${c.bg}40">${escapeHtml(proj.projectName)} <span style="opacity:.6;font-size:11px">(${proj.manuals.length})</span></div>`;
-            html += `<div class="manuals-col">`;
-            proj.manuals.forEach(m => {
-              html += `<div class="node-manual" data-node="manual-${user.userId}-${m.id}" onclick="navigate('manual-detail',{id:${m.id}})">
-                <div class="node-manual-title">${escapeHtml(m.title)}<span class="node-delete-btn" onclick="event.stopPropagation();confirmDeleteManual(${m.id})" title="削除">${icons.x}</span></div>
-                <div class="node-manual-purpose">${icons.target}<span class="line-clamp-2">${escapeHtml(m.purpose)}</span></div>
-              </div>`;
-            });
-            html += `</div>`;
-          });
-          html += `</div></div>`;
-        });
-        html += `</div></div></div>`;
+      if (projects.length === 0) {
+        html += `<div class="empty">プロジェクトがまだありません。<button class="btn btn-primary" onclick="showProjectDialog()" style="margin-left:8px">+ プロジェクトを作成</button></div>`;
         el.innerHTML = html;
-        setupMapInteractions(grouped, 'person');
+        return;
       }
-      function renderProjectView() {
-        const projects = getProjectMap();
-        if (projects.length === 0) {
-          html += `<div class="empty">プロジェクトがまだありません</div>`;
-          el.innerHTML = html;
-          return;
-        }
-        html += `<div class="mindmap-viewport" id="mindmap-viewport">`;
-        html += `<svg class="mindmap-svg" id="mindmap-svg"></svg>`;
-        html += `<div class="mindmap-inner" id="mindmap-inner" style="transform:scale(${mapZoom})">`;
-        html += `<div style="display:flex;flex-direction:column;justify-content:center;padding-top:32px"><div class="node-root" data-node="root">BOチーム</div><button class="map-add-btn" onclick="showProjectDialog()">+ プロジェクト追加</button></div>`;
-        html += `<div class="project-col">`;
-        projects.forEach((proj, pi) => {
-          const c = USER_COLORS[pi % USER_COLORS.length];
-          html += `<div class="project-branch">`;
-          html += `<div class="node-project-standalone" data-node="proj-${proj.projectId}" style="border-color:${c.bg};background:${c.light};color:${c.text}" onclick="navigate('project-detail',{id:${proj.projectId}})">${escapeHtml(proj.projectName)}<span style="opacity:.6;font-size:11px;margin-left:4px">(${proj.manuals.length})</span></div>`;
-          html += `<div class="project-items-col">`;
-          proj.manuals.forEach(m => {
-            html += `<div class="node-manual" data-node="pm-${proj.projectId}-${m.id}" onclick="navigate('manual-detail',{id:${m.id}})">
-              <div class="node-manual-title">${escapeHtml(m.title)}<span class="node-delete-btn" onclick="event.stopPropagation();confirmDeleteManual(${m.id})" title="削除">${icons.x}</span></div>
-              <div class="node-manual-purpose">${icons.target}<span class="line-clamp-2">${escapeHtml(m.purpose)}</span></div>
-            </div>`;
+      html += `<div class="mindmap-viewport" id="mindmap-viewport">`;
+      html += `<svg class="mindmap-svg" id="mindmap-svg"></svg>`;
+      html += `<div class="mindmap-inner" id="mindmap-inner" style="transform:scale(${mapZoom})">`;
+      html += `<div style="display:flex;flex-direction:column;justify-content:center;padding-top:32px"><div class="node-root" data-node="root">BOチーム</div><button class="map-add-btn" onclick="showProjectDialog()">+ プロジェクト追加</button></div>`;
+      html += `<div class="project-col">`;
+      projects.forEach((proj, pi) => {
+        const c = USER_COLORS[pi % USER_COLORS.length];
+        html += `<div class="project-branch">`;
+        html += `<div class="node-project-standalone" data-node="proj-${proj.projectId}" style="border-color:${c.bg};background:${c.light};color:${c.text}" onclick="navigate('project-detail',{id:${proj.projectId}})">${escapeHtml(proj.projectName)}<span style="opacity:.6;font-size:11px;margin-left:4px">(${proj.manuals.length})</span></div>`;
+        html += `<div class="project-items-col">`;
+        proj.manuals.forEach(m => {
+          html += `<div class="node-manual" data-node="pm-${proj.projectId}-${m.id}" onclick="navigate('manual-detail',{id:${m.id}})">
+            <div class="node-manual-title">${escapeHtml(m.title)}<span class="node-delete-btn" onclick="event.stopPropagation();confirmDeleteManual(${m.id})" title="削除">${icons.x}</span></div>
+            <div class="node-manual-purpose">${icons.target}<span class="line-clamp-2">${escapeHtml(m.purpose)}</span></div>
+          </div>`;
+        });
+        if (proj.users.length > 0) {
+          html += `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">`;
+          proj.users.forEach(u => {
+            html += `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:var(--bg-muted);color:var(--fg-muted)">${escapeHtml(u.name)}</span>`;
           });
-          if (proj.users.length > 0) {
-            html += `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">`;
-            proj.users.forEach(u => {
-              html += `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:var(--bg-muted);color:var(--fg-muted)">${escapeHtml(u.name)}</span>`;
-            });
-            html += `</div>`;
-          }
-          html += `<button class="map-add-btn" onclick="navigate('manual-form',{projectId:${proj.projectId}})">+ マニュアル追加</button>`;
-          html += `</div></div>`;
-        });
-        html += `</div></div></div>`;
-        el.innerHTML = html;
-        setupMapInteractions(projects, 'project');
-      }
-      function setupMapInteractions(mapData, mode) {
-        const viewport = document.getElementById('mindmap-viewport');
-        if (!viewport) return;
-        viewport.addEventListener('wheel', (e) => {
-          if (e.ctrlKey || e.metaKey) { e.preventDefault(); setMapZoom(mapZoom + (e.deltaY < 0 ? MAP_ZOOM_STEP : -MAP_ZOOM_STEP)); }
-        }, { passive: false });
-        let isPanning = false, panStartX = 0, panStartY = 0, scrollStartX = 0, scrollStartY = 0;
-        viewport.addEventListener('mousedown', (e) => {
-          if (e.target.closest('.node-manual,.node-project,.node-user,.node-root,.node-project-standalone,.map-add-btn')) return;
-          isPanning = true; panStartX = e.clientX; panStartY = e.clientY; scrollStartX = viewport.scrollLeft; scrollStartY = viewport.scrollTop; viewport.style.cursor = 'grabbing';
-        });
-        document.addEventListener('mousemove', (e) => { if (!isPanning) return; viewport.scrollLeft = scrollStartX - (e.clientX - panStartX); viewport.scrollTop = scrollStartY - (e.clientY - panStartY); });
-        document.addEventListener('mouseup', () => { isPanning = false; viewport.style.cursor = ''; });
-        requestAnimationFrame(() => requestAnimationFrame(() => drawMindmapLines(mapData, mode)));
-      }
+          html += `</div>`;
+        }
+        html += `<button class="map-add-btn" onclick="navigate('manual-form',{projectId:${proj.projectId}})">+ マニュアル追加</button>`;
+        html += `</div></div>`;
+      });
+      html += `</div></div></div>`;
+      el.innerHTML = html;
+      // Setup interactions
+      const viewport = document.getElementById('mindmap-viewport');
+      if (!viewport) return;
+      viewport.addEventListener('wheel', (e) => {
+        if (e.ctrlKey || e.metaKey) { e.preventDefault(); setMapZoom(mapZoom + (e.deltaY < 0 ? MAP_ZOOM_STEP : -MAP_ZOOM_STEP)); }
+      }, { passive: false });
+      let isPanning = false, panStartX = 0, panStartY = 0, scrollStartX = 0, scrollStartY = 0;
+      viewport.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.node-manual,.node-project,.node-user,.node-root,.node-project-standalone,.map-add-btn')) return;
+        isPanning = true; panStartX = e.clientX; panStartY = e.clientY; scrollStartX = viewport.scrollLeft; scrollStartY = viewport.scrollTop; viewport.style.cursor = 'grabbing';
+      });
+      document.addEventListener('mousemove', (e) => { if (!isPanning) return; viewport.scrollLeft = scrollStartX - (e.clientX - panStartX); viewport.scrollTop = scrollStartY - (e.clientY - panStartY); });
+      document.addEventListener('mouseup', () => { isPanning = false; viewport.style.cursor = ''; });
+      requestAnimationFrame(() => requestAnimationFrame(() => drawMindmapLines(projects)));
     }
-    function drawMindmapLines(mapData, mode) {
+    function drawMindmapLines(projects) {
       const svg = document.getElementById('mindmap-svg');
       const inner = document.getElementById('mindmap-inner');
       if (!svg || !inner) return;
@@ -740,42 +661,19 @@
       const rootNode = inner.querySelector('[data-node="root"]');
       const rootPos = getCenter(rootNode);
       if (!rootPos) return;
-      if (mode === 'person') {
-        mapData.forEach((user, ui) => {
-          const c = USER_COLORS[ui % USER_COLORS.length];
-          const userNode = inner.querySelector(`[data-node="user-${user.userId}"]`);
-          const userPos = getCenter(userNode);
-          if (userPos) {
-            lines.push({ from: rootPos, to: userPos, color: c.bg, width: 2.5 });
-            user.projects.forEach(proj => {
-              const projNode = inner.querySelector(`[data-node="proj-${user.userId}-${proj.projectId}"]`);
-              const projPos = getCenter(projNode);
-              if (projPos) {
-                lines.push({ from: userPos, to: projPos, color: c.bg, width: 1.8, opacity: 0.6 });
-                proj.manuals.forEach(m => {
-                  const manualNode = inner.querySelector(`[data-node="manual-${user.userId}-${m.id}"]`);
-                  const manualPos = getCenter(manualNode);
-                  if (manualPos) { lines.push({ from: projPos, to: manualPos, color: c.bg, width: 1.2, opacity: 0.35 }); }
-                });
-              }
-            });
-          }
-        });
-      } else {
-        mapData.forEach((proj, pi) => {
-          const c = USER_COLORS[pi % USER_COLORS.length];
-          const projNode = inner.querySelector(`[data-node="proj-${proj.projectId}"]`);
-          const projPos = getCenter(projNode);
-          if (projPos) {
-            lines.push({ from: rootPos, to: projPos, color: c.bg, width: 2.5 });
-            proj.manuals.forEach(m => {
-              const manualNode = inner.querySelector(`[data-node="pm-${proj.projectId}-${m.id}"]`);
-              const manualPos = getCenter(manualNode);
-              if (manualPos) { lines.push({ from: projPos, to: manualPos, color: c.bg, width: 1.5, opacity: 0.5 }); }
-            });
-          }
-        });
-      }
+      projects.forEach((proj, pi) => {
+        const c = USER_COLORS[pi % USER_COLORS.length];
+        const projNode = inner.querySelector(`[data-node="proj-${proj.projectId}"]`);
+        const projPos = getCenter(projNode);
+        if (projPos) {
+          lines.push({ from: rootPos, to: projPos, color: c.bg, width: 2.5 });
+          proj.manuals.forEach(m => {
+            const manualNode = inner.querySelector(`[data-node="pm-${proj.projectId}-${m.id}"]`);
+            const manualPos = getCenter(manualNode);
+            if (manualPos) { lines.push({ from: projPos, to: manualPos, color: c.bg, width: 1.5, opacity: 0.5 }); }
+          });
+        }
+      });
       const innerW = inner.scrollWidth;
       const innerH = inner.scrollHeight;
       svg.setAttribute('width', innerW);
@@ -817,7 +715,7 @@
       const project = getProject(pageParams.id);
       if (!project) { el.innerHTML = '<p>プロジェクトが見つかりません</p>'; return; }
       const manuals = getManualsByProject(project.id);
-      let html = `<button class="btn btn-ghost btn-sm mb-4" onclick="navigate('projects')">${icons.arrowLeft} プロジェクト一覧</button>`;
+      let html = `<button class="btn btn-ghost btn-sm mb-4" onclick="navigate('home')">${icons.arrowLeft} 全体マップ</button>`;
       html += `<div class="page-header"><div><h1 class="page-title">${escapeHtml(project.name)}</h1>${project.description ? `<p style="color:var(--fg-muted);margin-top:4px">${escapeHtml(project.description)}</p>` : ''}</div><button class="btn btn-primary" onclick="navigate('manual-form',{projectId:${project.id}})">${icons.plus} マニュアル作成</button></div>`;
       if (manuals.length === 0) {
         html += `<div class="empty">${icons.book}<p>マニュアルがまだありません</p></div>`;
@@ -1497,7 +1395,7 @@
             data.manuals = data.manuals.filter(m => m.projectId !== id);
             data.assignees = data.assignees.filter(a => !manualIds.includes(a.manualId));
             data.projects = data.projects.filter(p => p.id !== id);
-            saveData(); toast('プロジェクトを削除しました'); o.remove(); navigate('projects');
+            saveData(); toast('プロジェクトを削除しました'); o.remove(); navigate('home');
           }}
         ]
       );
