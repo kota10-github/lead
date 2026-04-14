@@ -696,8 +696,10 @@
       crumbs.push({label: '全体マップ', page: 'home'});
       
       if (page === 'project-detail' && params.id) {
-        const proj = getProject(params.id);
-        crumbs.push({label: proj ? proj.name : 'プロジェクト', page: 'project-detail', params: {id: params.id}});
+        var chain = [];
+        var cur = getProject(params.id);
+        while (cur) { chain.unshift(cur); cur = cur.parentId ? getProject(cur.parentId) : null; }
+        chain.forEach(function(p) { crumbs.push({label: p.name || 'プロジェクト', page: 'project-detail', params: {id: p.id}}); });
       }
       if (page === 'manual-form') {
         if (params.projectId) {
@@ -787,27 +789,24 @@
     function getManualsByUser(uid) { return data.assignees.filter(a => a.userId === uid).map(a => ({ ...a, manual: getManual(a.manualId) })).filter(a => a.manual); }
     function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
         function getProjectMap() {
-      const map = new Map();
-      data.projects.forEach(p => {
-        if (!p.parentId) {
-          map.set(p.id, { projectId: p.id, projectName: p.name, manuals: [], users: [], subProjects: [] });
-        }
-      });
-      data.projects.forEach(p => {
-        if (p.parentId && map.has(p.parentId)) {
-          map.get(p.parentId).subProjects.push(p);
-        }
-      });
-      data.assignees.forEach(a => {
-        const manual = getManual(a.manualId);
-        const user = getUser(a.userId);
-        if (!manual || !user) return;
-        const proj = map.get(manual.projectId);
-        if (!proj) return;
-        if (!proj.manuals.find(m => m.id === manual.id)) proj.manuals.push(manual);
-        if (!proj.users.find(u => u.id === user.id)) proj.users.push(user);
-      });
-      return Array.from(map.values());
+      function buildNode(p) {
+        var node = { projectId: p.id, projectName: p.name, manuals: [], users: [], subProjects: [] };
+        data.projects.forEach(function(child) {
+          if (child.parentId === p.id) node.subProjects.push(buildNode(child));
+        });
+        data.assignees.forEach(function(a) {
+          var manual = getManual(a.manualId);
+          var user = getUser(a.userId);
+          if (!manual || !user) return;
+          if (manual.projectId !== p.id) return;
+          if (!node.manuals.find(function(m) { return m.id === manual.id; })) node.manuals.push(manual);
+          if (!node.users.find(function(u) { return u.id === user.id; })) node.users.push(user);
+        });
+        return node;
+      }
+      var roots = [];
+      data.projects.forEach(function(p) { if (!p.parentId) roots.push(buildNode(p)); });
+      return roots;
     }
 
     function showModal(title, bodyHtml, actions) {
@@ -970,13 +969,21 @@
           });
           html += `</div>`;
         }
-        proj.subProjects.forEach(sp => {
-          const sc = getProjectColor(sp.id);
-          html += `<div class="node-manual" data-node="sp-${proj.projectId}-${sp.id}" onclick="navigate('project-detail',{id:${sp.id}})" style="border-left:3px solid ${sc.bg};background:${sc.light}">
-            <div class="node-manual-title" style="color:${sc.bg}">${icons.folder} ${escapeHtml(sp.name)}</div>
-            <div class="node-manual-purpose">${sp.description ? `<span class="line-clamp-2">${escapeHtml(sp.description)}</span>` : '<span style="opacity:.5">プロジェクト</span>'}</div>
+        function renderSubBranch(sp, depth) {
+          var sc = getProjectColor(sp.projectId);
+          html += '<div class="sub-branch" style="margin-left:' + (depth > 0 ? 16 : 0) + 'px">';
+          html += `<div class="node-manual" data-node="sp-${sp.projectId}" onclick="navigate('project-detail',{id:${sp.projectId}})" style="border-left:3px solid ${sc.bg};background:${sc.light}">
+            <div class="node-manual-title" style="color:${sc.bg}">${icons.folder} ${escapeHtml(sp.projectName)}</div>
+            <div class="node-manual-purpose">${sp.subProjects.length > 0 ? '<span style="opacity:.6;font-size:10px">' + sp.subProjects.length + '件のサブプロジェクト</span>' : ''}</div>
           </div>`;
-        });
+          if (sp.subProjects.length > 0) {
+            html += '<div class="project-items-col" style="margin-left:12px;padding-left:8px;border-left:2px solid ' + sc.bg + '33">';
+            sp.subProjects.forEach(function(child) { renderSubBranch(child, depth + 1); });
+            html += '</div>';
+          }
+          html += '</div>';
+        }
+        proj.subProjects.forEach(function(sp) { renderSubBranch(sp, 0); });
         html += `<div class="map-add-options">
           <button class="map-add-branch" onclick="navigate('manual-form',{projectId:${proj.projectId}})">+ マニュアル</button>
           <button class="map-add-branch" onclick="showProjectDialog(${proj.projectId})">+ プロジェクト</button>
@@ -1027,11 +1034,15 @@
             if (mp) mps.push(mp);
           });
           var sps = [];
-          proj.subProjects.forEach(function(sp) {
-            var sn = inner.querySelector('[data-node="sp-' + proj.projectId + '-' + sp.id + '"]');
-            var sp2 = getPos(sn);
-            if (sp2) sps.push(sp2);
-          });
+          function collectAllSp(subList) {
+            subList.forEach(function(sp) {
+              var sn = inner.querySelector('[data-node="sp-' + sp.projectId + '"]');
+              var spPos = getPos(sn);
+              if (spPos) sps.push(spPos);
+              if (sp.subProjects) collectAllSp(sp.subProjects);
+            });
+          }
+          collectAllSp(proj.subProjects);
           projData.push({ color: c.bg, pos: projPos, manuals: mps, subProjects: sps });
         }
       });
@@ -1096,7 +1107,7 @@
       if (!project.files) project.files = [];
       const manuals = getManualsByProject(project.id);
       const subProjects = data.projects.filter(p => p.parentId === project.id);
-      let html = `<button class="btn btn-ghost btn-sm mb-4" onclick="navigate('home')">${icons.arrowLeft} 全体マップ</button>`;
+      let html = project.parentId ? `<button class="btn btn-ghost btn-sm mb-4" onclick="navigate('project-detail',{id:${project.parentId}})">${icons.arrowLeft} 親プロジェクトへ戻る</button>` : `<button class="btn btn-ghost btn-sm mb-4" onclick="navigate('home')">${icons.arrowLeft} 全体マップ</button>`;
       html += renderBreadcrumb();
       html += `<div style="margin-bottom:24px"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap"><div style="flex:1;min-width:200px"><h1 class="page-title editable-title" contenteditable="true" id="proj-title-edit" onblur="saveProjectTitleInline(${project.id})" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">${escapeHtml(project.name)}</h1></div><div style="display:flex;gap:8px;flex-shrink:0;align-items:center"><button class="btn btn-primary" onclick="navigate('manual-form',{projectId:${project.id}})">${icons.plus} マニュアル作成</button><button class="btn btn-outline btn-sm" style="color:var(--destructive);border-color:var(--destructive)" onclick="confirmDeleteProject(${project.id})">${icons.trash} 削除</button></div></div><p class="editable-desc" contenteditable="true" id="proj-desc-edit" data-placeholder="説明を追加..." onblur="saveProjectDescInline(${project.id})" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur()}" style="margin-top:4px">${project.description ? escapeHtml(project.description) : ''}</p></div>`;
       // Tag selector
@@ -1173,6 +1184,7 @@
         });
         html += `</div></div>`;
       }
+      html += `<div style="margin-top:16px"><button class="btn btn-ghost btn-sm" onclick="showProjectDialog(${project.id})" style="color:var(--primary)">+ サブプロジェクト追加</button></div>`;
       el.innerHTML = html;
       // Setup drag & drop
       const zone = document.getElementById('file-upload-zone');
