@@ -1968,13 +1968,12 @@
     var SYNC_URL = 'https://jsonblob.com/api/jsonBlob/019d8db8-55f4-71d8-b2b7-fdfe57ee2c9c';
     var syncDebounce = null;
     var SYNC_KEYS = ['users','projects','manuals','goals','todos','dailyTasks','tags','permissions','assignees','nextId','nextTodoId','nextProjectId','nextManualId','nextGoalId','nextTagId','nextUserId','nextDailyId'];
-    var _syncLastPush = 0;
 
     // Push local data to remote (debounced)
     function pushSync() {
       clearTimeout(syncDebounce);
       syncDebounce = setTimeout(function() {
-        _syncLastPush = Date.now();
+        data._syncTs = Date.now();
         fetch(SYNC_URL, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -1983,7 +1982,7 @@
       }, 500);
     }
 
-    // Pull remote data and merge into local
+    // Pull remote data and overwrite local
     function pullSync() {
       fetch(SYNC_URL)
         .then(function(r) { return r.json(); })
@@ -1997,11 +1996,41 @@
               SYNC_KEYS.forEach(function(k) {
                 if (remote[k] !== undefined) data[k] = remote[k];
               });
+              if (remote._syncTs) data._syncTs = remote._syncTs;
               _origSaveData();
               render();
             }
           }
         }).catch(function(){});
+    }
+
+    // On load: compare timestamps - newer data wins
+    function initSync() {
+      fetch(SYNC_URL)
+        .then(function(r) { return r.json(); })
+        .then(function(remote) {
+          if (!remote || typeof remote !== 'object') { pushSync(); return; }
+          var remoteTs = remote._syncTs || 0;
+          var localTs = data._syncTs || 0;
+          if (remoteTs > localTs) {
+            // Remote is newer - pull it
+            var hasData = false;
+            SYNC_KEYS.forEach(function(k) {
+              if (remote[k] !== undefined) hasData = true;
+            });
+            if (hasData) {
+              SYNC_KEYS.forEach(function(k) {
+                if (remote[k] !== undefined) data[k] = remote[k];
+              });
+              data._syncTs = remoteTs;
+              _origSaveData();
+              render();
+            }
+          } else {
+            // Local is newer or same - push it
+            pushSync();
+          }
+        }).catch(function(){ pushSync(); });
     }
 
     // Override saveData to also push to cloud
@@ -2011,8 +2040,8 @@
       pushSync();
     };
 
-    // On load: PULL remote data first (get latest from other devices)
-    setTimeout(pullSync, 300);
+    // On load: smart sync with timestamp comparison
+    setTimeout(initSync, 300);
 
     // On tab focus: pull latest from remote
     document.addEventListener('visibilitychange', function() {
