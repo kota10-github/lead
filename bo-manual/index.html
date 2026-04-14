@@ -258,21 +258,16 @@
       .user-info{gap:8px}
       .avatar{width:32px;height:32px;font-size:13px}
       .todo-category{margin-bottom:12px}
-      .todo-node{margin-left:6px;padding-left:8px;margin-top:1px}
-      .todo-node::before{width:1px}
+      .todo-node{margin-left:1em;margin-top:1px}
       .todo-item{padding:2px 0}
-      .todo-checkbox{width:32px;height:32px}
-      .todo-checkbox svg{width:14px;height:14px}
-      .todo-title{font-size:14px}
-      .todo-meta{font-size:11px}
-      .todo-node-title{font-size:13px;padding:6px 10px}
-      .todo-node-depth0{font-size:14px}
-      .goal-large{margin-bottom:12px}
-      .goal-large-title{font-size:14px;padding:6px 12px}
-      .goal-mid{margin-left:10px;padding-left:10px}
-      .goal-mid-title{font-size:12px;padding:4px 8px}
-      .goal-small{margin-left:8px;padding-left:8px}
-      .goal-small-title{font-size:11px;padding:3px 6px}
+      .todo-checkbox{width:24px;height:24px}
+      .todo-checkbox svg{width:12px;height:12px}
+      .todo-title{font-size:13px}
+      .todo-node-title{font-size:12px}
+      .goal-large{margin-bottom:8px}
+      .goal-large-title{font-size:13px}
+      .goal-mid{margin-left:1em}
+      .goal-small{margin-left:1em}
       .todo-detail-screen{padding:16px}
       .todo-detail-title{font-size:18px}
       .todo-filters{gap:4px}
@@ -332,13 +327,13 @@
     /* Goal tree styles */
     .goal-tree{padding:8px 0}
     .goal-large{margin-bottom:24px}
-    .goal-large-title{font-size:15px;font-weight:600;color:#fff;padding:8px 14px;background:#334155;border-radius:var(--radius);display:inline-flex;align-items:center;gap:6px}
-    .goal-mid{margin-left:24px;margin-top:8px;position:relative;padding-left:20px}
-    .goal-mid::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--border)}
-    .goal-mid-title{font-size:13px;font-weight:600;color:var(--fg);padding:6px 10px;background:var(--bg-muted);border-radius:var(--radius);display:inline-flex;align-items:center;gap:6px;margin-bottom:4px}
-    .goal-small{margin-left:20px;margin-top:4px;position:relative;padding-left:16px}
-    .goal-small::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--border-light)}
-    .goal-small-title{font-size:12px;color:var(--fg-muted);padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius);display:inline-flex;align-items:center;gap:6px}
+    .goal-large-title{font-size:14px;font-weight:600;color:var(--fg);padding:4px 0;display:inline-flex;align-items:center;gap:6px}
+    .goal-mid{margin-left:1em;margin-top:4px;position:relative;padding-left:0}
+    .goal-mid::before{display:none}
+    .goal-mid-title{font-size:13px;font-weight:500;color:var(--fg-muted);padding:2px 0;display:inline-flex;align-items:center;gap:6px;margin-bottom:2px}
+    .goal-small{margin-left:1em;margin-top:2px;position:relative;padding-left:0}
+    .goal-small::before{display:none}
+    .goal-small-title{font-size:12px;color:var(--fg-muted2);padding:2px 0;display:inline-flex;align-items:center;gap:6px}
     /* Todo styles */
     .todo-filters{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
     .todo-filter-btn{padding:6px 14px;border-radius:999px;font-size:12px;font-weight:500;border:1px solid var(--border);color:var(--fg-muted);transition:all .15s}
@@ -360,13 +355,13 @@
 .todo-action-btn:hover{background:var(--bg-muted)}
 .todo-action-btn.complete{color:#059669}
 .todo-action-btn.delete{color:var(--destructive)}
-.todo-node{position:relative;margin-left:24px;margin-top:2px;padding-left:20px}
-.todo-node::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--border)}
-.todo-node-title{font-size:13px;font-weight:600;padding:6px 10px;border-radius:var(--radius);display:inline-flex;align-items:center;gap:6px;margin-bottom:4px}
-.todo-node-depth0{background:#334155;color:#fff;font-size:14px;font-weight:600}
-.todo-node-depth1{background:var(--bg-muted);color:var(--fg)}
-.todo-node-depth2{background:var(--bg-muted);color:var(--fg-muted);font-size:12px}
-.todo-node-leaf{background:var(--bg-muted);color:var(--fg-muted);font-size:12px}
+.todo-node{position:relative;margin-left:1em;margin-top:1px;padding-left:0}
+.todo-node::before{display:none}
+.todo-node-title{font-size:13px;font-weight:600;padding:4px 0;display:inline-flex;align-items:center;gap:6px;margin-bottom:2px;color:var(--fg)}
+.todo-node-depth0{font-size:13px;font-weight:600;color:var(--fg)}
+.todo-node-depth1{color:var(--fg-muted);font-weight:500}
+.todo-node-depth2{color:var(--fg-muted);font-size:12px;font-weight:500}
+.todo-node-leaf{color:var(--fg-muted);font-size:12px;font-weight:500}
 .hidden{display:none!important}
     .fade-in{animation:fadeIn .2s}
     @keyframes fadeIn{from{opacity:0}to{opacity:1}}
@@ -613,10 +608,6 @@
         <button class="nav-item active" data-page="home" onclick="navigate('home')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
           マップ
-        </button>
-        <button class="nav-item" data-page="manuals" onclick="navigate('manuals')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-          マニュアル
         </button>
         <button class="nav-item" data-page="todos" onclick="navigate('todos')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
@@ -1068,6 +1059,7 @@
     let calSelectedDate = (function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')})();
     let calViewYear = new Date().getFullYear();
     let calViewMonth = new Date().getMonth();
+    let calOpen = false;
     const MAP_ZOOM_MIN = 0.3;
     const MAP_ZOOM_MAX = 2;
     const MAP_ZOOM_STEP = 0.1;
@@ -1158,10 +1150,6 @@
         <button class="mobile-quick-btn" onclick="navigate('home')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
           マップ
-        </button>
-        <button class="mobile-quick-btn" onclick="navigate('manuals')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-          マニュアル
         </button>
         <button class="mobile-quick-btn" onclick="navigate('todos')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
@@ -1843,14 +1831,16 @@
 
     function renderTodos(el) {
       let html = '';
-      // Calendar
-      html += renderCalendar();
-      // Daily tasks for selected date
       var tasks = (data.dailyTasks[calSelectedDate] || []);
       var dateObj = new Date(calSelectedDate + 'T00:00:00');
       var dateLabel = (dateObj.getMonth()+1) + '/' + dateObj.getDate() + '(' + ['日','月','火','水','木','金','土'][dateObj.getDay()] + ')';
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h2 style="font-size:15px;font-weight:600">' + dateLabel + '</h2>';
+      // Date header with calendar toggle
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+      html += '<h2 style="font-size:15px;font-weight:600;cursor:pointer" onclick="calOpen=!calOpen;render()">' + dateLabel + ' <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></h2>';
       html += '<span style="font-size:12px;color:var(--fg-muted)">' + tasks.filter(t=>t.done).length + '/' + tasks.length + ' 完了</span></div>';
+      // Collapsible calendar
+      if (calOpen) html += renderCalendar();
+      // Tasks
       if (tasks.length > 0) {
         tasks.forEach(function(t) {
           html += '<div class="daily-task" onclick="navigate(\'daily-detail\',{date:\'' + calSelectedDate + '\',id:' + t.id + '})">';
@@ -1861,10 +1851,10 @@
       }
       // Add task
       html += '<div class="daily-add" onclick="addDailyTask(\'' + calSelectedDate + '\')">' + icons.plus + ' タスクを追加</div>';
-      // Separator + goal tree (collapsible)
-      html += '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:12px">';
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h3 style="font-size:13px;font-weight:600;color:var(--fg-muted)">プロジェクト目標</h3>';
-      html += '<button class="btn btn-sm btn-outline" onclick="showAddTodoCategoryDialog()" style="font-size:11px;padding:3px 8px">' + icons.plus + ' 追加</button></div>';
+      // Goal tree
+      html += '<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:10px">';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px;color:var(--fg-muted2)">プロジェクト目標</span>';
+      html += '<button class="btn btn-sm btn-ghost" onclick="showAddTodoCategoryDialog()" style="font-size:11px;padding:2px 6px;color:var(--fg-muted2)">' + icons.plus + '</button></div>';
       if (data.todos && data.todos.length > 0) {
         html += '<div class="goal-tree">';
         data.todos.forEach(cat => {
@@ -1872,11 +1862,6 @@
         });
         html += '</div>';
       }
-      html += '</div>';
-      // Sync
-      html += '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:12px">';
-      html += '<h3 style="font-size:13px;font-weight:600;color:var(--fg-muted);margin-bottom:8px">データ同期</h3>';
-      html += '<div class="sync-bar"><button class="btn btn-outline btn-sm" onclick="exportData()">エクスポート</button><button class="btn btn-outline btn-sm" onclick="importData()">インポート</button></div>';
       html += '</div>';
       el.innerHTML = html;
     }
@@ -1917,7 +1902,7 @@
 
     function calPrev() { calViewMonth--; if (calViewMonth < 0) { calViewMonth = 11; calViewYear--; } render(); }
     function calNext() { calViewMonth++; if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; } render(); }
-    function selectCalDate(dateStr) { calSelectedDate = dateStr; render(); }
+    function selectCalDate(dateStr) { calSelectedDate = dateStr; calOpen = false; render(); }
 
     function addDailyTask(dateStr) {
       var title = prompt('タスク名を入力');
@@ -1943,38 +1928,80 @@
       if (t) { t.memo = value; saveData(); toast('メモを保存しました'); }
     }
 
-    function exportData() {
-      var json = JSON.stringify(data);
-      navigator.clipboard.writeText(json).then(function() {
-        toast('データをコピーしました。他の端末でインポートしてください。');
-      }).catch(function() {
-        prompt('以下のデータをコピーしてください:', json);
-      });
+    // Cloud sync via jsonblob.com
+    var syncBlobId = localStorage.getItem('bo-sync-id') || '';
+    var syncDebounce = null;
+
+    function initSync() {
+      // Check URL hash for sync ID
+      var hash = location.hash.replace('#','');
+      if (hash && hash.startsWith('sync=')) {
+        var id = hash.split('=')[1];
+        if (id && id !== syncBlobId) {
+          syncBlobId = id;
+          localStorage.setItem('bo-sync-id', syncBlobId);
+          pullSync();
+          return;
+        }
+      }
+      if (syncBlobId) {
+        pullSync();
+      } else {
+        // Create new sync blob
+        pushSyncCreate();
+      }
     }
-    function importData() {
-      navigator.clipboard.readText().then(function(text) {
-        try {
-          var imported = JSON.parse(text);
-          if (!imported.users && !imported.todos && !imported.dailyTasks) { toast('無効なデータです'); return; }
-          if (confirm('現在のデータを上書きしますか？')) {
-            Object.assign(data, imported);
-            saveData(); render();
-            toast('データをインポートしました');
-          }
-        } catch(e) { toast('データの読み取りに失敗しました'); }
-      }).catch(function() {
-        var text = prompt('エクスポートしたデータを貼り付けてください:');
-        if (!text) return;
-        try {
-          var imported = JSON.parse(text);
-          if (confirm('現在のデータを上書きしますか？')) {
-            Object.assign(data, imported);
-            saveData(); render();
-            toast('データをインポートしました');
-          }
-        } catch(e) { toast('データの読み取りに失敗しました'); }
-      });
+
+    function pushSyncCreate() {
+      fetch('https://jsonblob.com/api/jsonBlob', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      }).then(function(r) {
+        var loc = r.headers.get('Location') || '';
+        var id = loc.split('/').pop();
+        if (id) {
+          syncBlobId = id;
+          localStorage.setItem('bo-sync-id', id);
+          location.hash = 'sync=' + id;
+        }
+      }).catch(function(){});
     }
+
+    function pushSync() {
+      if (!syncBlobId) return;
+      clearTimeout(syncDebounce);
+      syncDebounce = setTimeout(function() {
+        fetch('https://jsonblob.com/api/jsonBlob/' + syncBlobId, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        }).catch(function(){});
+      }, 1000);
+    }
+
+    function pullSync() {
+      if (!syncBlobId) return;
+      fetch('https://jsonblob.com/api/jsonBlob/' + syncBlobId)
+        .then(function(r) { return r.json(); })
+        .then(function(remote) {
+          if (remote && (remote.users || remote.dailyTasks)) {
+            Object.assign(data, remote);
+            saveData();
+            render();
+          }
+        }).catch(function(){});
+    }
+
+    // Override saveData to also push to cloud
+    var _origSaveData = saveData;
+    saveData = function() {
+      _origSaveData();
+      pushSync();
+    };
+
+    // Init sync on load
+    setTimeout(initSync, 500);
 
     function countTasks(node) {
       let total = 0, done = 0;
