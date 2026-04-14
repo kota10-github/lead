@@ -260,9 +260,9 @@
       .todo-category{margin-bottom:12px}
       .todo-node{margin-left:0;margin-top:1px}
       .todo-item{padding:2px 0;gap:6px}
-      .todo-checkbox{width:24px;height:24px}
-      .todo-checkbox svg{width:10px;height:10px}
-      .todo-title{font-size:13px}
+      .todo-checkbox{width:22px;height:22px}
+      .todo-checkbox svg{width:9px;height:9px}
+      .todo-title{font-size:12px}
       .todo-node-title{font-size:12px}
       .goal-large{margin-bottom:8px}
       .goal-large-title{font-size:13px}
@@ -343,9 +343,9 @@
     .todo-item:hover{background:var(--bg-muted);border-radius:var(--radius)}
     .todo-item.done{opacity:.5}
     .todo-item.done .todo-title{text-decoration:line-through}
-    .todo-checkbox{width:38px;height:38px;border:none;border-radius:50%;transition:all .3s cubic-bezier(.34,1.56,.64,1);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;margin-top:1px;background:#334155;color:#fff}
+    .todo-checkbox{width:32px;height:32px;border:none;border-radius:50%;transition:all .3s cubic-bezier(.34,1.56,.64,1);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;margin-top:1px;background:#334155;color:#fff}
     .todo-checkbox.checked{background:#059669;border-color:#059669;color:#fff}
-    .todo-title{font-size:17px;font-weight:500}
+    .todo-title{font-size:16px;font-weight:600}
     .todo-meta{font-size:11px;color:var(--fg-muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap}
     .todo-badge{padding:1px 8px;border-radius:999px;font-size:10px;font-weight:500}
     .todo-badge-routine{background:#dbeafe;color:#1e40af}
@@ -387,7 +387,7 @@
 .todo-checkbox:not(.expanded):hover{transform:scale(1.15);box-shadow:0 2px 8px rgba(37,99,235,.3)}
 .todo-checkbox:not(.expanded):active{transform:scale(.9)}
 .todo-checkbox.checked:not(.expanded):hover{box-shadow:0 2px 8px rgba(5,150,105,.3)}
-.todo-checkbox.expanded{width:86px;height:38px;border-radius:999px;padding:0 8px;gap:8px;display:flex;align-items:center;justify-content:center;background:var(--primary);animation:expandPill .25s cubic-bezier(.34,1.56,.64,1)}
+.todo-checkbox.expanded{width:74px;height:32px;border-radius:999px;padding:0 8px;gap:8px;display:flex;align-items:center;justify-content:center;background:var(--primary);animation:expandPill .25s cubic-bezier(.34,1.56,.64,1)}
 @keyframes expandPill{from{width:30px;opacity:.7}to{width:68px;opacity:1}}
 .todo-checkbox.expanded .action-icon{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;transition:all .15s;flex-shrink:0}
 .todo-checkbox.expanded .action-icon:hover{background:rgba(255,255,255,.25);transform:scale(1.15)}
