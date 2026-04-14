@@ -339,7 +339,7 @@
     .todo-filter-btn{padding:6px 14px;border-radius:999px;font-size:12px;font-weight:500;border:1px solid var(--border);color:var(--fg-muted);transition:all .15s}
     .todo-filter-btn:hover{background:var(--bg-muted)}
     .todo-filter-btn.active{background:#334155;color:#fff;border-color:#334155}
-    .todo-item{display:flex;align-items:center;gap:12px;padding:8px 4px;border:none;border-radius:0;margin-bottom:2px;transition:all .15s}
+    .todo-item{display:flex;align-items:center;gap:6px;padding:8px 4px;border:none;border-radius:0;margin-bottom:2px;transition:all .15s}
     .todo-item:hover{background:var(--bg-muted);border-radius:var(--radius)}
     .todo-item.done{opacity:.5}
     .todo-item.done .todo-title{text-decoration:line-through}
@@ -2037,6 +2037,16 @@
 
     // Init sync on load
     setTimeout(initSync, 500);
+
+    // Auto-sync: pull when tab becomes visible (user switches back)
+    document.addEventListener('visibilitychange', function() {
+      if (!document.hidden && syncBlobId) pullSync();
+    });
+
+    // Auto-sync: poll every 30 seconds
+    setInterval(function() {
+      if (!document.hidden && syncBlobId) pullSync();
+    }, 30000);
 
     function countTasks(node) {
       let total = 0, done = 0;
