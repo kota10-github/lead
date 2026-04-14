@@ -115,12 +115,12 @@
     .node-project-standalone{padding:8px 16px;border-radius:8px;font-weight:500;font-size:13px;border:2px solid var(--primary);background:var(--primary-light);color:var(--primary);cursor:pointer;transition:all .15s;white-space:nowrap;user-select:none}
     .node-project-standalone:hover{transform:scale(1.05);box-shadow:0 2px 8px rgba(37,99,235,.2)}
     .project-col{display:flex;flex-direction:column;gap:12px}
-    .project-branch{display:flex;align-items:flex-start;gap:24px}
+    .project-branch{display:flex;align-items:flex-start;gap:16px}
     .project-items-col{display:flex;flex-direction:column;gap:8px}
         /* Map branch add options */
     .map-add-options{display:flex;gap:6px;margin-top:6px}
     .map-add-branch{padding:5px 12px;border-radius:14px;font-size:11px;font-weight:500;border:1px dashed var(--border);background:transparent;color:var(--fg-muted);cursor:pointer;transition:all .2s;white-space:nowrap}
-    .map-add-branch:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
+    .map-add-branch:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)} .sub-tree-row{display:flex;align-items:flex-start;gap:12px;position:relative} .sub-tree-card-wrap{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:120px} .sub-tree-children{display:flex;flex-direction:column;gap:8px} .sub-add-btn{font-size:10px;padding:2px 8px;border:1px dashed var(--border);border-radius:4px;background:transparent;cursor:pointer;white-space:nowrap;color:var(--fg-muted)} .sub-add-btn:hover{border-color:var(--primary);color:var(--primary)}
     /* Project detail */
     .project-memo-area{margin-top:24px}
     .project-memo-area h3{font-size:15px;font-weight:600;margin-bottom:8px}
@@ -932,148 +932,150 @@
 
     // HOME (Mind Map) - with delete buttons on project and manual nodes
     function renderHome(el) {
-      const projects = getProjectMap();
-      let html = `<div class="page-header"><h1 class="page-title">全体マップ</h1>
-        <div class="zoom-controls">
-          <button class="zoom-btn" onclick="setMapZoom(mapZoom - MAP_ZOOM_STEP)" title="縮小">−</button>
-          <span class="zoom-label" id="zoom-label" onclick="setMapZoom(1)" title="リセット">${Math.round(mapZoom * 100)}%</span>
-          <button class="zoom-btn" onclick="setMapZoom(mapZoom + MAP_ZOOM_STEP)" title="拡大">+</button>
-        </div></div>`;
-      if (projects.length === 0) {
-        html += `<div class="empty">プロジェクトがまだありません。<button class="btn btn-primary" onclick="showProjectDialog()" style="margin-left:8px">+ プロジェクトを作成</button></div>`;
-        el.innerHTML = html;
-        return;
-      }
-      html += `<div class="mindmap-viewport" id="mindmap-viewport">`;
-      html += `<svg class="mindmap-svg" id="mindmap-svg"></svg>`;
-      html += `<div class="mindmap-inner" id="mindmap-inner" style="transform:scale(${mapZoom})">`;
-      html += `<div style="display:flex;flex-direction:column;justify-content:center;padding-top:32px"><div class="node-root" data-node="root">BOチーム</div><button class="map-add-btn" onclick="showProjectDialog()">+ プロジェクト追加</button></div>`;
-      html += `<div class="project-col">`;
-      projects.forEach((proj, pi) => {
-        const c = getProjectColor(proj.projectId);
-        html += `<div class="project-branch">`;
-        html += `<div class="node-project-standalone" data-node="proj-${proj.projectId}" style="border-color:${c.bg};background:${c.light};color:${c.text}" onclick="navigate('project-detail',{id:${proj.projectId}})">${escapeHtml(proj.projectName)}<span style="opacity:.6;font-size:11px;margin-left:4px">(${proj.manuals.length})</span></div>`;
-        html += `<div class="project-items-col">`;
-        proj.manuals.forEach(m => {
-          html += `<div class="node-manual" data-node="pm-${proj.projectId}-${m.id}" onclick="navigate('manual-detail',{id:${m.id}})" style="border-left:3px solid ${c.bg};background:${c.light}">
-            <div class="node-manual-title" style="color:${c.bg}">${escapeHtml(m.title)}<span class="node-delete-btn" onclick="event.stopPropagation();confirmDeleteManual(${m.id})" title="削除">${icons.x}</span></div>
-            <div class="node-manual-purpose">${icons.target}<span class="line-clamp-2">${escapeHtml(m.purpose)}</span></div>
+        const projects = getProjectMap();
+        let html = `<div class="page-header"><h1 class="page-title">全体マップ</h1>
+        <div class="zoom-controls"><button onclick="changeMapZoom(-0.1)">-</button><span id="zoom-level">${Math.round(mapZoom*100)}%</span><button onclick="changeMapZoom(0.1)">+</button></div></div>`;
+        html += `<div class="breadcrumb"><span class="breadcrumb-item" onclick="navigate('home')">全体マップ</span></div>`;
+        html += `<div class="mindmap-viewport" id="mindmap-viewport"><svg class="mindmap-svg" id="mindmap-svg"></svg>`;
+        html += `<div class="mindmap-inner" id="mindmap-inner" style="transform:scale(${mapZoom})">`;
+        html += `<div style="display:flex;flex-direction:column;justify-content:center;padding-top:32px"><div class="node-root" data-node="root">BOチーム</div><button class="map-add-btn" onclick="showProjectDialog()">+ プロジェクト追加</button></div>`;
+        html += `<div class="project-col">`;
+        projects.forEach((proj, pi) => {
+          const c = getProjectColor(proj.projectId);
+          html += `<div class="project-branch">`;
+          html += `<div class="node-project-standalone" data-node="proj-${proj.projectId}" style="border-color:${c.bg};background:${c.light};color:${c.text}" onclick="navigate('project-detail',{id:${proj.projectId}})">`;
+          html += `<div style="font-weight:600">${escapeHtml(proj.projectName)}<span style="opacity:.6;font-size:11px;margin-left:4px">(${proj.manuals.length})</span></div>`;
+          html += `<div class="project-items-col">`;
+          proj.manuals.forEach(m => {
+            html += `<div class="node-manual" data-node="pm-${proj.projectId}-${m.id}" onclick="navigate('manual-detail',{id:${m.id}})" style="border-left:3px solid ${c.bg};background:${c.light}"><div class="node-manual-title" style="color:${c.bg}">${escapeHtml(m.title)}<span class="node-delete-btn" onclick="event.stopPropagation();confirmDeleteManual(${m.id})" title="削除">×</span></div>`;
+            html += `<div class="node-manual-purpose">${escapeHtml(m.purpose||'')}</div></div>`;
+          });
+          if (proj.users.length > 0) {
+            html += `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">`;
+            proj.users.forEach(u => { html += `<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:var(--bg-muted);color:var(--fg-muted)">${escapeHtml(u.name)}</span>`; });
+            html += `</div>`;
+          }
+          html += `</div>`; // close project-items-col
+          html += `</div>`; // close node-project-standalone
+          // Sub-projects branch to the right
+          html += `<div class="sub-tree-children" data-parent="proj-${proj.projectId}">`;
+          proj.subProjects.forEach(function(sp) { renderSubBranch(sp); });
+          html += `<div class="map-add-options">
+            <button class="map-add-branch" onclick="navigate('manual-form',{projectId:${proj.projectId}})">+ マニュアル</button>
+            <button class="map-add-branch" onclick="showProjectDialog(${proj.projectId})">+ プロジェクト</button>
           </div>`;
+          html += `</div>`; // close sub-tree-children
+          html += `</div>`; // close project-branch
         });
-        if (proj.users.length > 0) {
-          html += `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">`;
-          proj.users.forEach(u => {
-            html += `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:var(--bg-muted);color:var(--fg-muted)">${escapeHtml(u.name)}</span>`;
-          });
-          html += `</div>`;
-        }
-        function renderSubBranch(sp, depth) {
+        html += `</div></div></div>`;
+
+        function renderSubBranch(sp) {
           var sc = getProjectColor(sp.projectId);
-          html += '<div class="sub-branch" style="margin-left:' + (depth > 0 ? 16 : 0) + 'px">';
-          html += `<div class="node-manual" data-node="sp-${sp.projectId}" onclick="navigate('project-detail',{id:${sp.projectId}})" style="border-left:3px solid ${sc.bg};background:${sc.light}">
-            <div class="node-manual-title" style="color:${sc.bg}">${icons.folder} ${escapeHtml(sp.projectName)}</div>
-            <div class="node-manual-purpose">${sp.subProjects.length > 0 ? '<span style="opacity:.6;font-size:10px">' + sp.subProjects.length + '件のサブプロジェクト</span>' : ''}</div>
-          </div>`;
+          html += '<div class="sub-tree-row">';
+          html += '<div class="sub-tree-card-wrap">';
+          html += `<div class="node-manual" data-node="sp-${sp.projectId}" onclick="navigate('project-detail',{id:${sp.projectId}})" style="border-left:3px solid ${sc.bg};background:${sc.light}"><div class="node-manual-title" style="color:${sc.bg}">${escapeHtml(sp.projectName)}</div>`;
+          html += `<div class="node-manual-purpose">${sp.subProjects.length > 0 ? '<span style="opacity:.6;font-size:10px">' + sp.subProjects.length + '件のサブ</span>' : ''}</div></div>`;
+          html += '</div>'; // close sub-tree-card-wrap
+          // Children to the right
+          html += '<div class="sub-tree-children">';
           if (sp.subProjects.length > 0) {
-            html += '<div class="project-items-col" style="margin-left:12px;padding-left:8px;border-left:2px solid ' + sc.bg + '33">';
-            sp.subProjects.forEach(function(child) { renderSubBranch(child, depth + 1); });
-            html += '</div>';
+            sp.subProjects.forEach(function(child) { renderSubBranch(child); });
           }
-          html += '<button class="map-add-branch" onclick="event.stopPropagation();showProjectDialog(' + sp.projectId + ')" style="font-size:10px;padding:2px 6px;margin-top:2px">+ サブ</button>';
-          html += '</div>';
+          html += '<button class="sub-add-btn" onclick="event.stopPropagation();showProjectDialog(' + sp.projectId + ')">+ サブ</button>';
+          html += '</div>'; // close sub-tree-children
+          html += '</div>'; // close sub-tree-row
         }
-        proj.subProjects.forEach(function(sp) { renderSubBranch(sp, 0); });
-        html += `<div class="map-add-options">
-          <button class="map-add-branch" onclick="navigate('manual-form',{projectId:${proj.projectId}})">+ マニュアル</button>
-          <button class="map-add-branch" onclick="showProjectDialog(${proj.projectId})">+ プロジェクト</button>
-        </div>`;
-        html += `</div></div>`;
-      });
-      html += `</div></div></div>`;
-      el.innerHTML = html;
-      // Setup interactions
-      const viewport = document.getElementById('mindmap-viewport');
-      if (!viewport) return;
-      viewport.addEventListener('wheel', (e) => {
-        if (e.ctrlKey || e.metaKey) { e.preventDefault(); setMapZoom(mapZoom + (e.deltaY < 0 ? MAP_ZOOM_STEP : -MAP_ZOOM_STEP)); }
-      }, { passive: false });
-      let isPanning = false, panStartX = 0, panStartY = 0, scrollStartX = 0, scrollStartY = 0;
-      viewport.addEventListener('mousedown', (e) => {
-        if (e.target.closest('.node-manual,.node-project,.node-user,.node-root,.node-project-standalone,.map-add-btn')) return;
-        isPanning = true; panStartX = e.clientX; panStartY = e.clientY; scrollStartX = viewport.scrollLeft; scrollStartY = viewport.scrollTop; viewport.style.cursor = 'grabbing';
-      });
-      document.addEventListener('mousemove', (e) => { if (!isPanning) return; viewport.scrollLeft = scrollStartX - (e.clientX - panStartX); viewport.scrollTop = scrollStartY - (e.clientY - panStartY); });
-      document.addEventListener('mouseup', () => { isPanning = false; viewport.style.cursor = ''; });
-      requestAnimationFrame(() => requestAnimationFrame(() => drawMindmapLines(projects)));
-    }
-    function drawMindmapLines(projects) {
-      var svg = document.getElementById('mindmap-svg');
-      var inner = document.getElementById('mindmap-inner');
-      if (!svg || !inner) return;
-      var innerRect = inner.getBoundingClientRect();
-      var scale = mapZoom;
-      function getPos(node) {
-        if (!node) return null;
-        var r = node.getBoundingClientRect();
-        return { x: (r.left + r.width / 2 - innerRect.left) / scale, y: (r.top + r.height / 2 - innerRect.top) / scale, right: (r.right - innerRect.left) / scale, left: (r.left - innerRect.left) / scale, top: (r.top - innerRect.top) / scale, bottom: (r.bottom - innerRect.top) / scale };
+
+        el.innerHTML = html;
+        // Setup interactions
+        var viewport = document.getElementById('mindmap-viewport');
+        if (!viewport) return;
+        var isDragging = false, startX, startY, scrollLeft, scrollTop;
+        viewport.addEventListener('mousedown', function(e) { if (e.target.closest('.node-manual,.node-project-standalone,.node-root,button')) return; isDragging = true; startX = e.pageX - viewport.offsetLeft; startY = e.pageY - viewport.offsetTop; scrollLeft = viewport.scrollLeft; scrollTop = viewport.scrollTop; viewport.style.cursor = 'grabbing'; });
+        viewport.addEventListener('mouseleave', function() { isDragging = false; viewport.style.cursor = 'grab'; });
+        viewport.addEventListener('mouseup', function() { isDragging = false; viewport.style.cursor = 'grab'; });
+        viewport.addEventListener('mousemove', function(e) { if (!isDragging) return; e.preventDefault(); viewport.scrollLeft = scrollLeft - (e.pageX - viewport.offsetLeft - startX); viewport.scrollTop = scrollTop - (e.pageY - viewport.offsetTop - startY); });
+        requestAnimationFrame(() => requestAnimationFrame(() => drawMindmapLines(projects)));
       }
-      var rootNode = inner.querySelector('[data-node="root"]');
-      var rootPos = getPos(rootNode);
-      if (!rootPos) return;
-      var projData = [];
-      projects.forEach(function(proj, pi) {
-        var c = getProjectColor(proj.projectId);
-        var projNode = inner.querySelector('[data-node="proj-' + proj.projectId + '"]');
-        var projPos = getPos(projNode);
-        if (projPos) {
-          var mps = [];
-          proj.manuals.forEach(function(m) {
-            var mn = inner.querySelector('[data-node="pm-' + proj.projectId + '-' + m.id + '"]');
-            var mp = getPos(mn);
-            if (mp) mps.push(mp);
-          });
-          var sps = [];
-          function collectAllSp(subList) {
-            subList.forEach(function(sp) {
-              var sn = inner.querySelector('[data-node="sp-' + sp.projectId + '"]');
-              var spPos = getPos(sn);
-              if (spPos) sps.push(spPos);
-              if (sp.subProjects) collectAllSp(sp.subProjects);
-            });
+      function drawMindmapLines(projects) {
+        var svg = document.getElementById('mindmap-svg');
+        var inner = document.getElementById('mindmap-inner');
+        if (!svg || !inner) return;
+        var innerRect = inner.getBoundingClientRect();
+        var scale = mapZoom;
+        function getPos(node) {
+          if (!node) return null;
+          var r = node.getBoundingClientRect();
+          return { x: (r.left + r.width / 2 - innerRect.left) / scale, y: (r.top + r.height / 2 - innerRect.top) / scale, left: (r.left - innerRect.left) / scale, right: (r.right - innerRect.left) / scale, top: (r.top - innerRect.top) / scale, bottom: (r.bottom - innerRect.top) / scale };
+        }
+        var rootNode = inner.querySelector('[data-node="root"]');
+        var rootPos = getPos(rootNode);
+        if (!rootPos) { svg.innerHTML = ''; return; }
+        var paths = '';
+        // Collect all project positions
+        var projNodes = [];
+        projects.forEach(function(proj) {
+          var c = getProjectColor(proj.projectId);
+          var projNode = inner.querySelector('[data-node="proj-' + proj.projectId + '"]');
+          var pp = getPos(projNode);
+          if (pp) projNodes.push({ pos: pp, color: c.bg, projectId: proj.projectId });
+        });
+        if (projNodes.length === 0) { svg.innerHTML = ''; return; }
+        // Root trunk line
+        var trunkX = rootPos.right + 30;
+        var topY = Math.min.apply(null, projNodes.map(function(p){return p.pos.y}));
+        var botY = Math.max.apply(null, projNodes.map(function(p){return p.pos.y}));
+        paths += '<path d="M' + rootPos.right + ' ' + rootPos.y + ' L' + trunkX + ' ' + rootPos.y + '" fill="none" stroke="#cbd5e1" stroke-width="2"/>';
+        if (projNodes.length > 1) {
+          paths += '<path d="M' + trunkX + ' ' + topY + ' L' + trunkX + ' ' + botY + '" fill="none" stroke="#cbd5e1" stroke-width="2"/>';
+        }
+        // Lines from trunk to each project
+        projNodes.forEach(function(pd) {
+          paths += '<path d="M' + trunkX + ' ' + pd.pos.y + ' L' + pd.pos.left + ' ' + pd.pos.y + '" fill="none" stroke="' + pd.color + '" stroke-width="2"/>';
+        });
+        // Draw lines for sub-project tree recursively
+        function drawSubLines(parentNode, parentId) {
+          if (!parentNode) return;
+          var container = parentNode.closest('.project-branch,.sub-tree-row');
+          if (!container) return;
+          var childrenDiv = container.querySelector(':scope > .sub-tree-children');
+          if (!childrenDiv) return;
+          var childNodes = childrenDiv.querySelectorAll(':scope > .sub-tree-row > .sub-tree-card-wrap > [data-node]');
+          if (childNodes.length === 0) return;
+          var parentPos = getPos(parentNode);
+          if (!parentPos) return;
+          var childPositions = [];
+          childNodes.forEach(function(cn) { var cp = getPos(cn); if (cp) childPositions.push({ pos: cp, node: cn }); });
+          if (childPositions.length === 0) return;
+          var midX = parentPos.right + 15;
+          var cTopY = Math.min.apply(null, childPositions.map(function(c){return c.pos.y}));
+          var cBotY = Math.max.apply(null, childPositions.map(function(c){return c.pos.y}));
+          // Horizontal line from parent right
+          paths += '<path d="M' + parentPos.right + ' ' + parentPos.y + ' L' + midX + ' ' + parentPos.y + '" fill="none" stroke="#cbd5e1" stroke-width="1.5" opacity="0.5"/>';
+          // Vertical connector
+          if (childPositions.length > 1) {
+            paths += '<path d="M' + midX + ' ' + cTopY + ' L' + midX + ' ' + cBotY + '" fill="none" stroke="#cbd5e1" stroke-width="1.5" opacity="0.4"/>';
           }
-          collectAllSp(proj.subProjects);
-          projData.push({ color: c.bg, pos: projPos, manuals: mps, subProjects: sps });
-        }
-      });
-      var innerW = inner.scrollWidth;
-      var innerH = inner.scrollHeight;
-      svg.setAttribute('width', innerW);
-      svg.setAttribute('height', innerH);
-      svg.setAttribute('viewBox', '0 0 ' + innerW + ' ' + innerH);
-      var paths = '';
-      if (projData.length === 0) { svg.innerHTML = ''; return; }
-      var trunkX = rootPos.right + 30;
-      var topY = Math.min(rootPos.y, projData[0].pos.y);
-      var botY = Math.max(rootPos.y, projData[projData.length - 1].pos.y);
-      paths += '<path d="M' + rootPos.right + ' ' + rootPos.y + ' L' + trunkX + ' ' + rootPos.y + '" fill="none" stroke="#cbd5e1" stroke-width="2"/>';
-      paths += '<path d="M' + trunkX + ' ' + topY + ' L' + trunkX + ' ' + botY + '" fill="none" stroke="#cbd5e1" stroke-width="2"/>';
-      projData.forEach(function(pd) {
-        paths += '<path d="M' + trunkX + ' ' + pd.pos.y + ' L' + pd.pos.left + ' ' + pd.pos.y + '" fill="none" stroke="' + pd.color + '" stroke-width="2"/>';
-        var children = pd.manuals.concat(pd.subProjects);
-        if (children.length > 0) {
-          var cx = pd.pos.right + 16;
-          var ctTop = Math.min(pd.pos.y, children[0].y);
-          var ctBot = Math.max(pd.pos.y, children[children.length - 1].y);
-          paths += '<path d="M' + pd.pos.right + ' ' + pd.pos.y + ' L' + cx + ' ' + pd.pos.y + '" fill="none" stroke="' + pd.color + '" stroke-width="1.5" opacity="0.4"/>';
-          paths += '<path d="M' + cx + ' ' + ctTop + ' L' + cx + ' ' + ctBot + '" fill="none" stroke="' + pd.color + '" stroke-width="1.5" opacity="0.4"/>';
-          children.forEach(function(cp) {
-            paths += '<path d="M' + cx + ' ' + cp.y + ' L' + cp.left + ' ' + cp.y + '" fill="none" stroke="' + pd.color + '" stroke-width="1.5" opacity="0.4"/>';
+          // Lines to each child
+          childPositions.forEach(function(cp) {
+            paths += '<path d="M' + midX + ' ' + cp.pos.y + ' L' + cp.pos.left + ' ' + cp.pos.y + '" fill="none" stroke="#cbd5e1" stroke-width="1.5" opacity="0.5"/>';
+            // Recurse for children of this child
+            drawSubLines(cp.node, null);
           });
         }
-      });
-      svg.innerHTML = paths;
-    }
-    function renderProjects(el) {
+        // Draw sub-project lines for each project
+        projects.forEach(function(proj) {
+          var projNode = inner.querySelector('[data-node="proj-' + proj.projectId + '"]');
+          if (projNode) drawSubLines(projNode, proj.projectId);
+        });
+        var innerW = inner.scrollWidth;
+        var innerH = inner.scrollHeight;
+        svg.setAttribute('width', innerW);
+        svg.setAttribute('height', innerH);
+        svg.setAttribute('viewBox', '0 0 ' + innerW + ' ' + innerH);
+        svg.innerHTML = paths;
+      }
+      function renderProjects(el) {
       let html = `<div class="page-header"><h1 class="page-title">プロジェクト</h1><button class="btn btn-primary" onclick="showProjectDialog()">${icons.plus} 新規プロジェクト</button></div>`;
       if (data.projects.length === 0) {
         html += `<div class="empty">${icons.folder}<p>プロジェクトがありません</p><button class="btn btn-outline mt-4" onclick="showProjectDialog()">${icons.plus} 最初のプロジェクトを作成</button></div>`;
@@ -1577,7 +1579,7 @@
     }
 
     function renderTodos(el) {
-      let html = '<div class="page-header"><h1 class="page-title">ToDo管理</h1><button class="btn btn-primary" onclick="showAddTodoCategoryDialog()">' + icons.plus + ' 大目的を追加</button></div>';
+      let html = '<div class="page-header"><h1 class="page-title">ToDo管理</h1><button class="btn btn-primary" onclick="showAddTodoCategoryDialog()">' + icons.plus + ' プロジェクトを追加</button></div>';
       if (!data.todos || data.todos.length === 0) {
         html += renderBreadcrumb();
       html += '<div class="empty"><p>ToDoがまだ登録されていません。プロジェクトを選んで追加してください。</p></div>';
@@ -1760,23 +1762,48 @@
     function showAddTodoCategoryDialog() {
       var allProjects = data.projects || [];
       var usedIds = (data.todos || []).map(function(c) { return c.projectId; }).filter(Boolean);
-      var available = allProjects.filter(function(p) { return !usedIds.includes(p.id); });
-      if (available.length === 0) { toast('追加可能なプロジェクトがありません'); return; }
-      var opts = available.map(function(p) { return '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>'; }).join('');
-      showModal('プロジェクトからカテゴリを追加',
-        '<div class="form-group"><label class="label">プロジェクトを選択</label><select class="select" id="d-todo-goal" style="width:100%"><option value="">プロジェクトを選んでください</option>' + opts + '</select></div>',
-        [
-          { label: 'キャンセル', onClick: function(o) { o.remove(); } },
-          { label: '追加', class: 'btn btn-primary', onClick: function(o) {
-            var projId = Number(document.getElementById('d-todo-goal').value);
-            if (!projId) { toast('プロジェクトを選択してください'); return; }
-            var proj = data.projects.find(function(p) { return p.id === projId; });
-            if (!data.todos) data.todos = [];
-            data.todos.push({ id: data.nextTodoId++, projectId: projId, title: proj ? proj.name : 'カテゴリ', items: [] });
-            saveData(); o.remove(); render();
-          }}
-        ]
-      );
+      // Get top-level projects (no parentId)
+      var topProjects = allProjects.filter(function(p) { return !p.parentId; });
+      if (topProjects.length === 0) { showModal('通知', '<p>先にプロジェクトを作成してください。</p>', [{label:'OK',class:'btn btn-primary',onClick:function(o){o.remove()}}]); return; }
+      var topOpts = topProjects.map(function(p) { return '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>'; }).join('');
+      var formHtml = '<div class="form-group"><label>大プロジェクト</label><select class="select" id="d-todo-level0" style="width:100%" onchange="window._todoUpdateCascade(0)"><option value="">選択してください</option>' + topOpts + '</select></div>';
+      formHtml += '<div id="d-todo-cascade-container"></div>';
+      formHtml += '<div class="form-group" style="margin-top:8px"><p style="font-size:11px;color:var(--fg-muted)">選択したプロジェクト（またはサブプロジェクト）がToDoカテゴリとして追加されます。</p></div>';
+      window._todoSelectedId = null;
+      window._todoCascadeDepth = 0;
+      window._todoUpdateCascade = function(level) {
+        var sel = document.getElementById('d-todo-level' + level);
+        var selectedId = sel ? Number(sel.value) : null;
+        window._todoSelectedId = selectedId || null;
+        // Remove deeper levels
+        for (var i = level + 1; i <= window._todoCascadeDepth; i++) {
+          var el = document.getElementById('d-todo-level-wrap-' + i);
+          if (el) el.remove();
+        }
+        window._todoCascadeDepth = level;
+        if (!selectedId) return;
+        // Find children
+        var children = allProjects.filter(function(p) { return p.parentId === selectedId; });
+        if (children.length === 0) return;
+        window._todoCascadeDepth = level + 1;
+        var childOpts = children.map(function(p) { return '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>'; }).join('');
+        var labels = ['大','中','小','詳細','細分'];
+        var lbl = labels[level + 1] || ('L' + (level + 1));
+        var wrapHtml = '<div id="d-todo-level-wrap-' + (level+1) + '" class="form-group" style="margin-top:8px"><label>' + lbl + 'プロジェクト（任意）</label><select class="select" id="d-todo-level' + (level+1) + '" style="width:100%" onchange="window._todoUpdateCascade(' + (level+1) + ')"><option value="">このレベルで確定</option>' + childOpts + '</select></div>';
+        var container = document.getElementById('d-todo-cascade-container');
+        container.insertAdjacentHTML('beforeend', wrapHtml);
+      };
+      showModal('プロジェクトからカテゴリを追加', formHtml, [
+        { label: '追加', class: 'btn btn-primary', onClick: function(o) {
+          var projId = window._todoSelectedId;
+          if (!projId) return;
+          if (usedIds.includes(projId)) { alert('このプロジェクトは既に追加されています'); return; }
+          var proj = allProjects.find(function(p) { return p.id === projId; });
+          if (!data.todos) data.todos = [];
+          data.todos.push({ projectId: projId, title: proj ? proj.name : 'カテゴリ', items: [] });
+          saveData(); o.remove(); render();
+        }}
+      ]);
     }
 
     
