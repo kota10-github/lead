@@ -258,9 +258,9 @@
       .user-info{gap:8px}
       .avatar{width:32px;height:32px;font-size:13px}
       .todo-category{margin-bottom:12px}
-      .todo-node{margin-left:6px;padding-left:8px}
+      .todo-node{margin-left:6px;padding-left:8px;margin-top:1px}
       .todo-node::before{width:1px}
-      .todo-item{padding:6px 0}
+      .todo-item{padding:2px 0}
       .todo-checkbox{width:32px;height:32px}
       .todo-checkbox svg{width:14px;height:14px}
       .todo-title{font-size:14px}
@@ -360,7 +360,7 @@
 .todo-action-btn:hover{background:var(--bg-muted)}
 .todo-action-btn.complete{color:#059669}
 .todo-action-btn.delete{color:var(--destructive)}
-.todo-node{position:relative;margin-left:24px;margin-top:6px;padding-left:20px}
+.todo-node{position:relative;margin-left:24px;margin-top:2px;padding-left:20px}
 .todo-node::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--border)}
 .todo-node-title{font-size:13px;font-weight:600;padding:6px 10px;border-radius:var(--radius);display:inline-flex;align-items:center;gap:6px;margin-bottom:4px}
 .todo-node-depth0{background:#334155;color:#fff;font-size:14px;font-weight:600}
@@ -419,6 +419,33 @@
 .goal-detail-child{padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;transition:all .15s;cursor:pointer}
 .goal-detail-child:hover{border-color:rgba(37,99,235,.3);background:var(--bg-muted)}
   
+/* Calendar */
+.cal-wrap{margin-bottom:16px}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.cal-header h3{font-size:14px;font-weight:600}
+.cal-header button{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--bg-muted);color:var(--fg)}
+.cal-header button:hover{background:var(--border)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.cal-dow{font-size:10px;color:var(--fg-muted2);padding:4px 0;font-weight:500}
+.cal-day{font-size:12px;padding:6px 0;border-radius:6px;cursor:pointer;position:relative;color:var(--fg-muted)}
+.cal-day:hover{background:var(--bg-muted)}
+.cal-day.today{font-weight:700;color:var(--fg)}
+.cal-day.selected{background:#334155;color:#fff;font-weight:600}
+.cal-day.has-tasks::after{content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:#334155}
+.cal-day.selected.has-tasks::after{background:#fff}
+.cal-day.other-month{opacity:.3}
+/* Daily tasks */
+.daily-task{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border-light);cursor:pointer}
+.daily-task:last-child{border-bottom:none}
+.daily-task .dt-check{width:22px;height:22px;border:2px solid var(--border);border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.daily-task .dt-check.done{background:#059669;border-color:#059669;color:#fff}
+.daily-task .dt-title{font-size:13px;flex:1;min-width:0}
+.daily-task .dt-title.done{text-decoration:line-through;opacity:.5}
+.daily-add{display:flex;align-items:center;gap:8px;padding:8px 4px;color:var(--fg-muted);font-size:13px;cursor:pointer}
+.daily-add:hover{color:var(--fg)}
+/* Sync */
+.sync-bar{display:flex;gap:8px;margin-top:12px}
+.sync-bar button{flex:1}
 .overlay-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;animation:fadeIn .15s ease}
 .overlay-panel{background:#fff;border-radius:16px;transition:transform .2s ease;padding:24px 24px 32px;width:100%;max-width:600px;max-height:70vh;overflow-y:auto;animation:slideUp .3s ease;box-shadow:0 -4px 20px rgba(0,0,0,.15)}
 @keyframes slideUp{0%{transform:scale(.85);opacity:0}60%{transform:scale(1.02);opacity:1}100%{transform:scale(1);opacity:1}}
@@ -722,6 +749,8 @@
       }
       if (!data.nextGoalId) data.nextGoalId = 300;
       if (!data.nextTodoId) data.nextTodoId = 8;
+      if (!data.dailyTasks) data.dailyTasks = {};
+      if (!data.nextDailyId) data.nextDailyId = 1;
       if (!data.tags) data.tags = [{id:1,name:'マーケ',color:'#3b82f6'},{id:2,name:'セールス',color:'#8b5cf6'},{id:3,name:'CS',color:'#06b6d4'},{id:4,name:'バックオフィス',color:'#10b981'}];
       if (!data.nextTagId) data.nextTagId = 5;
       // Ensure project memo and files fields
@@ -955,6 +984,7 @@
         case 'goals': renderGoals(main); break;
         case 'todos': renderTodos(main); break;
       case 'todo-detail': renderTodoDetail(main); break;
+      case 'daily-detail': renderDailyDetail(main); break;
       case 'goal-detail': renderGoalDetail(main); break;
         case 'users': renderUsers(main); break;
         case 'tags': renderTags(main); break;
@@ -1035,6 +1065,9 @@
 
     // ZOOM STATE
     let mapZoom = 1;
+    let calSelectedDate = (function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')})();
+    let calViewYear = new Date().getFullYear();
+    let calViewMonth = new Date().getMonth();
     const MAP_ZOOM_MIN = 0.3;
     const MAP_ZOOM_MAX = 2;
     const MAP_ZOOM_STEP = 0.1;
@@ -1809,18 +1842,138 @@
     }
 
     function renderTodos(el) {
-      let html = '<div class="page-header"><h1 class="page-title">今日のタスク</h1><button class="btn btn-primary" onclick="showAddTodoCategoryDialog()">' + icons.plus + ' プロジェクトを追加</button></div>';
-      if (!data.todos || data.todos.length === 0) {
-        html += renderBreadcrumb();
-      html += '<div class="empty"><p>ToDoがまだ登録されていません。プロジェクトを選んで追加してください。</p></div>';
-      } else {
+      let html = '';
+      // Calendar
+      html += renderCalendar();
+      // Daily tasks for selected date
+      var tasks = (data.dailyTasks[calSelectedDate] || []);
+      var dateObj = new Date(calSelectedDate + 'T00:00:00');
+      var dateLabel = (dateObj.getMonth()+1) + '/' + dateObj.getDate() + '(' + ['日','月','火','水','木','金','土'][dateObj.getDay()] + ')';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h2 style="font-size:15px;font-weight:600">' + dateLabel + '</h2>';
+      html += '<span style="font-size:12px;color:var(--fg-muted)">' + tasks.filter(t=>t.done).length + '/' + tasks.length + ' 完了</span></div>';
+      if (tasks.length > 0) {
+        tasks.forEach(function(t) {
+          html += '<div class="daily-task" onclick="navigate(\'daily-detail\',{date:\'' + calSelectedDate + '\',id:' + t.id + '})">';
+          html += '<div class="dt-check ' + (t.done ? 'done' : '') + '" onclick="event.stopPropagation();toggleDailyTask(\'' + calSelectedDate + '\',' + t.id + ')">' + (t.done ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '') + '</div>';
+          html += '<div class="dt-title ' + (t.done ? 'done' : '') + '">' + escapeHtml(t.title) + '</div>';
+          html += '</div>';
+        });
+      }
+      // Add task
+      html += '<div class="daily-add" onclick="addDailyTask(\'' + calSelectedDate + '\')">' + icons.plus + ' タスクを追加</div>';
+      // Separator + goal tree (collapsible)
+      html += '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:12px">';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><h3 style="font-size:13px;font-weight:600;color:var(--fg-muted)">プロジェクト目標</h3>';
+      html += '<button class="btn btn-sm btn-outline" onclick="showAddTodoCategoryDialog()" style="font-size:11px;padding:3px 8px">' + icons.plus + ' 追加</button></div>';
+      if (data.todos && data.todos.length > 0) {
         html += '<div class="goal-tree">';
         data.todos.forEach(cat => {
           html += renderTodoNode(cat, 0, String(cat.id));
         });
         html += '</div>';
       }
+      html += '</div>';
+      // Sync
+      html += '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:12px">';
+      html += '<h3 style="font-size:13px;font-weight:600;color:var(--fg-muted);margin-bottom:8px">データ同期</h3>';
+      html += '<div class="sync-bar"><button class="btn btn-outline btn-sm" onclick="exportData()">エクスポート</button><button class="btn btn-outline btn-sm" onclick="importData()">インポート</button></div>';
+      html += '</div>';
       el.innerHTML = html;
+    }
+
+    function renderCalendar() {
+      var html = '<div class="cal-wrap">';
+      var months = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+      html += '<div class="cal-header"><button onclick="calPrev()">‹</button><h3>' + calViewYear + '年 ' + months[calViewMonth] + '</h3><button onclick="calNext()">›</button></div>';
+      html += '<div class="cal-grid">';
+      ['日','月','火','水','木','金','土'].forEach(d => { html += '<div class="cal-dow">' + d + '</div>'; });
+      var first = new Date(calViewYear, calViewMonth, 1);
+      var startDay = first.getDay();
+      var daysInMonth = new Date(calViewYear, calViewMonth + 1, 0).getDate();
+      var now = new Date(); var today = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+      // Previous month padding
+      var prevDays = new Date(calViewYear, calViewMonth, 0).getDate();
+      for (var i = startDay - 1; i >= 0; i--) {
+        var d = prevDays - i;
+        html += '<div class="cal-day other-month">' + d + '</div>';
+      }
+      for (var d = 1; d <= daysInMonth; d++) {
+        var dateStr = calViewYear + '-' + String(calViewMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+        var cls = 'cal-day';
+        if (dateStr === today) cls += ' today';
+        if (dateStr === calSelectedDate) cls += ' selected';
+        if (data.dailyTasks[dateStr] && data.dailyTasks[dateStr].length > 0) cls += ' has-tasks';
+        html += '<div class="' + cls + '" onclick="selectCalDate(\'' + dateStr + '\')">' + d + '</div>';
+      }
+      // Next month padding
+      var totalCells = startDay + daysInMonth;
+      var remaining = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+      for (var i = 1; i <= remaining; i++) {
+        html += '<div class="cal-day other-month">' + i + '</div>';
+      }
+      html += '</div></div>';
+      return html;
+    }
+
+    function calPrev() { calViewMonth--; if (calViewMonth < 0) { calViewMonth = 11; calViewYear--; } render(); }
+    function calNext() { calViewMonth++; if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; } render(); }
+    function selectCalDate(dateStr) { calSelectedDate = dateStr; render(); }
+
+    function addDailyTask(dateStr) {
+      var title = prompt('タスク名を入力');
+      if (!title || !title.trim()) return;
+      if (!data.dailyTasks[dateStr]) data.dailyTasks[dateStr] = [];
+      data.dailyTasks[dateStr].push({ id: data.nextDailyId++, title: title.trim(), done: false, memo: '' });
+      saveData(); render();
+    }
+    function toggleDailyTask(dateStr, id) {
+      var tasks = data.dailyTasks[dateStr] || [];
+      var t = tasks.find(function(x){return x.id===id});
+      if (t) { t.done = !t.done; saveData(); render(); }
+    }
+    function deleteDailyTask(dateStr, id) {
+      if (!data.dailyTasks[dateStr]) return;
+      data.dailyTasks[dateStr] = data.dailyTasks[dateStr].filter(function(x){return x.id!==id});
+      if (data.dailyTasks[dateStr].length === 0) delete data.dailyTasks[dateStr];
+      saveData();
+    }
+    function saveDailyMemo(dateStr, id, value) {
+      var tasks = data.dailyTasks[dateStr] || [];
+      var t = tasks.find(function(x){return x.id===id});
+      if (t) { t.memo = value; saveData(); toast('メモを保存しました'); }
+    }
+
+    function exportData() {
+      var json = JSON.stringify(data);
+      navigator.clipboard.writeText(json).then(function() {
+        toast('データをコピーしました。他の端末でインポートしてください。');
+      }).catch(function() {
+        prompt('以下のデータをコピーしてください:', json);
+      });
+    }
+    function importData() {
+      navigator.clipboard.readText().then(function(text) {
+        try {
+          var imported = JSON.parse(text);
+          if (!imported.users && !imported.todos && !imported.dailyTasks) { toast('無効なデータです'); return; }
+          if (confirm('現在のデータを上書きしますか？')) {
+            Object.assign(data, imported);
+            saveData(); render();
+            toast('データをインポートしました');
+          }
+        } catch(e) { toast('データの読み取りに失敗しました'); }
+      }).catch(function() {
+        var text = prompt('エクスポートしたデータを貼り付けてください:');
+        if (!text) return;
+        try {
+          var imported = JSON.parse(text);
+          if (confirm('現在のデータを上書きしますか？')) {
+            Object.assign(data, imported);
+            saveData(); render();
+            toast('データをインポートしました');
+          }
+        } catch(e) { toast('データの読み取りに失敗しました'); }
+      });
     }
 
     function countTasks(node) {
@@ -1841,14 +1994,11 @@
       if (node.type === 'task') {
         // Leaf task node
         html += '<div class="todo-node">';
-        html += '<div class="todo-item' + (node.done ? ' done' : '') + '" style="margin:0;border:none;padding:4px 0">';
-        html += '<div class="todo-checkbox ' + (node.done ? 'checked' : '') + '" data-checkbox-id="' + node.id + '" data-path="' + path + '" onclick="event.stopPropagation();expandTodoActions(this,\'' + path + '\',' + node.done + ')">' + (node.done ? icons.check : '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
+        html += '<div class="todo-item' + (node.done ? ' done' : '') + '" style="margin:0;border:none;padding:2px 0">';
+        html += '<div class="todo-checkbox ' + (node.done ? 'checked' : '') + '" data-checkbox-id="' + node.id + '" data-path="' + path + '" onclick="event.stopPropagation();expandTodoActions(this,\'' + path + '\',' + node.done + ')" style="width:24px;height:24px">' + (node.done ? icons.check : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
         html += '<div style="flex:1;min-width:0;cursor:pointer" onclick="event.stopPropagation();navigate(\'todo-detail\',{path:\'' + path + '\'})">';
         html += '<div class="todo-title">' + escapeHtml(node.title) + '</div>';
-        html += '<div class="todo-meta">';
-        html += '<span>' + icons.users + ' ' + escapeHtml(node.assignee || '未割当') + '</span>';
-        html += '<span>' + icons.clock + ' ' + escapeHtml(node.dueDay || '期限なし') + '</span>';
-        html += '</div></div></div></div>';
+        html += '</div></div></div>';
       } else {
         // Branch node (category, subcategory, or any intermediate level)
         const title = node.goalId ? getGoalTitle(node.goalId) : (node.title || '(ノード)');
@@ -2830,6 +2980,39 @@
     }
     
     
+    // DAILY TASK DETAIL
+    function renderDailyDetail(el) {
+      var dateStr = pageParams.date;
+      var id = Number(pageParams.id);
+      var tasks = data.dailyTasks[dateStr] || [];
+      var t = tasks.find(function(x){return x.id===id});
+      if (!t) { navigate('todos'); return; }
+      var dateObj = new Date(dateStr + 'T00:00:00');
+      var dateLabel = (dateObj.getMonth()+1) + '/' + dateObj.getDate() + '(' + ['日','月','火','水','木','金','土'][dateObj.getDay()] + ')';
+      var html = '<div class="todo-detail-screen">';
+      html += '<div class="todo-detail-header">';
+      html += '<button class="todo-detail-back" onclick="calSelectedDate=\'' + dateStr + '\';navigate(\'todos\')">' + icons.arrowLeft + ' ' + dateLabel + ' に戻る</button></div>';
+      var statusIcon = t.done
+        ? '<span style="color:#059669;font-size:20px">' + icons.check + '</span>'
+        : '<span style="color:var(--fg-muted);font-size:20px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg></span>';
+      html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">' + statusIcon;
+      html += '<h1 class="todo-detail-title" style="margin:0;font-size:18px">' + escapeHtml(t.title) + '</h1></div>';
+      html += '<div style="font-size:12px;color:var(--fg-muted);margin-bottom:16px">' + dateLabel + '</div>';
+      // Memo
+      html += '<div><label class="label" style="font-size:14px;margin-bottom:8px;display:flex;align-items:center;gap:6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> メモ</label>';
+      html += '<textarea class="textarea" placeholder="メモを入力..." style="min-height:240px;font-size:14px;line-height:1.8" onblur="saveDailyMemo(\'' + dateStr + '\',' + id + ',this.value)">' + escapeHtml(t.memo || '') + '</textarea></div>';
+      // Actions
+      html += '<div class="todo-detail-actions">';
+      if (t.done) {
+        html += '<button class="todo-detail-action-btn undo" onclick="toggleDailyTask(\'' + dateStr + '\',' + id + ');navigate(\'daily-detail\',{date:\'' + dateStr + '\',id:' + id + '})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg> 未完了に戻す</button>';
+      } else {
+        html += '<button class="todo-detail-action-btn check" onclick="toggleDailyTask(\'' + dateStr + '\',' + id + ');navigate(\'daily-detail\',{date:\'' + dateStr + '\',id:' + id + '})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> 完了にする</button>';
+      }
+      html += '<button class="todo-detail-action-btn delete" onclick="if(confirm(\'このタスクを削除しますか？\')){deleteDailyTask(\'' + dateStr + '\',' + id + ');navigate(\'todos\')}">' + icons.trash + ' 削除する</button>';
+      html += '</div></div>';
+      el.innerHTML = html;
+    }
+
     // TODO DETAIL SCREEN
     function renderTodoDetail(el) {
       const path = pageParams.path;
