@@ -1965,60 +1965,44 @@
     }
 
     // Cloud sync via jsonblob.com
-    var syncBlobId = '019d8db8-55f4-71d8-b2b7-fdfe57ee2c9c';
+    var SYNC_URL = 'https://jsonblob.com/api/jsonBlob/019d8db8-55f4-71d8-b2b7-fdfe57ee2c9c';
     var syncDebounce = null;
-    var syncInitialized = false;
+    var SYNC_KEYS = ['users','projects','manuals','goals','todos','dailyTasks','tags','permissions','assignees','nextId','nextTodoId','nextProjectId','nextManualId','nextGoalId','nextTagId','nextUserId','nextDailyId'];
 
+    // On load: push local data to remote (this device's data is current)
     function initSync() {
-      // Check if remote has data
-      fetch('https://jsonblob.com/api/jsonBlob/' + syncBlobId)
-        .then(function(r) { return r.json(); })
-        .then(function(remote) {
-          if (remote && typeof remote === 'object' && remote.users) {
-            // Remote has data → merge: remote wins for shared keys
-            var keys = ['users','projects','manuals','goals','todos','dailyTasks','tags','permissions','nextId','nextTodoId','nextProjectId','nextManualId','nextGoalId','nextTagId'];
-            keys.forEach(function(k) {
-              if (remote[k] !== undefined) data[k] = remote[k];
-            });
-            _origSaveData();
-            render();
-          } else {
-            // Remote is empty → push local data
-            pushSync();
-          }
-          syncInitialized = true;
-        }).catch(function() {
-          syncInitialized = true;
-        });
+      fetch(SYNC_URL, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      }).catch(function(){});
     }
 
+    // Push local data to remote (debounced)
     function pushSync() {
-      if (!syncBlobId) return;
       clearTimeout(syncDebounce);
       syncDebounce = setTimeout(function() {
-        fetch('https://jsonblob.com/api/jsonBlob/' + syncBlobId, {
+        fetch(SYNC_URL, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
         }).catch(function(){});
-      }, 1000);
+      }, 500);
     }
 
+    // Pull remote data and overwrite local
     function pullSync() {
-      if (!syncBlobId) return;
-      fetch('https://jsonblob.com/api/jsonBlob/' + syncBlobId)
+      fetch(SYNC_URL)
         .then(function(r) { return r.json(); })
         .then(function(remote) {
-          if (remote && typeof remote === 'object') {
-            // Overwrite all data keys from remote
-            var keys = ['users','projects','manuals','goals','todos','dailyTasks','tags','permissions','nextId','nextTodoId','nextProjectId','nextManualId','nextGoalId','nextTagId'];
-            keys.forEach(function(k) {
+          if (remote && typeof remote === 'object' && remote.users) {
+            SYNC_KEYS.forEach(function(k) {
               if (remote[k] !== undefined) data[k] = remote[k];
             });
             _origSaveData();
             render();
           }
-        }).catch(function(e){ console.log('sync pull error', e); });
+        }).catch(function(){});
     }
 
     // Override saveData to also push to cloud
@@ -2028,12 +2012,12 @@
       pushSync();
     };
 
-    // Init sync on load
+    // On load: push this device's data to remote
     setTimeout(initSync, 500);
 
-    // Auto-sync: pull when tab becomes visible (user switches back)
+    // On tab focus: pull latest from remote (picks up changes from other device)
     document.addEventListener('visibilitychange', function() {
-      if (!document.hidden && syncBlobId) pullSync();
+      if (!document.hidden) pullSync();
     });
 
 
