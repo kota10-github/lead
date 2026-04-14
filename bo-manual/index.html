@@ -211,9 +211,10 @@
     .user-actions{display:flex;gap:4px}
     /* Responsive */
     @media(max-width:768px){
+      .app{flex-direction:column}
       .sidebar{transform:translateX(-100%);z-index:50;width:260px}
       .sidebar.open{transform:translateX(0)}
-      .main-area{margin-left:0;padding:16px 12px}
+      .main-area{margin-left:0;padding:16px 12px;width:100%}
       .mobile-header{display:flex!important;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:30}
       .hamburger{width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg)}
       .grid-3,.grid-2{grid-template-columns:1fr}
