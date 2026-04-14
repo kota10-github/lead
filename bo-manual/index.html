@@ -345,7 +345,7 @@
     .todo-item.done .todo-title{text-decoration:line-through}
     .todo-checkbox{width:30px;height:30px;border:none;border-radius:50%;transition:all .3s cubic-bezier(.34,1.56,.64,1);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;margin-top:1px;background:#334155;color:#fff}
     .todo-checkbox.checked{background:#059669;border-color:#059669;color:#fff}
-    .todo-title{font-size:14px;font-weight:500}
+    .todo-title{font-size:16px;font-weight:500}
     .todo-meta{font-size:11px;color:var(--fg-muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap}
     .todo-badge{padding:1px 8px;border-radius:999px;font-size:10px;font-weight:500}
     .todo-badge-routine{background:#dbeafe;color:#1e40af}
@@ -1872,9 +1872,15 @@
       var allTasks = collectAllTasks(data.todos, '', []);
       var doneCount = allTasks.filter(function(t) { return t.node.done; }).length;
 
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
-      html += '<span style="font-size:12px;color:var(--fg-muted)">' + doneCount + '/' + allTasks.length + ' 完了</span>';
+      var pct = allTasks.length > 0 ? Math.round(doneCount / allTasks.length * 100) : 0;
+      html += '<div style="margin-bottom:12px">';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">';
+      html += '<span style="font-size:12px;color:var(--fg-muted)">' + doneCount + '/' + allTasks.length + '</span>';
+      html += '<span style="font-size:12px;font-weight:600;color:' + (pct === 100 ? '#059669' : 'var(--fg)') + '">' + pct + '%</span>';
       html += '</div>';
+      html += '<div style="width:100%;height:6px;background:var(--border);border-radius:3px;overflow:hidden">';
+      html += '<div style="width:' + pct + '%;height:100%;background:' + (pct === 100 ? '#059669' : '#334155') + ';border-radius:3px;transition:width .3s ease"></div>';
+      html += '</div></div>';
 
       // Flat task list
       allTasks.forEach(function(t) {
@@ -1968,6 +1974,7 @@
       if (hash && hash.startsWith('sync=')) {
         var id = hash.split('=')[1];
         if (id && id !== syncBlobId) {
+          // New device joining with a sync ID → pull remote data
           syncBlobId = id;
           localStorage.setItem('bo-sync-id', syncBlobId);
           pullSync();
@@ -1975,9 +1982,11 @@
         }
       }
       if (syncBlobId) {
-        pullSync();
+        // Existing device → push local data to remote (PC data is master)
+        pushSync();
+        location.hash = 'sync=' + syncBlobId;
       } else {
-        // Create new sync blob
+        // First time → create new sync blob from local data
         pushSyncCreate();
       }
     }
