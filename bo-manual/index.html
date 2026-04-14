@@ -384,11 +384,11 @@
 .task-action-bar .action-icon.delete-icon{color:#fff}
 .task-action-bar .action-icon.add-icon{color:#fff}
 
-.todo-checkbox:not(.expanded):hover{transform:scale(1.15);box-shadow:0 2px 8px rgba(37,99,235,.3)}
-.todo-checkbox:not(.expanded):active{transform:scale(.9)}
+.todo-checkbox:not(.expanded):hover{transform:scale(1.08);box-shadow:0 2px 8px rgba(37,99,235,.3)}
+.todo-checkbox:not(.expanded):active{transform:scale(.95)}
 .todo-checkbox.checked:not(.expanded):hover{box-shadow:0 2px 8px rgba(5,150,105,.3)}
-.todo-checkbox.expanded{width:96px;height:42px;border-radius:999px;padding:0 8px;gap:8px;display:flex;align-items:center;justify-content:center;background:var(--primary);animation:expandPill .25s cubic-bezier(.34,1.56,.64,1)}
-@keyframes expandPill{from{width:30px;opacity:.7}to{width:68px;opacity:1}}
+.todo-checkbox.expanded{width:96px;height:42px;border-radius:999px;padding:0 8px;gap:8px;display:flex;align-items:center;justify-content:center;background:var(--primary);animation:expandPill .2s ease-out}
+@keyframes expandPill{from{width:42px;opacity:.8}to{width:96px;opacity:1}}
 .todo-checkbox.expanded .action-icon{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;transition:all .15s;flex-shrink:0}
 .todo-checkbox.expanded .action-icon:hover{background:rgba(255,255,255,.25);transform:scale(1.15)}
 .todo-checkbox.expanded .action-icon:active{transform:scale(.85)}
@@ -2943,32 +2943,6 @@
         });
       }
     });
-    function toggleTaskActions(nodeId, path) {
-      const checkboxEl = event.currentTarget;
-      
-      if (checkboxEl.classList.contains('expanded')) {
-        checkboxEl.style.transform = 'scale(0.8)';
-        setTimeout(() => {
-          checkboxEl.classList.remove('expanded');
-          checkboxEl.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>';
-          checkboxEl.style.transform = '';
-        }, 120);
-        return;
-      }
-      
-      document.querySelectorAll('.todo-checkbox.expanded').forEach(el => {
-        el.classList.remove('expanded');
-        el.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>';
-      });
-      
-      checkboxEl.style.transform = 'scale(0.85)';
-      setTimeout(() => {
-        checkboxEl.classList.add('expanded');
-        checkboxEl.innerHTML = '<span class="action-icon check-icon" onclick="event.stopPropagation(); completeTask(' + nodeId + '); return false;">&#10003;</span><span class="action-icon delete-icon" onclick="event.stopPropagation(); if(confirm(\'' + String.fromCharCode(21066,38500,12375,12414,12377,12363,65311) + '\')) { deleteTodoNodeByPath(\'' + path + '\'); saveData(); render(); } return false;">&#128465;</span>';
-        checkboxEl.style.transform = 'scale(1.05)';
-        setTimeout(() => { checkboxEl.style.transform = ''; }, 150);
-      }, 100);
-    }
 
     function closeOverlay() {
       const backdrop = document.querySelector('.overlay-backdrop');
