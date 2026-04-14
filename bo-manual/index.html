@@ -1823,6 +1823,7 @@
             <div><div class="user-info"><div class="avatar">${(u.name || 'U').charAt(0).toUpperCase()}</div><div><p style="font-weight:500">${escapeHtml(u.name || '名前未設定')}</p></div></div>
             <div class="user-link">${icons.link}<code>member/${u.id}</code></div></div>
             <div class="user-actions">
+              <button class="btn btn-ghost btn-icon" title="編集" onclick="showEditUserDialog(${u.id})">${icons.pencil}</button>
               <button class="btn btn-ghost btn-icon" title="責任者ページを開く" onclick="navigate('member-page',{userId:${u.id}})">${icons.external}</button>
               <button class="btn btn-ghost btn-icon" title="リンクをコピー" onclick="navigator.clipboard.writeText('${memberUrl}');toast('リンクをコピーしました')">${icons.copy}</button>
               <button class="btn btn-ghost btn-icon" style="color:var(--destructive)" title="削除" onclick="confirmDeleteUser(${u.id})">${icons.trash}</button>
@@ -1839,6 +1840,22 @@
       if (!name) return;
       data.users.push({ id: data.nextUserId++, name });
       saveData(); toast('ユーザーを追加しました'); render();
+    }
+    function showEditUserDialog(userId) {
+      var user = data.users.find(function(u) { return u.id === userId; });
+      if (!user) return;
+      showModal('ユーザー編集', '<div class="form-group"><label>名前</label><input class="input" id="d-edit-user-name" value="' + escapeHtml(user.name || '') + '" style="width:100%"></div>', [
+        { label: '保存', class: 'btn btn-primary', onClick: function(o) {
+          var newName = document.getElementById('d-edit-user-name').value.trim();
+          if (!newName) return;
+          user.name = newName;
+          saveData();
+          toast('ユーザー情報を更新しました');
+          o.remove();
+          render();
+        }}
+      ]);
+      setTimeout(function() { var inp = document.getElementById('d-edit-user-name'); if (inp) inp.focus(); }, 100);
     }
     function confirmDeleteUser(id) {
       const user = getUser(id);
