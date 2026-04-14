@@ -44,7 +44,7 @@
 
     .card-header{padding:16px 20px 8px}
     .card-body{padding:8px 20px 16px}
-    .card-title{font-size:14px;font-weight:600;color:var(--fg)}
+    .card-title{font-size:14px;font-weight:600;color:var(--fg);word-break:break-word;overflow-wrap:break-word}
     /* Buttons */
     .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius);font-size:13px;font-weight:500;transition:all .15s}
     .btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:#1d4ed8}
@@ -104,7 +104,7 @@
     .node-user:hover{transform:scale(1.05);box-shadow:0 4px 12px rgba(0,0,0,.15)}
     .node-project{padding:6px 14px;border-radius:8px;font-weight:500;font-size:13px;border:1px solid;cursor:pointer;transition:all .15s;white-space:nowrap;user-select:none}
     .node-project:hover{transform:scale(1.05)}
-    .node-manual{padding:8px 12px;border-radius:8px;background:#fff;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,.04);cursor:pointer;transition:all .15s;max-width:280px}
+    .node-manual{padding:8px 12px;border-radius:8px;background:#fff;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,.04);cursor:pointer;transition:all .15s;max-width:280px;min-width:100px;word-break:break-word;overflow-wrap:break-word}
     .node-manual:hover{border-color:rgba(37,99,235,.3);box-shadow:0 2px 8px rgba(0,0,0,.08)}
     .node-manual-title{font-size:13px;font-weight:500}
     .node-manual-purpose{font-size:11px;color:var(--fg-muted);margin-top:4px;display:flex;align-items:flex-start;gap:4px}
@@ -112,7 +112,7 @@
     .user-col{display:flex;flex-direction:column;gap:12px}
     .project-row{display:flex;align-items:flex-start;gap:24px}
     .manuals-col{display:flex;flex-direction:column;gap:8px}
-    .node-project-standalone{padding:8px 16px;border-radius:8px;font-weight:500;font-size:13px;border:2px solid var(--primary);background:var(--primary-light);color:var(--primary);cursor:pointer;transition:all .15s;white-space:nowrap;user-select:none}
+    .node-project-standalone{padding:8px 16px;border-radius:8px;font-weight:500;font-size:13px;border:2px solid var(--primary);background:var(--primary-light);color:var(--primary);cursor:pointer;transition:all .15s;white-space:nowrap;user-select:none;word-break:break-word;overflow-wrap:break-word}
     .node-project-standalone:hover{transform:scale(1.05);box-shadow:0 2px 8px rgba(37,99,235,.2)}
     .project-col{display:flex;flex-direction:column;gap:12px}
     .project-branch{display:flex;align-items:flex-start;gap:16px}
@@ -120,7 +120,7 @@
         /* Map branch add options */
     .map-add-options{display:flex;gap:6px;margin-top:6px}
     .map-add-branch{padding:5px 12px;border-radius:14px;font-size:11px;font-weight:500;border:1px dashed var(--border);background:transparent;color:var(--fg-muted);cursor:pointer;transition:all .2s;white-space:nowrap}
-    .map-add-branch:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)} .sub-tree-row{display:flex;align-items:flex-start;gap:12px;position:relative} .sub-tree-card-wrap{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:120px} .sub-tree-children{display:flex;flex-direction:column;gap:8px} .sub-add-btn{font-size:10px;padding:2px 8px;border:1px dashed var(--border);border-radius:4px;background:transparent;cursor:pointer;white-space:nowrap;color:var(--fg-muted)} .sub-add-btn:hover{border-color:var(--primary);color:var(--primary)}
+    .map-add-branch:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)} .sub-tree-row{display:flex;align-items:flex-start;gap:12px;position:relative;flex-shrink:0} .sub-tree-card-wrap{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:120px} .sub-tree-children{display:flex;flex-direction:column;gap:8px} .sub-add-btn{font-size:10px;padding:2px 8px;border:1px dashed var(--border);border-radius:4px;background:transparent;cursor:pointer;white-space:nowrap;color:var(--fg-muted)} .sub-add-btn:hover{border-color:var(--primary);color:var(--primary)}
     /* Project detail */
     .project-memo-area{margin-top:24px}
     .project-memo-area h3{font-size:15px;font-weight:600;margin-bottom:8px}
@@ -216,6 +216,12 @@
       .main-area{margin-left:0;padding:16px 12px}
       .mobile-header{display:flex!important}
       .grid-3,.grid-2{grid-template-columns:1fr}
+      .card{word-break:break-word;overflow-wrap:break-word}
+      .card-title{word-break:break-word;overflow-wrap:break-word}
+      .sub-tree-card-wrap{min-width:100px}
+      .node-manual{min-width:100px;word-break:break-word;overflow-wrap:break-word}
+      .node-manual-title{word-break:break-word;overflow-wrap:break-word}
+      .project-branch{overflow-x:auto;-webkit-overflow-scrolling:touch}
       .info-grid{grid-template-columns:1fr}
       .info-grid > div + div{border-left:none;border-top:1px solid var(--border)}
       .doc-toc{display:none}
