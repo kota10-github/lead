@@ -257,6 +257,7 @@
       .user-info{gap:8px}
       .avatar{width:32px;height:32px;font-size:13px}
       .todo-category{margin-bottom:12px}
+      .todo-node{margin-left:12px;padding-left:12px}
       .todo-item{padding:10px 4px}
       .todo-checkbox{width:38px;height:38px}
       .todo-checkbox svg{width:16px;height:16px}
@@ -264,6 +265,10 @@
       .todo-meta{font-size:12px}
       .todo-node-title{font-size:15px;padding:8px 12px}
       .todo-node-depth0{font-size:17px}
+      .goal-large{margin-bottom:16px}
+      .goal-large-title{font-size:17px}
+      .todo-detail-screen{padding:16px}
+      .todo-detail-title{font-size:18px}
       .todo-filters{gap:4px}
       .todo-filter-btn{padding:4px 10px;font-size:11px}
       .page-title{font-size:22px}
@@ -1794,7 +1799,7 @@
         html += '<div class="todo-node">';
         html += '<div class="todo-item' + (node.done ? ' done' : '') + '" style="margin:0;border:none;padding:4px 0">';
         html += '<div class="todo-checkbox ' + (node.done ? 'checked' : '') + '" data-checkbox-id="' + node.id + '" data-path="' + path + '" onclick="event.stopPropagation();expandTodoActions(this,\'' + path + '\',' + node.done + ')">' + (node.done ? icons.check : '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
-        html += '<div style="flex:1;min-width:0">';
+        html += '<div style="flex:1;min-width:0;cursor:pointer" onclick="event.stopPropagation();navigate(\'todo-detail\',{path:\'' + path + '\'})">';
         html += '<div class="todo-title">' + escapeHtml(node.title) + '</div>';
         html += '<div class="todo-meta">';
         html += '<span>' + icons.users + ' ' + escapeHtml(node.assignee || '未割当') + '</span>';
@@ -1850,6 +1855,14 @@
       saveData();
       toast('削除しました');
       render();
+    }
+
+    function saveTodoMemo(pathStr, value) {
+      const node = findNodeByPath(pathStr);
+      if (!node) return;
+      node.memo = value;
+      saveData();
+      toast('メモを保存しました');
     }
 
     function showAddChildDialog(pathStr, depth) {
@@ -2807,6 +2820,10 @@
         html += '<div class="todo-detail-info-row"><span class="todo-detail-info-label">' + icons.users + ' 担当者</span><span style="font-weight:500">' + escapeHtml(node.assignee || '未割当') + '</span></div>';
         html += '<div class="todo-detail-info-row"><span class="todo-detail-info-label">' + icons.clock + ' 期限</span><span style="font-weight:500">' + escapeHtml(node.dueDay || '期限なし') + '</span></div>';
         html += '</div>';
+
+        // Memo
+        html += '<div style="margin-top:20px"><label class="label" style="font-size:14px;margin-bottom:8px;display:flex;align-items:center;gap:6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> メモ</label>';
+        html += '<textarea class="textarea" id="todo-memo" placeholder="メモを入力..." style="min-height:120px;font-size:14px" onblur="saveTodoMemo(\'' + path + '\',this.value)">' + escapeHtml(node.memo || '') + '</textarea></div>';
 
         // Action buttons
         html += '<div class="todo-detail-actions">';
