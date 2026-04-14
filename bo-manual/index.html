@@ -62,8 +62,8 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
 
 /* Grid */
 .grid{display:grid;gap:16px}
-.grid-3{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
-.grid-2{grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
+.grid-3{grid-template-columns:repeat(auto-fill,minmax(min(280px,100%),1fr))}
+.grid-2{grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr))}
 
 /* Page header */
 .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
@@ -180,12 +180,16 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
 @media(max-width:768px){
   .sidebar{transform:translateX(-100%)}
   .sidebar.open{transform:translateX(0)}
-  .main-area{margin-left:0}
+  .main-area{margin-left:0;padding:16px}
   .mobile-header{display:flex!important}
   .grid-3,.grid-2{grid-template-columns:1fr}
   .info-grid{grid-template-columns:1fr}
   .info-grid > div + div{border-left:none;border-top:1px solid var(--border)}
   .doc-toc{display:none}
+  .page-header{flex-direction:column;align-items:flex-start;gap:12px}
+  .card-header .flex{min-width:0}
+  .card-title{word-break:break-word}
+  .purpose-box{word-break:break-word}
 }
 .mobile-header{display:none;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:30}
 .hamburger{width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius)}
@@ -667,9 +671,9 @@ function renderManualList(el) {
       const project = getProject(m.projectId);
       const assignees = getAssigneesForManual(m.id);
       html += `<div class="card mb-2" onclick="navigate('manual-detail',{id:${m.id}})" style="cursor:pointer;padding:16px 20px">
-        <div style="display:flex;justify-content:space-between;gap:16px">
+        <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px">
           <div style="flex:1;min-width:0">
-            <div class="flex items-center gap-2 mb-2">${icons.book}<span style="font-weight:500">${escapeHtml(m.title)}</span></div>
+            <div class="flex items-center gap-2 mb-2" style="min-width:0">${icons.book}<span style="font-weight:500;word-break:break-word">${escapeHtml(m.title)}</span></div>
             <div class="purpose-box"><div class="purpose-label">${icons.target} 目的</div><p class="text-sm line-clamp-2">${escapeHtml(m.purpose)}</p></div>
           </div>
           <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
@@ -798,7 +802,7 @@ function submitManualForm(editId, projectId) {
 // ── MY TASKS ──
 function renderMyTasks(el) {
   let html = `<div class="page-header"><h1 class="page-title">マイタスク</h1></div>`;
-  html += `<div class="card mb-4" style="padding:16px 20px"><div class="flex items-center gap-3"><label class="text-sm" style="color:var(--fg-muted);white-space:nowrap;font-weight:500">責任者を選択</label><select class="select" id="task-user-select" onchange="renderTasksForUser()"><option value="">責任者を選んでください</option>`;
+  html += `<div class="card mb-4" style="padding:16px 20px"><div class="flex items-center gap-3" style="flex-wrap:wrap"><label class="text-sm" style="color:var(--fg-muted);white-space:nowrap;font-weight:500">責任者を選択</label><select class="select" id="task-user-select" onchange="renderTasksForUser()" style="min-width:0;flex:1"><option value="">責任者を選んでください</option>`;
   data.users.forEach(u => { html += `<option value="${u.id}">${escapeHtml(u.name)}</option>`; });
   html += `</select><span id="task-count" class="text-sm" style="color:var(--fg-muted)"></span></div></div>`;
   html += `<div id="task-list"><div class="empty" style="padding:48px"><p>責任者を選択するとタスクが表示されます</p></div></div>`;
@@ -817,9 +821,9 @@ function renderTasksForUser() {
   tasks.forEach(t => {
     const project = getProject(t.manual.projectId);
     html += `<div class="card mb-2" onclick="navigate('manual-detail',{id:${t.manual.id}})" style="cursor:pointer;padding:16px 20px">
-      <div class="flex items-center gap-2 mb-2"><span style="font-weight:600;font-size:13px">${escapeHtml(t.manual.title)}</span></div>
-      <div class="purpose-box mb-2"><div class="flex items-center gap-2">${icons.target}<p class="text-sm">${escapeHtml(t.manual.purpose)}</p></div></div>
-      <div class="flex items-center gap-3 text-xs" style="color:var(--fg-muted)">${icons.folder} ${escapeHtml(project?.name || '')}
+      <div class="flex items-center gap-2 mb-2" style="min-width:0"><span style="font-weight:600;font-size:13px;word-break:break-word">${escapeHtml(t.manual.title)}</span></div>
+      <div class="purpose-box mb-2"><div class="flex items-center gap-2" style="min-width:0">${icons.target}<p class="text-sm" style="word-break:break-word">${escapeHtml(t.manual.purpose)}</p></div></div>
+      <div class="flex items-center gap-3 text-xs" style="color:var(--fg-muted);flex-wrap:wrap">${icons.folder} ${escapeHtml(project?.name || '')}
       ${t.manual.operationPace ? `<span class="badge badge-outline">${escapeHtml(t.manual.operationPace)}</span>` : ''}
       ${t.manual.responseSpeed ? `<span class="badge badge-outline">${escapeHtml(t.manual.responseSpeed)}</span>` : ''}
       </div>
