@@ -460,6 +460,16 @@
 .manual-rich-editor hr{border:none;border-top:1px solid var(--border);margin:12px 0}
 .manual-rich-editor mark{background:#FEF08A;padding:1px 4px;border-radius:3px}
 
+    
+/* Inline editable title */
+.editable-title{cursor:text;padding:4px 8px;margin:-4px -8px;border-radius:var(--radius);border:2px solid transparent;transition:all .15s;min-width:100px;outline:none}
+.editable-title:hover{border-color:var(--border);background:var(--bg-muted)}
+.editable-title:focus{border-color:var(--primary);background:var(--bg);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.editable-desc{cursor:text;padding:4px 8px;margin:-4px -8px;border-radius:var(--radius);border:1px solid transparent;transition:all .15s;outline:none;font-size:14px;color:var(--fg-muted)}
+.editable-desc:hover{border-color:var(--border);background:var(--bg-muted)}
+.editable-desc:focus{border-color:var(--primary);background:var(--bg);box-shadow:0 0 0 3px rgba(37,99,235,.1);color:var(--fg)}
+.editable-desc:empty::before{content:attr(data-placeholder);color:var(--fg-muted2);pointer-events:none}
+
     </style>
 </head>
 <body>
@@ -985,11 +995,7 @@
       const subProjects = data.projects.filter(p => p.parentId === project.id);
       let html = `<button class="btn btn-ghost btn-sm mb-4" onclick="navigate('home')">${icons.arrowLeft} 全体マップ</button>`;
       html += renderBreadcrumb();
-      html += `<div class="page-header"><div><h1 class="page-title">${escapeHtml(project.name)}</h1>${project.description ? `<p style="color:var(--fg-muted);margin-top:4px">${escapeHtml(project.description)}</p>` : ''}</div>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-primary" onclick="navigate('manual-form',{projectId:${project.id}})">${icons.plus} マニュアル作成</button>
-          <button class="btn btn-ghost" onclick="showProjectDialog(getProject(${project.id}))">${icons.pencil} 編集</button>
-        </div></div>`;
+      html += `<div class="page-header"><div style="flex:1;min-width:0"><h1 class="page-title editable-title" contenteditable="true" id="proj-title-edit" onblur="saveProjectTitleInline(${project.id})" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">${escapeHtml(project.name)}</h1><p class="editable-desc" contenteditable="true" id="proj-desc-edit" data-placeholder="説明を追加..." onblur="saveProjectDescInline(${project.id})" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur()}">${project.description ? escapeHtml(project.description) : ''}</p></div><div style="display:flex;gap:8px;flex-shrink:0"><button class="btn btn-primary" onclick="navigate('manual-form',{projectId:${project.id}})">${icons.plus} マニュアル作成</button><button class="btn btn-outline" style="color:var(--destructive);border-color:var(--destructive)" onclick="confirmDeleteProject(${project.id})">${icons.trash} 削除</button></div></div>`;
       // Memo section
       html += `<div class="project-memo-area">
         <h3>📝 メモ・思考整理</h3>
@@ -1788,6 +1794,35 @@
         ]
       );
     }
+    
+    function saveProjectTitleInline(projectId) {
+      var project = getProject(projectId);
+      if (!project) return;
+      var el = document.getElementById('proj-title-edit');
+      if (!el) return;
+      var newName = el.textContent.trim();
+      if (newName && newName !== project.name) {
+        project.name = newName;
+        saveData();
+        toast('\u30d7\u30ed\u30b8\u30a7\u30af\u30c8\u540d\u3092\u66f4\u65b0\u3057\u307e\u3057\u305f');
+      } else if (!newName) {
+        el.textContent = project.name;
+      }
+    }
+    
+    function saveProjectDescInline(projectId) {
+      var project = getProject(projectId);
+      if (!project) return;
+      var el = document.getElementById('proj-desc-edit');
+      if (!el) return;
+      var newDesc = el.textContent.trim();
+      if (newDesc !== (project.description || '')) {
+        project.description = newDesc;
+        saveData();
+        toast('\u8aac\u660e\u3092\u66f4\u65b0\u3057\u307e\u3057\u305f');
+      }
+    }
+
     function confirmDeleteProject(id) {
       const project = getProject(id);
       const manualCount = getManualCountForProject(id);
