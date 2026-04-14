@@ -1873,7 +1873,6 @@
       var doneCount = allTasks.filter(function(t) { return t.node.done; }).length;
 
       html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
-      html += '<span style="font-size:13px;font-weight:600">タスク一覧</span>';
       html += '<span style="font-size:12px;color:var(--fg-muted)">' + doneCount + '/' + allTasks.length + ' 完了</span>';
       html += '</div>';
 
@@ -2043,10 +2042,6 @@
       if (!document.hidden && syncBlobId) pullSync();
     });
 
-    // Auto-sync: poll every 30 seconds
-    setInterval(function() {
-      if (!document.hidden && syncBlobId) pullSync();
-    }, 30000);
 
     function countTasks(node) {
       let total = 0, done = 0;
