@@ -1098,6 +1098,16 @@
       let html = `<button class="btn btn-ghost btn-sm mb-4" onclick="navigate('home')">${icons.arrowLeft} 全体マップ</button>`;
       html += renderBreadcrumb();
       html += `<div style="margin-bottom:24px"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap"><div style="flex:1;min-width:200px"><h1 class="page-title editable-title" contenteditable="true" id="proj-title-edit" onblur="saveProjectTitleInline(${project.id})" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">${escapeHtml(project.name)}</h1></div><div style="display:flex;gap:8px;flex-shrink:0;align-items:center"><button class="btn btn-primary" onclick="navigate('manual-form',{projectId:${project.id}})">${icons.plus} マニュアル作成</button><button class="btn btn-outline btn-sm" style="color:var(--destructive);border-color:var(--destructive)" onclick="confirmDeleteProject(${project.id})">${icons.trash} 削除</button></div></div><p class="editable-desc" contenteditable="true" id="proj-desc-edit" data-placeholder="説明を追加..." onblur="saveProjectDescInline(${project.id})" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur()}" style="margin-top:4px">${project.description ? escapeHtml(project.description) : ''}</p></div>`;
+      // Tag selector
+      const currentTag = (data.tags||[]).find(t=>t.id===project.tagId);
+      html += `<div style="margin-top:8px;margin-bottom:16px;display:flex;align-items:center;gap:8px">
+        <span style="font-size:13px;color:var(--muted-foreground)">タグ:</span>
+        <select id="proj-tag-select" onchange="changeProjectTag(${project.id}, this.value)" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--card);cursor:pointer">
+          <option value="">タグなし</option>
+          ${(data.tags||[]).map(t=>'<option value="'+t.id+'"'+(project.tagId===t.id?' selected':'')+' style="color:'+t.color+'">'+escapeHtml(t.name)+'</option>').join('')}
+        </select>
+        ${currentTag ? '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:'+currentTag.color+'"></span>' : ''}
+      </div>`;
       // Memo section
       html += `<div class="project-memo-area">
         <h3>📝 メモ・思考整理</h3>
@@ -1882,7 +1892,8 @@
       const isEdit = !!editProject;
       showModal(isEdit ? 'プロジェクト編集' : '新規プロジェクト',
         `<div class="form-group"><label class="label">プロジェクト名</label><input class="input" id="d-proj-name" value="${escapeHtml(editProject?.name || '')}" placeholder="プロジェクト名を入力"></div>
-        <div class="form-group"><label class="label">説明（任意）</label><textarea class="textarea" id="d-proj-desc" rows="3" placeholder="プロジェクトの説明">${escapeHtml(editProject?.description || '')}</textarea></div>`,
+        <div class="form-group"><label class="label">説明（任意）</label><textarea class="textarea" id="d-proj-desc" rows="3" placeholder="プロジェクトの説明">${escapeHtml(editProject?.description || '')}</textarea></div>
+        <div class="form-group"><label class="label">タグ</label><select class="input" id="d-proj-tag"><option value="">タグなし</option>${(data.tags||[]).map(t=>'<option value="'+t.id+'"'+((editProject&&editProject.tagId===t.id)?' selected':'')+'>'+escapeHtml(t.name)+'</option>').join('')}</select></div>`,
         [
           { label: 'キャンセル', onClick: o => o.remove() },
           { label: isEdit ? '更新' : '作成', class: 'btn btn-primary', onClick: o => {
@@ -1925,6 +1936,15 @@
         saveData();
         toast('\u8aac\u660e\u3092\u66f4\u65b0\u3057\u307e\u3057\u305f');
       }
+    }
+
+    function changeProjectTag(projectId, tagValue) {
+      const proj = data.projects.find(p => p.id === projectId);
+      if (!proj) return;
+      proj.tagId = tagValue ? parseInt(tagValue) : null;
+      saveData();
+      render();
+      toast('タグを変更しました');
     }
 
     function confirmDeleteProject(id) {
