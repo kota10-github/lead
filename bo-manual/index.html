@@ -701,10 +701,9 @@
     // NAVIGATION
     let currentPage = 'home';
     let pageParams = {};
-    function navigate(page, params = {
+    function navigate(page, params = {}) {
       // Close sidebar on mobile navigation
       var sb = document.querySelector('.sidebar'); if (sb && sb.classList.contains('open')) { sb.classList.remove('open'); var ov = document.getElementById('sidebar-overlay'); if (ov) ov.remove(); document.body.style.overflow = ''; }
-}) {
       currentPage = page;
       pageParams = params;
       document.querySelectorAll('.nav-item').forEach(el => {
