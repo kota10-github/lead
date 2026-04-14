@@ -916,66 +916,66 @@
       requestAnimationFrame(() => requestAnimationFrame(() => drawMindmapLines(projects)));
     }
     function drawMindmapLines(projects) {
-      const svg = document.getElementById('mindmap-svg');
-      const inner = document.getElementById('mindmap-inner');
+      var svg = document.getElementById('mindmap-svg');
+      var inner = document.getElementById('mindmap-inner');
       if (!svg || !inner) return;
-      const innerRect = inner.getBoundingClientRect();
-      const scale = mapZoom;
-      function getCenter(node) {
+      var innerRect = inner.getBoundingClientRect();
+      var scale = mapZoom;
+      function getPos(node) {
         if (!node) return null;
-        const r = node.getBoundingClientRect();
+        var r = node.getBoundingClientRect();
         return { x: (r.left + r.width / 2 - innerRect.left) / scale, y: (r.top + r.height / 2 - innerRect.top) / scale, right: (r.right - innerRect.left) / scale, left: (r.left - innerRect.left) / scale, top: (r.top - innerRect.top) / scale, bottom: (r.bottom - innerRect.top) / scale };
       }
-      const rootNode = inner.querySelector('[data-node="root"]');
-      const rootPos = getCenter(rootNode);
+      var rootNode = inner.querySelector('[data-node="root"]');
+      var rootPos = getPos(rootNode);
       if (!rootPos) return;
-      const projData = [];
+      var projData = [];
       projects.forEach(function(proj, pi) {
-        const c = USER_COLORS[pi % USER_COLORS.length];
-        const projNode = inner.querySelector('[data-node="proj-' + proj.projectId + '"]');
-        const projPos = getCenter(projNode);
+        var c = USER_COLORS[pi % USER_COLORS.length];
+        var projNode = inner.querySelector('[data-node="proj-' + proj.projectId + '"]');
+        var projPos = getPos(projNode);
         if (projPos) {
-          const manualPositions = [];
+          var mps = [];
           proj.manuals.forEach(function(m) {
-            const manualNode = inner.querySelector('[data-node="pm-' + proj.projectId + '-' + m.id + '"]');
-            const mp = getCenter(manualNode);
-            if (mp) manualPositions.push(mp);
+            var mn = inner.querySelector('[data-node="pm-' + proj.projectId + '-' + m.id + '"]');
+            var mp = getPos(mn);
+            if (mp) mps.push(mp);
           });
-          const spPositions = [];
+          var sps = [];
           proj.subProjects.forEach(function(sp) {
-            const spNode = inner.querySelector('[data-node="sp-' + proj.projectId + '-' + sp.id + '"]');
-            const sp2 = getCenter(spNode);
-            if (sp2) spPositions.push(sp2);
+            var sn = inner.querySelector('[data-node="sp-' + proj.projectId + '-' + sp.id + '"]');
+            var sp2 = getPos(sn);
+            if (sp2) sps.push(sp2);
           });
-          projData.push({ proj: proj, pi: pi, color: c.bg, pos: projPos, manuals: manualPositions, subProjects: spPositions });
+          projData.push({ color: c.bg, pos: projPos, manuals: mps, subProjects: sps });
         }
       });
-      const innerW = inner.scrollWidth;
-      const innerH = inner.scrollHeight;
+      var innerW = inner.scrollWidth;
+      var innerH = inner.scrollHeight;
       svg.setAttribute('width', innerW);
       svg.setAttribute('height', innerH);
       svg.setAttribute('viewBox', '0 0 ' + innerW + ' ' + innerH);
-      let paths = '';
-      const trunkX = rootPos.right + 30;
-      if (projData.length > 0) {
-        const firstY = projData[0].pos.y;
-        const lastY = projData[projData.length - 1].pos.y;
-        paths += '<path d="M' + rootPos.right + ' ' + rootPos.y + ' L' + trunkX + ' ' + rootPos.y + '" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.5"/>';
-        const trunkTop = Math.min(rootPos.y, firstY);
-        const trunkBottom = Math.max(rootPos.y, lastY);
-        paths += '<path d="M' + trunkX + ' ' + trunkTop + ' L' + trunkX + ' ' + trunkBottom + '" fill="none" stroke="#94a3b8" stroke-width="2" opacity="0.5"/>';
-        projData.forEach(function(pd) {
-          paths += '<path d="M' + trunkX + ' ' + pd.pos.y + ' L' + pd.pos.left + ' ' + pd.pos.y + '" fill="none" stroke="' + pd.color + '" stroke-width="2.5"/>';
-          pd.manuals.forEach(function(mp) {
-            var mx2 = (pd.pos.right + mp.left) / 2;
-            paths += '<path d="M' + pd.pos.right + ' ' + pd.pos.y + ' C' + mx2 + ' ' + pd.pos.y + ' ' + mx2 + ' ' + mp.y + ' ' + mp.left + ' ' + mp.y + '" fill="none" stroke="' + pd.color + '" stroke-width="1.5" opacity="0.5"/>';
+      var paths = '';
+      if (projData.length === 0) { svg.innerHTML = ''; return; }
+      var trunkX = rootPos.right + 30;
+      var topY = Math.min(rootPos.y, projData[0].pos.y);
+      var botY = Math.max(rootPos.y, projData[projData.length - 1].pos.y);
+      paths += '<path d="M' + rootPos.right + ' ' + rootPos.y + ' L' + trunkX + ' ' + rootPos.y + '" fill="none" stroke="#cbd5e1" stroke-width="2"/>';
+      paths += '<path d="M' + trunkX + ' ' + topY + ' L' + trunkX + ' ' + botY + '" fill="none" stroke="#cbd5e1" stroke-width="2"/>';
+      projData.forEach(function(pd) {
+        paths += '<path d="M' + trunkX + ' ' + pd.pos.y + ' L' + pd.pos.left + ' ' + pd.pos.y + '" fill="none" stroke="' + pd.color + '" stroke-width="2"/>';
+        var children = pd.manuals.concat(pd.subProjects);
+        if (children.length > 0) {
+          var cx = pd.pos.right + 16;
+          var ctTop = Math.min(pd.pos.y, children[0].y);
+          var ctBot = Math.max(pd.pos.y, children[children.length - 1].y);
+          paths += '<path d="M' + pd.pos.right + ' ' + pd.pos.y + ' L' + cx + ' ' + pd.pos.y + '" fill="none" stroke="' + pd.color + '" stroke-width="1.5" opacity="0.4"/>';
+          paths += '<path d="M' + cx + ' ' + ctTop + ' L' + cx + ' ' + ctBot + '" fill="none" stroke="' + pd.color + '" stroke-width="1.5" opacity="0.4"/>';
+          children.forEach(function(cp) {
+            paths += '<path d="M' + cx + ' ' + cp.y + ' L' + cp.left + ' ' + cp.y + '" fill="none" stroke="' + pd.color + '" stroke-width="1.5" opacity="0.4"/>';
           });
-          pd.subProjects.forEach(function(sp) {
-            var mx2 = (pd.pos.right + sp.left) / 2;
-            paths += '<path d="M' + pd.pos.right + ' ' + pd.pos.y + ' C' + mx2 + ' ' + pd.pos.y + ' ' + mx2 + ' ' + sp.y + ' ' + sp.left + ' ' + sp.y + '" fill="none" stroke="' + pd.color + '" stroke-width="1.5" opacity="0.5"/>';
-          });
-        });
-      }
+        }
+      });
       svg.innerHTML = paths;
     }
     function renderProjects(el) {
