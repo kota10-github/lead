@@ -506,6 +506,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           ユーザー管理
         </button>
+        <button class="nav-item" data-page="tags" onclick="navigate('tags')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.83z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          タグ管理
+        </button>
         <button class="nav-item" data-page="permissions" onclick="navigate('permissions')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           権限管理
@@ -602,6 +606,13 @@
       nextManualId: 5,
       nextGoalId: 300,
       nextTodoId: 8,
+      tags: [
+        { id: 1, name: 'マーケ', color: '#3b82f6' },
+        { id: 2, name: 'セールス', color: '#8b5cf6' },
+        { id: 3, name: 'CS', color: '#06b6d4' },
+        { id: 4, name: 'バックオフィス', color: '#10b981' },
+      ],
+      nextTagId: 5,
     };
 
     let data;
@@ -617,6 +628,8 @@
       }
       if (!data.nextGoalId) data.nextGoalId = 300;
       if (!data.nextTodoId) data.nextTodoId = 8;
+      if (!data.tags) data.tags = [{id:1,name:'マーケ',color:'#3b82f6'},{id:2,name:'セールス',color:'#8b5cf6'},{id:3,name:'CS',color:'#06b6d4'},{id:4,name:'バックオフィス',color:'#10b981'}];
+      if (!data.nextTagId) data.nextTagId = 5;
       // Ensure project memo and files fields
       (data.projects || []).forEach(p => { if (!p.memo) p.memo = ''; if (!p.files) p.files = []; });
     } catch {
@@ -716,6 +729,7 @@
       if (page === 'goal-detail') crumbs.push({label: '目的ツリー', page: 'goals'}, {label: '目的詳細', current: true});
       if (page === 'tasks') crumbs.push({label: 'マイタスク', current: true});
       if (page === 'users') crumbs.push({label: 'ユーザー管理', current: true});
+      if (page === 'tags') crumbs.push({label: 'タグ管理', current: true});
       if (page === 'permissions') crumbs.push({label: '権限管理', current: true});
       if (page === 'member-page' && params.userId) {
         crumbs.push({label: 'ユーザー管理', page: 'users'});
@@ -828,10 +842,80 @@
       case 'todo-detail': renderTodoDetail(main); break;
       case 'goal-detail': renderGoalDetail(main); break;
         case 'users': renderUsers(main); break;
+        case 'tags': renderTags(main); break;
         case 'permissions': renderPermissions(main); break;
         case 'member-page': renderMemberPage(main); break;
         default: main.innerHTML = '<p>Not Found</p>';
       }
+    }
+
+    // TAG COLOR HELPER
+    function getProjectColor(projectId) {
+      var proj = getProject(projectId);
+      if (!proj || !proj.tagId) return { bg: '#94a3b8', light: '#f1f5f9', text: '#475569' };
+      var tag = (data.tags || []).find(function(t) { return t.id === proj.tagId; });
+      if (!tag) return { bg: '#94a3b8', light: '#f1f5f9', text: '#475569' };
+      return { bg: tag.color, light: tag.color + '20', text: tag.color };
+    }
+
+    function renderTags(el) {
+      var html = '';
+      html += renderBreadcrumb();
+      html += '<div class="page-header"><h1 class="page-title">タグ管理</h1>';
+      html += '<button class="btn btn-primary" onclick="showTagDialog()">+ 新規タグ</button></div>';
+      if (!data.tags || data.tags.length === 0) {
+        html += '<div class="empty"><p>タグがありません</p></div>';
+      } else {
+        html += '<div style="display:flex;flex-direction:column;gap:8px">';
+        data.tags.forEach(function(tag) {
+          var projCount = data.projects.filter(function(p) { return p.tagId === tag.id; }).length;
+          html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg)">';
+          html += '<div style="display:flex;align-items:center;gap:12px"><span style="width:16px;height:16px;border-radius:50%;background:' + tag.color + ';flex-shrink:0"></span><span style="font-weight:500;font-size:14px">' + escapeHtml(tag.name) + '</span><span class="badge badge-secondary">' + projCount + ' プロジェクト</span></div>';
+          html += '<div style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm" onclick="showTagDialog(' + tag.id + ')">' + icons.pencil + '</button><button class="btn btn-ghost btn-sm" style="color:var(--destructive)" onclick="confirmDeleteTag(' + tag.id + ')">' + icons.trash + '</button></div></div>';
+        });
+        html += '</div>';
+      }
+      el.innerHTML = html;
+    }
+
+    var TAG_PRESET_COLORS = ['#3b82f6','#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#6366f1','#14b8a6','#f97316'];
+    function showTagDialog(editTagId) {
+      var editTag = editTagId ? (data.tags || []).find(function(t) { return t.id === editTagId; }) : null;
+      var colorOptions = TAG_PRESET_COLORS.map(function(c) {
+        var sel = (editTag && editTag.color === c) ? ' style="outline:3px solid var(--fg);outline-offset:2px;border-radius:50%"' : '';
+        return '<span class="tag-color-opt" data-color="' + c + '"' + sel + ' onclick="document.querySelectorAll(\'.tag-color-opt\').forEach(function(e){e.style.outline=\'\'});this.style.outline=\'3px solid var(--fg)\';this.style.outlineOffset=\'2px\';this.style.borderRadius=\'50%\'" style="width:28px;height:28px;border-radius:50%;background:' + c + ';cursor:pointer;display:inline-block"></span>';
+      }).join('');
+      showModal(editTag ? 'タグ編集' : '新規タグ',
+        '<div class="form-group"><label class="label">タグ名</label><input class="input" id="d-tag-name" value="' + escapeHtml(editTag ? editTag.name : '') + '" placeholder="タグ名"></div><div class="form-group"><label class="label">カラー</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">' + colorOptions + '</div></div>',
+        [
+          { label: 'キャンセル', onClick: function(o) { o.remove(); } },
+          { label: editTag ? '更新' : '作成', class: 'btn btn-primary', onClick: function(o) {
+            var name = document.getElementById('d-tag-name').value.trim();
+            if (!name) { toast('タグ名を入力してください'); return; }
+            var selColor = document.querySelector('.tag-color-opt[style*="outline: 3px"]') || document.querySelector('.tag-color-opt[style*="outline:3px"]');
+            var color = selColor ? selColor.getAttribute('data-color') : TAG_PRESET_COLORS[0];
+            if (editTag) { editTag.name = name; editTag.color = color; toast('タグを更新しました'); }
+            else { if (!data.tags) data.tags = []; data.tags.push({ id: data.nextTagId++, name: name, color: color }); toast('タグを作成しました'); }
+            saveData(); o.remove(); render();
+          }}
+        ]
+      );
+    }
+
+    function confirmDeleteTag(tagId) {
+      var tag = (data.tags || []).find(function(t) { return t.id === tagId; });
+      if (!tag) return;
+      showModal('タグの削除',
+        '<p class="confirm-text">タグ「' + escapeHtml(tag.name) + '」を削除しますか？このタグが付いたプロジェクトのタグは解除されます。</p>',
+        [
+          { label: 'キャンセル', onClick: function(o) { o.remove(); } },
+          { label: '削除', class: 'btn btn-destructive', onClick: function(o) {
+            data.tags = (data.tags || []).filter(function(t) { return t.id !== tagId; });
+            data.projects.forEach(function(p) { if (p.tagId === tagId) p.tagId = null; });
+            saveData(); o.remove(); render(); toast('タグを削除しました');
+          }}
+        ]
+      );
     }
 
     // ZOOM STATE
@@ -869,7 +953,7 @@
       html += `<div style="display:flex;flex-direction:column;justify-content:center;padding-top:32px"><div class="node-root" data-node="root">BOチーム</div><button class="map-add-btn" onclick="showProjectDialog()">+ プロジェクト追加</button></div>`;
       html += `<div class="project-col">`;
       projects.forEach((proj, pi) => {
-        const c = USER_COLORS[pi % USER_COLORS.length];
+        const c = getProjectColor(proj.projectId);
         html += `<div class="project-branch">`;
         html += `<div class="node-project-standalone" data-node="proj-${proj.projectId}" style="border-color:${c.bg};background:${c.light};color:${c.text}" onclick="navigate('project-detail',{id:${proj.projectId}})">${escapeHtml(proj.projectName)}<span style="opacity:.6;font-size:11px;margin-left:4px">(${proj.manuals.length})</span></div>`;
         html += `<div class="project-items-col">`;
@@ -931,7 +1015,7 @@
       if (!rootPos) return;
       var projData = [];
       projects.forEach(function(proj, pi) {
-        var c = USER_COLORS[pi % USER_COLORS.length];
+        var c = getProjectColor(proj.projectId);
         var projNode = inner.querySelector('[data-node="proj-' + proj.projectId + '"]');
         var projPos = getPos(projNode);
         if (projPos) {
@@ -1805,8 +1889,10 @@
             const name = document.getElementById('d-proj-name').value.trim();
             if (!name) { toast('プロジェクト名を入力してください'); return; }
             const desc = document.getElementById('d-proj-desc').value.trim();
-            if (isEdit) { editProject.name = name; editProject.description = desc; toast('プロジェクトを更新しました'); }
-            else { data.projects.push({ id: data.nextProjectId++, name, description: desc, createdBy: 0, memo: '', files: [], parentId: parentId || null }); toast('プロジェクトを作成しました'); }
+            var tagVal = document.getElementById('d-proj-tag').value;
+            var tagId = tagVal ? parseInt(tagVal) : null;
+            if (isEdit) { editProject.name = name; editProject.description = desc; editProject.tagId = tagId; toast('プロジェクトを更新しました'); }
+            else { data.projects.push({ id: data.nextProjectId++, name: name, description: desc, createdBy: 0, memo: '', files: [], parentId: parentId || null, tagId: tagId }); toast('プロジェクトを作成しました'); }
             saveData(); o.remove(); render();
           }}
         ]
