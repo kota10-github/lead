@@ -969,7 +969,8 @@
             <button class="btn btn-ghost btn-icon btn-sm card-delete-btn" style="position:absolute;top:8px;right:8px;color:var(--destructive)" onclick="event.stopPropagation();confirmDeleteProject(${p.id})" title="削除">${icons.trash}</button>
           </div>`;
         });
-        html += `</div>`;
+        html += renderBreadcrumb();
+      html += `</div>`;
       }
       el.innerHTML = html;
     }
@@ -983,6 +984,7 @@
       const manuals = getManualsByProject(project.id);
       const subProjects = data.projects.filter(p => p.parentId === project.id);
       let html = `<button class="btn btn-ghost btn-sm mb-4" onclick="navigate('home')">${icons.arrowLeft} 全体マップ</button>`;
+      html += renderBreadcrumb();
       html += `<div class="page-header"><div><h1 class="page-title">${escapeHtml(project.name)}</h1>${project.description ? `<p style="color:var(--fg-muted);margin-top:4px">${escapeHtml(project.description)}</p>` : ''}</div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-primary" onclick="navigate('manual-form',{projectId:${project.id}})">${icons.plus} マニュアル作成</button>
@@ -1064,7 +1066,8 @@
     function renderManualList(el) {
       let html = `<div class="page-header"><h1 class="page-title">マニュアル一覧</h1></div>`;
       if (data.manuals.length === 0) {
-        html += `<div class="empty">${icons.book}<p>マニュアルがありません</p></div>`;
+        html += renderBreadcrumb();
+      html += `<div class="empty">${icons.book}<p>マニュアルがありません</p></div>`;
       } else {
         data.manuals.forEach(m => {
           const project = getProject(m.projectId);
@@ -1105,6 +1108,7 @@
       html += `<div class="doc-layout">`;
       html += `<aside class="doc-toc"><div class="doc-toc-title">目次</div><div id="toc-links"></div></aside>`;
       html += `<main class="doc-main">`;
+      html += renderBreadcrumb();
       html += renderBreadcrumb();
       html += `<h1 class="doc-title">${escapeHtml(manual.title)}</h1>`;
       html += `<div class="doc-assignees">`;
@@ -1248,6 +1252,7 @@
     // MY TASKS
     function renderMyTasks(el) {
       let html = `<div class="page-header"><h1 class="page-title">マイタスク</h1></div>`;
+      html += renderBreadcrumb();
       html += `<div class="card mb-4" style="padding:16px 20px"><div class="flex items-center gap-3"><label class="text-sm" style="color:var(--fg-muted);white-space:nowrap;font-weight:500">責任者を選択</label><select class="select" id="task-user-select" onchange="renderTasksForUser()"><option value="">責任者を選んでください</option>`;
       data.users.forEach(u => { html += `<option value="${u.id}">${escapeHtml(u.name)}</option>`; });
       html += `</select><span id="task-count" class="text-sm" style="color:var(--fg-muted)"></span></div></div>`;
@@ -1281,7 +1286,8 @@
     function renderGoals(el) {
       let html = `<div class="page-header"><h1 class="page-title">目的ツリー</h1><button class="btn btn-primary" onclick="showAddGoalDialog('large')">${icons.plus} 大目的を追加</button></div>`;
       if (!data.goals || data.goals.length === 0) {
-        html += `<div class="empty">${icons.target}<p>目的がまだ登録されていません</p></div>`;
+        html += renderBreadcrumb();
+      html += `<div class="empty">${icons.target}<p>目的がまだ登録されていません</p></div>`;
       } else {
         html += `<div class="goal-tree">`;
         data.goals.forEach(g => {
@@ -1444,7 +1450,8 @@
     function renderTodos(el) {
       let html = '<div class="page-header"><h1 class="page-title">ToDo管理</h1><button class="btn btn-primary" onclick="showAddTodoCategoryDialog()">' + icons.plus + ' 大目的を追加</button></div>';
       if (!data.todos || data.todos.length === 0) {
-        html += '<div class="empty"><p>ToDoがまだ登録されていません。目的ツリーから大目的を選んで追加してください。</p></div>';
+        html += renderBreadcrumb();
+      html += '<div class="empty"><p>ToDoがまだ登録されていません。目的ツリーから大目的を選んで追加してください。</p></div>';
       } else {
         html += '<div class="goal-tree">';
         data.todos.forEach(cat => {
@@ -1648,6 +1655,7 @@
     // USERS
     function renderUsers(el) {
       let html = `<div class="page-header"><h1 class="page-title">ユーザー管理</h1></div>`;
+      html += renderBreadcrumb();
       html += `<div class="card mb-4"><div class="card-header"><span class="text-xs" style="font-weight:600;color:var(--fg-muted)">ユーザー追加</span></div><div class="card-body"><div class="flex gap-2"><input class="input" id="new-user-name" placeholder="名前を入力" style="flex:1" onkeydown="if(event.key==='Enter')addUser()"><button class="btn btn-primary" onclick="addUser()">${icons.plus} 追加</button></div></div></div>`;
       html += `<div class="card"><div class="card-header"><span class="text-xs" style="font-weight:600;color:var(--fg-muted)">${icons.users} ユーザー一覧 <span class="badge badge-secondary" style="margin-left:4px">${data.users.length}</span></span></div><div class="card-body">`;
       if (data.users.length === 0) {
@@ -1692,6 +1700,7 @@
     // PERMISSIONS
     function renderPermissions(el) {
       let html = `<div class="page-header"><h1 class="page-title">権限管理</h1></div>`;
+      html += renderBreadcrumb();
       html += `<p class="text-sm mb-4" style="color:var(--fg-muted)">プロジェクトごとにユーザーの閲覧・編集権限を設定できます。</p>`;
       data.projects.forEach(p => {
         html += `<div class="card mb-4"><div class="card-header"><span class="card-title">${icons.folder} ${escapeHtml(p.name)}</span></div><div class="card-body">`;
@@ -2489,6 +2498,7 @@
       if (!goal) { navigate('goals'); return; }
 
       var html = '<div class="goal-detail-screen">';
+      html += renderBreadcrumb();
       html += renderBreadcrumb();
       html += '<div class="todo-detail-header">';
       html += '<button class="todo-detail-back" onclick="navigate(\'goals\')">' + icons.arrowLeft + ' 目的ツリーに戻る</button>';
