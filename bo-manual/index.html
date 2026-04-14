@@ -258,7 +258,7 @@
       .user-info{gap:8px}
       .avatar{width:32px;height:32px;font-size:13px}
       .todo-category{margin-bottom:12px}
-      .todo-node{margin-left:1em;margin-top:1px}
+      .todo-node{margin-left:0;margin-top:1px}
       .todo-item{padding:2px 0}
       .todo-checkbox{width:24px;height:24px}
       .todo-checkbox svg{width:12px;height:12px}
@@ -345,7 +345,7 @@
     .todo-item.done .todo-title{text-decoration:line-through}
     .todo-checkbox{width:30px;height:30px;border:none;border-radius:50%;transition:all .3s cubic-bezier(.34,1.56,.64,1);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;margin-top:1px;background:#334155;color:#fff}
     .todo-checkbox.checked{background:#059669;border-color:#059669;color:#fff}
-    .todo-title{font-size:13px;font-weight:500}
+    .todo-title{font-size:16px;font-weight:500}
     .todo-meta{font-size:11px;color:var(--fg-muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap}
     .todo-badge{padding:1px 8px;border-radius:999px;font-size:10px;font-weight:500}
     .todo-badge-routine{background:#dbeafe;color:#1e40af}
@@ -355,7 +355,11 @@
 .todo-action-btn:hover{background:var(--bg-muted)}
 .todo-action-btn.complete{color:#059669}
 .todo-action-btn.delete{color:var(--destructive)}
-.todo-node{position:relative;margin-left:1em;margin-top:1px;padding-left:0}
+.todo-project-group{margin-bottom:12px}
+.todo-project-label{font-size:11px;font-weight:500;color:var(--fg-muted2);padding:2px 0;margin-top:8px;margin-bottom:2px;display:flex;align-items:center;justify-content:space-between}
+.todo-project-delete{font-size:14px;color:var(--fg-muted2);cursor:pointer;opacity:0;transition:opacity .15s;padding:0 4px}
+.todo-project-label:hover .todo-project-delete{opacity:1}
+.todo-node{position:relative;margin-left:0;margin-top:1px;padding-left:0}
 .todo-node::before{display:none}
 .todo-node-title{font-size:13px;font-weight:600;padding:4px 0;display:inline-flex;align-items:center;gap:6px;margin-bottom:2px;color:var(--fg)}
 .todo-node-depth0{font-size:13px;font-weight:600;color:var(--fg)}
@@ -1829,28 +1833,71 @@
       render();
     }
 
-    function renderTodos(el) {
-      let html = '';
-      var tasks = (data.dailyTasks[calSelectedDate] || []);
-      var dateObj = new Date(calSelectedDate + 'T00:00:00');
-      var dateLabel = (dateObj.getMonth()+1) + '/' + dateObj.getDate() + '(' + ['日','月','火','水','木','金','土'][dateObj.getDay()] + ')';
-      // Date header with calendar toggle
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
-      html += '<h2 style="font-size:15px;font-weight:600;cursor:pointer" onclick="calOpen=!calOpen;render()">' + dateLabel + ' <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></h2>';
-      html += '<span style="font-size:12px;color:var(--fg-muted)">' + tasks.filter(t=>t.done).length + '/' + tasks.length + ' 完了</span></div>';
-      // Collapsible calendar
-      if (calOpen) html += renderCalendar();
-      // Tasks
-      if (tasks.length > 0) {
-        tasks.forEach(function(t) {
-          html += '<div class="daily-task" onclick="navigate(\'daily-detail\',{date:\'' + calSelectedDate + '\',id:' + t.id + '})">';
-          html += '<div class="dt-check ' + (t.done ? 'done' : '') + '" onclick="event.stopPropagation();toggleDailyTask(\'' + calSelectedDate + '\',' + t.id + ')">' + (t.done ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '') + '</div>';
-          html += '<div class="dt-title ' + (t.done ? 'done' : '') + '">' + escapeHtml(t.title) + '</div>';
-          html += '</div>';
-        });
+    function collectAllTasks(nodes, path, projectLabels) {
+      var result = [];
+      (nodes || []).forEach(function(node) {
+        var nodePath = path ? path + ',' + node.id : String(node.id);
+        if (node.type === 'task') {
+          result.push({ node: node, path: nodePath, project: projectLabels.join(' › ') });
+          // Sub-tasks (children of a task)
+          if (node.children && node.children.length > 0) {
+            node.children.forEach(function(child) {
+              if (child.type === 'task') {
+                result.push({ node: child, path: nodePath + ',' + child.id, project: projectLabels.join(' › '), isChild: true, parentTitle: node.title });
+              }
+            });
+          }
+        } else {
+          var title = node.goalId ? getGoalTitle(node.goalId) : (node.title || '');
+          result = result.concat(collectAllTasks(node.children, nodePath, projectLabels.concat(title ? [title] : [])));
+        }
+      });
+      return result;
+    }
+
+    function getTaskProjectPath(pathStr) {
+      var ids = pathStr.split(',').map(Number);
+      var labels = [];
+      var nodes = data.todos;
+      for (var i = 0; i < ids.length - 1; i++) {
+        var node = (nodes || []).find(function(n) { return n.id === ids[i]; });
+        if (!node) break;
+        if (node.type !== 'task') {
+          var title = node.goalId ? getGoalTitle(node.goalId) : (node.title || '');
+          if (title) labels.push(title);
+        }
+        nodes = node.children;
       }
-      // Add task
-      html += '<div class="daily-add" onclick="addDailyTask(\'' + calSelectedDate + '\')">' + icons.plus + ' タスクを追加</div>';
+      return labels.join(' › ');
+    }
+
+    function renderTodos(el) {
+      var html = '';
+      var allTasks = collectAllTasks(data.todos, '', []);
+      var doneCount = allTasks.filter(function(t) { return t.node.done; }).length;
+
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
+      html += '<span style="font-size:13px;font-weight:600">タスク一覧</span>';
+      html += '<span style="font-size:12px;color:var(--fg-muted)">' + doneCount + '/' + allTasks.length + ' 完了</span>';
+      html += '</div>';
+
+      // Flat task list
+      allTasks.forEach(function(t) {
+        var indent = t.isChild ? 'padding-left:1em;' : '';
+        html += '<div class="todo-item' + (t.node.done ? ' done' : '') + '" style="margin:0;border:none;padding:3px 0;' + indent + '">';
+        html += '<div class="todo-checkbox ' + (t.node.done ? 'checked' : '') + '" data-checkbox-id="' + t.node.id + '" data-path="' + t.path + '" onclick="event.stopPropagation();expandTodoActions(this,\'' + t.path + '\',' + t.node.done + ')" style="width:24px;height:24px">' + (t.node.done ? icons.check : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
+        html += '<div style="flex:1;min-width:0;cursor:pointer" onclick="event.stopPropagation();navigate(\'todo-detail\',{path:\'' + t.path + '\'})">';
+        html += '<div class="todo-title">' + escapeHtml(t.node.title) + '</div>';
+        html += '</div></div>';
+      });
+
+      if (allTasks.length === 0) {
+        html += '<div class="empty" style="padding:24px 0"><p>タスクがありません</p></div>';
+      }
+
+      // Add task button
+      html += '<div class="daily-add" onclick="showAddTaskFromProject()">' + icons.plus + ' タスクを追加</div>';
+
       el.innerHTML = html;
     }
 
@@ -2007,33 +2054,22 @@
     function renderTodoNode(node, depth, path) {
       let html = '';
       if (node.type === 'task') {
-        // Leaf task node
-        html += '<div class="todo-node">';
-        html += '<div class="todo-item' + (node.done ? ' done' : '') + '" style="margin:0;border:none;padding:2px 0">';
+        // Task node — main focus, no indentation
+        html += '<div class="todo-item' + (node.done ? ' done' : '') + '" style="margin:0;border:none;padding:3px 0">';
         html += '<div class="todo-checkbox ' + (node.done ? 'checked' : '') + '" data-checkbox-id="' + node.id + '" data-path="' + path + '" onclick="event.stopPropagation();expandTodoActions(this,\'' + path + '\',' + node.done + ')" style="width:24px;height:24px">' + (node.done ? icons.check : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
         html += '<div style="flex:1;min-width:0;cursor:pointer" onclick="event.stopPropagation();navigate(\'todo-detail\',{path:\'' + path + '\'})">';
         html += '<div class="todo-title">' + escapeHtml(node.title) + '</div>';
-        html += '</div></div></div>';
+        html += '</div></div>';
       } else {
-        // Branch node (category, subcategory, or any intermediate level)
+        // Project/category node — small, subordinate label
         const title = node.goalId ? getGoalTitle(node.goalId) : (node.title || '(ノード)');
         const counts = countTasks(node);
-        
-        if (depth === 0) {
-          html += '<div class="goal-large">';
-          html += '<div class="goal-large-title" style="cursor:pointer" onclick="showTodoOverlay(\'' + path + '\',\'' + escapeHtml(title) + '\')">' + icons.target + ' ' + escapeHtml(title);
-          html += ' <span class="badge badge-secondary" style="margin-left:4px">' + counts.done + '/' + counts.total + '</span>';
-          html += '';
-          html += '';
-          html += '</div>';
-        } else {
-          html += '<div class="todo-node">';
-          html += '<div class="todo-node-title todo-node-depth' + Math.min(depth, 2) + '" style="cursor:pointer" onclick="showTodoOverlay(\'' + path + '\',\'' + escapeHtml(title) + '\')">' + escapeHtml(title);
-          html += ' <span class="badge badge-outline" style="margin-left:4px">' + counts.done + '/' + counts.total + '</span>';
-          html += '';
-          html += '';
-          html += '</div>';
-        }
+
+        html += '<div class="todo-project-group">';
+        html += '<div class="todo-project-label">';
+        html += '<span style="cursor:pointer" onclick="showTodoOverlay(\'' + path + '\',\'' + escapeHtml(title) + '\')">' + escapeHtml(title) + ' <span style="color:var(--fg-muted2);font-size:10px">' + counts.done + '/' + counts.total + '</span></span>';
+        html += '<span class="todo-project-delete" onclick="event.stopPropagation();if(confirm(\'「' + escapeHtml(title) + '」を削除しますか？\')) { deleteTodoNodeByPath(\'' + path + '\'); }">×</span>';
+        html += '</div>';
 
         if (node.children && node.children.length > 0) {
           node.children.forEach(child => {
@@ -2209,7 +2245,57 @@
       ]);
     }
 
-    
+    function showAddTaskFromProject() {
+      // Build a tree of all non-task nodes from data.todos for picking where to add
+      var categories = [];
+      function collectCategories(nodes, path, label) {
+        (nodes || []).forEach(function(node) {
+          var nodePath = path ? path + ',' + node.id : String(node.id);
+          if (node.type !== 'task') {
+            var title = node.goalId ? getGoalTitle(node.goalId) : (node.title || '(ノード)');
+            categories.push({ path: nodePath, label: label ? label + ' › ' + title : title });
+            collectCategories(node.children, nodePath, label ? label + ' › ' + title : title);
+          } else {
+            // Allow adding sub-tasks to existing tasks
+            categories.push({ path: nodePath, label: (label ? label + ' › ' : '') + node.title + '（子タスク）', isTask: true });
+          }
+        });
+      }
+      collectCategories(data.todos, '', '');
+
+      var bodyHtml = '<div class="form-group"><label class="label">タスク名</label><input class="input" id="d-new-task-title" placeholder="タスク名を入力"></div>';
+
+      if (categories.length > 0) {
+        var opts = categories.map(function(c) { return '<option value="' + c.path + '">' + escapeHtml(c.label) + '</option>'; }).join('');
+        bodyHtml += '<div class="form-group"><label class="label">所属プロジェクト</label><select class="select" id="d-new-task-parent" style="width:100%"><option value="">なし（直接追加）</option>' + opts + '</select></div>';
+      }
+
+      bodyHtml += '<div class="form-group"><label class="label">親タスクとして作成</label><label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="d-new-task-is-parent"> この下に子タスクを追加できるようにする</label></div>';
+
+      showModal('タスクを追加', bodyHtml, [
+        { label: 'キャンセル', onClick: function(o) { o.remove(); } },
+        { label: '追加', class: 'btn btn-primary', onClick: function(o) {
+          var title = document.getElementById('d-new-task-title').value.trim();
+          if (!title) { toast('タスク名を入力してください'); return; }
+          var parentPath = document.getElementById('d-new-task-parent') ? document.getElementById('d-new-task-parent').value : '';
+          var isParent = document.getElementById('d-new-task-is-parent').checked;
+          var newTask = { id: data.nextTodoId++, type: 'task', title: title, done: false, children: isParent ? [] : undefined };
+
+          if (parentPath) {
+            var parentNode = findNodeByPath(parentPath);
+            if (parentNode) {
+              if (!parentNode.children) parentNode.children = [];
+              parentNode.children.push(newTask);
+            }
+          } else {
+            // Add as top-level category with the task inside
+            if (!data.todos) data.todos = [];
+            data.todos.push({ id: data.nextTodoId++, type: 'category', title: 'タスク', children: [newTask] });
+          }
+          saveData(); toast('追加しました'); o.remove(); render();
+        }}
+      ]);
+    }
 
     // USERS
     function renderUsers(el) {
@@ -2829,6 +2915,15 @@
     function deleteTodoFromBtn(iconEl, path) {
       deleteTodoNodeByPath(path);
     }
+    function addSubTask(parentPath) {
+      var title = prompt('子タスク名を入力');
+      if (!title || !title.trim()) return;
+      var parentNode = findNodeByPath(parentPath);
+      if (!parentNode) return;
+      if (!parentNode.children) parentNode.children = [];
+      parentNode.children.push({ id: data.nextTodoId++, type: 'task', title: title.trim(), done: false });
+      saveData(); toast('子タスクを追加しました'); render();
+    }
     // Close expanded checkboxes on outside click
     document.addEventListener('click', function(e) {
       if (!e.target.closest('.todo-checkbox')) {
@@ -3048,11 +3143,16 @@
 
       if (node.type === 'task') {
         // Task detail
+        var projectPath = getTaskProjectPath(path);
         var statusIcon = node.done
           ? '<span style="color:#059669;font-size:24px">' + icons.check + '</span>'
           : '<span style="color:var(--primary);font-size:24px"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg></span>';
         html += '<div style="display:flex;align-items:center;gap:16px;margin-bottom:8px">' + statusIcon;
         html += '<h1 class="todo-detail-title" style="margin:0">' + escapeHtml(node.title) + '</h1></div>';
+
+        if (projectPath) {
+          html += '<div style="margin-bottom:12px;font-size:12px;color:var(--fg-muted2)">' + icons.folder + ' ' + escapeHtml(projectPath) + '</div>';
+        }
 
         if (node.done) {
           html += '<div style="margin-bottom:16px"><span class="badge badge-secondary" style="font-size:12px;padding:4px 12px;background:#d1fae5;color:#059669">完了済み</span></div>';
@@ -3062,6 +3162,25 @@
         html += '<div class="todo-detail-info-row"><span class="todo-detail-info-label">' + icons.users + ' 担当者</span><span style="font-weight:500">' + escapeHtml(node.assignee || '未割当') + '</span></div>';
         html += '<div class="todo-detail-info-row"><span class="todo-detail-info-label">' + icons.clock + ' 期限</span><span style="font-weight:500">' + escapeHtml(node.dueDay || '期限なし') + '</span></div>';
         html += '</div>';
+
+        // Sub-tasks
+        if (node.children && node.children.length > 0) {
+          html += '<div style="margin-top:20px"><label class="label" style="font-size:14px;margin-bottom:8px">子タスク</label>';
+          node.children.forEach(function(child) {
+            if (child.type === 'task') {
+              var childPath = path + ',' + child.id;
+              html += '<div class="todo-item' + (child.done ? ' done' : '') + '" style="margin:0;border:none;padding:3px 0">';
+              html += '<div class="todo-checkbox ' + (child.done ? 'checked' : '') + '" onclick="event.stopPropagation();completeTask(\'' + childPath + '\');navigate(\'todo-detail\',{path:\'' + path + '\'})" style="width:22px;height:22px">' + (child.done ? icons.check : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
+              html += '<div style="flex:1;min-width:0;cursor:pointer" onclick="navigate(\'todo-detail\',{path:\'' + childPath + '\'})">';
+              html += '<div class="todo-title">' + escapeHtml(child.title) + '</div>';
+              html += '</div></div>';
+            }
+          });
+          html += '</div>';
+        }
+
+        // Add sub-task button
+        html += '<div style="margin-top:8px"><button class="daily-add" onclick="addSubTask(\'' + path + '\')" style="display:inline-flex;font-size:12px;padding:4px 0">' + icons.plus + ' 子タスクを追加</button></div>';
 
         // Memo
         html += '<div style="margin-top:20px"><label class="label" style="font-size:14px;margin-bottom:8px;display:flex;align-items:center;gap:6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> メモ</label>';
