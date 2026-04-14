@@ -431,6 +431,35 @@
     .block-copy-btn:hover{background:var(--primary-light);border-color:var(--primary);color:var(--primary)}
     .block-copy-btn svg{width:12px;height:12px;fill:currentColor}
     .block-copy-btn.copied{background:#16a34a;border-color:#16a34a;color:#fff;opacity:1}
+    
+/* Breadcrumb navigation */
+.breadcrumb{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--fg-muted2);margin-bottom:16px;padding:8px 14px;background:var(--bg-muted);border-radius:var(--radius);flex-wrap:wrap;border:1px solid var(--border-light)}
+.breadcrumb a,.breadcrumb button{color:var(--fg-muted);font-size:11px;background:none;border:none;cursor:pointer;padding:2px 6px;border-radius:4px;transition:all .15s;text-decoration:none;font-family:var(--font)}
+.breadcrumb a:hover,.breadcrumb button:hover{color:var(--primary);background:var(--primary-light)}
+.breadcrumb .bc-sep{color:var(--fg-muted2);font-size:10px;margin:0 1px;user-select:none}
+.breadcrumb .bc-current{color:var(--primary-fg);font-weight:600;padding:2px 8px;background:var(--primary-light);border-radius:4px;font-size:11px}
+/* Active sidebar enhancement */
+.nav-item.active{background:var(--primary);color:#fff;font-weight:600;box-shadow:0 2px 8px rgba(37,99,235,.25)}
+.nav-item.active svg{color:#fff}
+.nav-item.active:hover{background:#1d4ed8;color:#fff}
+/* Rich editor for manual form */
+.manual-rich-editor{width:100%;min-height:300px;padding:16px;border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius);font-family:var(--font);font-size:14px;line-height:1.8;background:var(--bg);outline:none;overflow-y:auto;white-space:pre-wrap;word-wrap:break-word}
+.manual-rich-editor:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.manual-rich-editor:empty::before{content:attr(data-placeholder);color:var(--fg-muted);pointer-events:none}
+.manual-rich-editor h1{font-size:22px;font-weight:700;margin:12px 0 6px;padding-bottom:6px;border-bottom:2px solid var(--border)}
+.manual-rich-editor h2{font-size:18px;font-weight:600;margin:10px 0 4px;padding-bottom:4px;border-bottom:1px solid var(--border-light)}
+.manual-rich-editor h3{font-size:15px;font-weight:600;margin:8px 0 4px}
+.manual-rich-editor p{margin:4px 0}
+.manual-rich-editor strong{font-weight:700}
+.manual-rich-editor em{font-style:italic}
+.manual-rich-editor ul,.manual-rich-editor ol{margin:6px 0;padding-left:24px}
+.manual-rich-editor li{margin:2px 0}
+.manual-rich-editor code{background:var(--bg-muted);padding:2px 6px;border-radius:3px;font-family:'SFMono-Regular',Consolas,monospace;font-size:13px}
+.manual-rich-editor blockquote{border-left:3px solid var(--primary);padding:4px 12px;margin:8px 0;color:var(--fg-muted);background:var(--bg-muted);border-radius:0 var(--radius) var(--radius) 0}
+.manual-rich-editor a{color:var(--primary);text-decoration:underline}
+.manual-rich-editor hr{border:none;border-top:1px solid var(--border);margin:12px 0}
+.manual-rich-editor mark{background:#FEF08A;padding:1px 4px;border-radius:3px}
+
     </style>
 </head>
 <body>
@@ -631,6 +660,86 @@
       external: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>',
       check: '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>',
     };
+
+    
+    // BREADCRUMB helper
+    let navHistory = [];
+    function getBreadcrumb() {
+      const crumbs = [];
+      const page = currentPage;
+      const params = pageParams;
+      
+      // Always start with home
+      crumbs.push({label: '全体マップ', page: 'home'});
+      
+      if (page === 'project-detail' && params.id) {
+        const proj = getProject(params.id);
+        crumbs.push({label: proj ? proj.name : 'プロジェクト', page: 'project-detail', params: {id: params.id}});
+      }
+      if (page === 'manual-form') {
+        if (params.projectId) {
+          const proj = getProject(params.projectId);
+          crumbs.push({label: proj ? proj.name : 'プロジェクト', page: 'project-detail', params: {id: params.projectId}});
+        }
+        if (params.editId) {
+          const m = getManual(params.editId);
+          if (m) {
+            const proj = getProject(m.projectId);
+            if (proj) crumbs.push({label: proj.name, page: 'project-detail', params: {id: m.projectId}});
+            crumbs.push({label: m.title, page: 'manual-detail', params: {id: params.editId}});
+          }
+        }
+        crumbs.push({label: params.editId ? 'マニュアル編集' : '新規作成', current: true});
+      }
+      if (page === 'manual-detail' && params.id) {
+        const m = getManual(params.id);
+        if (m) {
+          const proj = getProject(m.projectId);
+          if (proj) crumbs.push({label: proj.name, page: 'project-detail', params: {id: m.projectId}});
+          crumbs.push({label: m.title, current: true});
+        }
+      }
+      if (page === 'manuals') crumbs.push({label: 'マニュアル一覧', current: true});
+      if (page === 'goals') crumbs.push({label: '目的ツリー', current: true});
+      if (page === 'todos') crumbs.push({label: 'ToDo管理', current: true});
+      if (page === 'todo-detail') crumbs.push({label: 'ToDo管理', page: 'todos'}, {label: 'タスク詳細', current: true});
+      if (page === 'goal-detail') crumbs.push({label: '目的ツリー', page: 'goals'}, {label: '目的詳細', current: true});
+      if (page === 'tasks') crumbs.push({label: 'マイタスク', current: true});
+      if (page === 'users') crumbs.push({label: 'ユーザー管理', current: true});
+      if (page === 'permissions') crumbs.push({label: '権限管理', current: true});
+      if (page === 'member-page' && params.userId) {
+        crumbs.push({label: 'ユーザー管理', page: 'users'});
+        const u = getUser(params.userId);
+        crumbs.push({label: u ? u.name + ' のページ' : 'メンバーページ', current: true});
+      }
+      
+      // Mark last one as current if not already marked
+      if (crumbs.length > 0 && !crumbs[crumbs.length-1].current && page !== 'home') {
+        crumbs[crumbs.length-1].current = true;
+      }
+      
+      return crumbs;
+    }
+    
+    function renderBreadcrumb() {
+      if (currentPage === 'home') return '';
+      var crumbs = getBreadcrumb();
+      if (crumbs.length <= 1) return '';
+      var html = '<div class="breadcrumb">';
+      crumbs.forEach(function(c, i) {
+        if (i > 0) html += '<span class="bc-sep">\u203A</span>';
+        if (c.current) {
+          html += '<span class="bc-current">' + escapeHtml(c.label) + '</span>';
+        } else if (c.page) {
+          var paramsStr = c.params ? JSON.stringify(c.params).replace(/"/g, "'") : '{}';
+          html += '<button onclick="navigate(\'' + c.page + '\',' + paramsStr + ')">' + escapeHtml(c.label) + '</button>';
+        } else {
+          html += '<span>' + escapeHtml(c.label) + '</span>';
+        }
+      });
+      html += '</div>';
+      return html;
+    }
 
     // USER COLORS
     const USER_COLORS = [
@@ -996,6 +1105,7 @@
       html += `<div class="doc-layout">`;
       html += `<aside class="doc-toc"><div class="doc-toc-title">目次</div><div id="toc-links"></div></aside>`;
       html += `<main class="doc-main">`;
+      html += renderBreadcrumb();
       html += `<h1 class="doc-title">${escapeHtml(manual.title)}</h1>`;
       html += `<div class="doc-assignees">`;
       assignees.forEach(a => {
@@ -1037,6 +1147,7 @@
       const isEdit = !!pageParams.editId;
       const existing = isEdit ? getManual(pageParams.editId) : null;
       let html = `<button class="btn btn-ghost btn-sm mb-4" onclick="${isEdit ? `navigate('manual-detail',{id:${pageParams.editId}})` : `navigate('project-detail',{id:${pageParams.projectId}})`}">${icons.arrowLeft} 戻る</button>`;
+      html += renderBreadcrumb();
       html += `<h1 class="page-title mb-4">${isEdit ? 'マニュアル編集' : '新規マニュアル作成'}</h1>`;
       html += `<div style="max-width:800px">`;
       html += `<div class="form-group"><label class="label">タイトル <span style="color:var(--destructive)">*</span></label><input class="input" id="f-title" value="${escapeHtml(existing?.title || '')}" placeholder="マニュアルのタイトル"></div>`;
@@ -1049,10 +1160,70 @@
       html += `<div><label class="label label-icon">${icons.clock} 稼働ペース</label><textarea class="textarea" id="f-pace" rows="3" placeholder="例：週5日、9:00-18:00">${escapeHtml(existing?.operationPace || '')}</textarea></div>`;
       html += `<div><label class="label label-icon">${icons.zap} 対応スピード</label><textarea class="textarea" id="f-speed" rows="3" placeholder="例：問い合わせから24時間以内に対応">${escapeHtml(existing?.responseSpeed || '')}</textarea></div>`;
       html += `</div>`;
-      html += `<div class="form-group"><label class="label label-icon">${icons.book} マニュアル</label><textarea class="textarea" id="f-roadmap" rows="12" placeholder="マニュアルの内容を記述（HTML可）">${existing?.taskRoadmap ? escapeHtml(existing.taskRoadmap) : ''}</textarea></div>`;
+      html += `<div class="form-group"><label class="label label-icon">${icons.book} マニュアル</label>
+      <div class="memo-toolbar">
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('h2')" title="見出し2">H2</button>
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('h3')" title="見出し3">H3</button>
+        <div class="memo-toolbar-sep"></div>
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('bold')" title="太字"><b>B</b></button>
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('italic')" title="イタリック"><i>I</i></button>
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('strike')" title="取り消し線"><s>S</s></button>
+        <div class="memo-toolbar-sep"></div>
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('ul')" title="箇条書き">• リスト</button>
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('ol')" title="番号リスト">1. リスト</button>
+        <div class="memo-toolbar-sep"></div>
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('quote')" title="引用">❮ 引用</button>
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('hr')" title="水平線">─ 線</button>
+      </div>
+      <div class="manual-rich-editor" id="f-roadmap-editor" contenteditable="true" data-placeholder="マニュアルの内容を記述できます（見出し・太字・リストなどが使えます）"></div>
+      </div>`;
+      // Load existing content into rich editor after render
+      if (isEdit && existing && existing.taskRoadmap) {
+        window._pendingManualContent = existing.taskRoadmap;
+      } else {
+        window._pendingManualContent = '';
+      }
+      setTimeout(function() {
+        var editor = document.getElementById('f-roadmap-editor');
+        if (editor && window._pendingManualContent) {
+          editor.innerHTML = window._pendingManualContent;
+        }
+      }, 50);
       html += `<div class="flex gap-2"><button class="btn btn-primary" onclick="submitManualForm(${isEdit ? pageParams.editId : 'null'},${pageParams.projectId || 'null'})">${isEdit ? '更新' : '作成'}</button><button class="btn btn-outline" onclick="${isEdit ? `navigate('manual-detail',{id:${pageParams.editId}})` : `navigate('project-detail',{id:${pageParams.projectId}})`}">キャンセル</button></div>`;
       html += `</div>`;
       el.innerHTML = html;
+    }
+
+    
+    function manualFormExecCmd(type) {
+      var editor = document.getElementById('f-roadmap-editor');
+      if (!editor) return;
+      editor.focus();
+      switch(type) {
+        case 'h2': document.execCommand('formatBlock', false, 'h2'); break;
+        case 'h3': document.execCommand('formatBlock', false, 'h3'); break;
+        case 'bold': document.execCommand('bold'); break;
+        case 'italic': document.execCommand('italic'); break;
+        case 'strike': document.execCommand('strikeThrough'); break;
+        case 'ul': document.execCommand('insertUnorderedList'); break;
+        case 'ol': document.execCommand('insertOrderedList'); break;
+        case 'quote': {
+          var sel = window.getSelection();
+          var text = sel.toString() || '引用テキスト';
+          var bq = document.createElement('blockquote');
+          bq.textContent = text;
+          var range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+          if (range) { range.deleteContents(); range.insertNode(bq); }
+          break;
+        }
+        case 'hr': {
+          var sel = window.getSelection();
+          var range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+          var hr = document.createElement('hr');
+          if (range) { range.collapse(false); range.insertNode(hr); }
+          break;
+        }
+      }
     }
 
     function submitManualForm(editId, projectId) {
@@ -1061,7 +1232,8 @@
       const authority = document.getElementById('f-authority').value.trim();
       const pace = document.getElementById('f-pace').value.trim();
       const speed = document.getElementById('f-speed').value.trim();
-      const roadmap = document.getElementById('f-roadmap').value;
+      const roadmapEditor = document.getElementById('f-roadmap-editor');
+      const roadmap = roadmapEditor ? roadmapEditor.innerHTML : '';
       if (!title || !purpose) { toast('タイトルと目的は必須です'); return; }
       if (editId) {
         const m = getManual(editId);
@@ -1560,6 +1732,7 @@
         projMap.get(proj.id).manuals.push(t.manual);
       });
       let html = `<div class="doc-page" style="padding:32px">`;
+      html += renderBreadcrumb();
       html += `<button class="back-float" onclick="navigate('users')">${icons.arrowLeft} 管理画面に戻る</button>`;
       html += `<div style="max-width:800px;margin:0 auto;padding-top:40px">`;
       html += `<h1 style="font-size:24px;font-weight:700;margin-bottom:24px">${escapeHtml(user.name)} のマニュアル</h1>`;
@@ -2204,6 +2377,7 @@
       if (!node) { navigate('todos'); return; }
 
       let html = '<div class="todo-detail-screen">';
+      html += renderBreadcrumb();
       html += '<div class="todo-detail-header">';
       html += '<button class="todo-detail-back" onclick="navigate(\'todos\')">' + icons.arrowLeft + ' ToDo管理に戻る</button>';
 
@@ -2315,6 +2489,7 @@
       if (!goal) { navigate('goals'); return; }
 
       var html = '<div class="goal-detail-screen">';
+      html += renderBreadcrumb();
       html += '<div class="todo-detail-header">';
       html += '<button class="todo-detail-back" onclick="navigate(\'goals\')">' + icons.arrowLeft + ' 目的ツリーに戻る</button>';
 
