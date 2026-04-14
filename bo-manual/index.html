@@ -339,13 +339,13 @@
     .todo-filter-btn{padding:6px 14px;border-radius:999px;font-size:12px;font-weight:500;border:1px solid var(--border);color:var(--fg-muted);transition:all .15s}
     .todo-filter-btn:hover{background:var(--bg-muted)}
     .todo-filter-btn.active{background:#334155;color:#fff;border-color:#334155}
-    .todo-item{display:flex;align-items:center;gap:10px;padding:10px 4px;border:none;border-radius:0;margin-bottom:2px;transition:all .15s}
+    .todo-item{display:flex;align-items:center;gap:12px;padding:14px 4px;border:none;border-radius:0;margin-bottom:2px;transition:all .15s}
     .todo-item:hover{background:var(--bg-muted);border-radius:var(--radius)}
     .todo-item.done{opacity:.5}
     .todo-item.done .todo-title{text-decoration:line-through}
-    .todo-checkbox{width:32px;height:32px;border:none;border-radius:50%;transition:all .3s cubic-bezier(.34,1.56,.64,1);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;margin-top:1px;background:#334155;color:#fff}
+    .todo-checkbox{width:42px;height:42px;border:none;border-radius:50%;transition:all .3s cubic-bezier(.34,1.56,.64,1);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;margin-top:1px;background:#334155;color:#fff}
     .todo-checkbox.checked{background:#059669;border-color:#059669;color:#fff}
-    .todo-title{font-size:16px;font-weight:600}
+    .todo-title{font-size:16px;font-weight:400}
     .todo-meta{font-size:11px;color:var(--fg-muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap}
     .todo-badge{padding:1px 8px;border-radius:999px;font-size:10px;font-weight:500}
     .todo-badge-routine{background:#dbeafe;color:#1e40af}
@@ -387,7 +387,7 @@
 .todo-checkbox:not(.expanded):hover{transform:scale(1.15);box-shadow:0 2px 8px rgba(37,99,235,.3)}
 .todo-checkbox:not(.expanded):active{transform:scale(.9)}
 .todo-checkbox.checked:not(.expanded):hover{box-shadow:0 2px 8px rgba(5,150,105,.3)}
-.todo-checkbox.expanded{width:74px;height:32px;border-radius:999px;padding:0 8px;gap:8px;display:flex;align-items:center;justify-content:center;background:var(--primary);animation:expandPill .25s cubic-bezier(.34,1.56,.64,1)}
+.todo-checkbox.expanded{width:96px;height:42px;border-radius:999px;padding:0 8px;gap:8px;display:flex;align-items:center;justify-content:center;background:var(--primary);animation:expandPill .25s cubic-bezier(.34,1.56,.64,1)}
 @keyframes expandPill{from{width:30px;opacity:.7}to{width:68px;opacity:1}}
 .todo-checkbox.expanded .action-icon{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;transition:all .15s;flex-shrink:0}
 .todo-checkbox.expanded .action-icon:hover{background:rgba(255,255,255,.25);transform:scale(1.15)}
@@ -1968,20 +1968,13 @@
     var SYNC_URL = 'https://jsonblob.com/api/jsonBlob/019d8db8-55f4-71d8-b2b7-fdfe57ee2c9c';
     var syncDebounce = null;
     var SYNC_KEYS = ['users','projects','manuals','goals','todos','dailyTasks','tags','permissions','assignees','nextId','nextTodoId','nextProjectId','nextManualId','nextGoalId','nextTagId','nextUserId','nextDailyId'];
-
-    // On load: push local data to remote (this device's data is current)
-    function initSync() {
-      fetch(SYNC_URL, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      }).catch(function(){});
-    }
+    var _syncLastPush = 0;
 
     // Push local data to remote (debounced)
     function pushSync() {
       clearTimeout(syncDebounce);
       syncDebounce = setTimeout(function() {
+        _syncLastPush = Date.now();
         fetch(SYNC_URL, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -1990,17 +1983,23 @@
       }, 500);
     }
 
-    // Pull remote data and overwrite local
+    // Pull remote data and merge into local
     function pullSync() {
       fetch(SYNC_URL)
         .then(function(r) { return r.json(); })
         .then(function(remote) {
-          if (remote && typeof remote === 'object' && remote.users) {
+          if (remote && typeof remote === 'object') {
+            var hasData = false;
             SYNC_KEYS.forEach(function(k) {
-              if (remote[k] !== undefined) data[k] = remote[k];
+              if (remote[k] !== undefined) hasData = true;
             });
-            _origSaveData();
-            render();
+            if (hasData) {
+              SYNC_KEYS.forEach(function(k) {
+                if (remote[k] !== undefined) data[k] = remote[k];
+              });
+              _origSaveData();
+              render();
+            }
           }
         }).catch(function(){});
     }
@@ -2012,10 +2011,10 @@
       pushSync();
     };
 
-    // On load: push this device's data to remote
-    setTimeout(initSync, 500);
+    // On load: PULL remote data first (get latest from other devices)
+    setTimeout(pullSync, 300);
 
-    // On tab focus: pull latest from remote (picks up changes from other device)
+    // On tab focus: pull latest from remote
     document.addEventListener('visibilitychange', function() {
       if (!document.hidden) pullSync();
     });
