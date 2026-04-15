@@ -2531,6 +2531,15 @@
       }
     }
 
+    var _taskTitleTimer = null;
+    function autoSaveTaskTitle(taskId) {
+      clearTimeout(_taskTitleTimer);
+      _taskTitleTimer = setTimeout(function() {
+        var task = (data.projectTasks || []).find(function(t) { return t.id === taskId; });
+        var el = document.getElementById('task-title-input');
+        if (task && el && el.value.trim()) { task.title = el.value.trim(); saveData(); }
+      }, 800);
+    }
     var _taskMemoTimer = null;
     function autoSaveTaskMemo(taskId) {
       var status = document.getElementById('task-memo-status');
@@ -2565,7 +2574,7 @@
       // Header
       html += '<div class="page-header"><h1 class="page-title" style="display:flex;align-items:center;gap:12px">';
       html += '<div class="todo-checkbox ' + (task.done ? 'checked' : '') + '" onclick="toggleProjectTask(' + task.id + ')" style="flex-shrink:0">' + (task.done ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
-      html += '<span style="' + (task.done ? 'text-decoration:line-through;opacity:.5' : '') + '">' + escapeHtml(task.title) + '</span>';
+      html += '<input class="input" id="task-title-input" value="' + escapeHtml(task.title).replace(/"/g, '&quot;') + '" oninput="autoSaveTaskTitle(' + task.id + ')" style="font-size:22px;font-weight:600;letter-spacing:-0.02em;border:none;padding:0;background:transparent;' + (task.done ? 'text-decoration:line-through;opacity:.5' : '') + '">';
       html += '</h1>';
       html += '<button class="btn btn-destructive btn-sm" onclick="if(confirm(\'このタスクを削除しますか？\')){deleteProjectTask(' + task.id + ');navigate(\'todos\')}">削除</button>';
       html += '</div>';
