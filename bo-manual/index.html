@@ -2131,11 +2131,10 @@
       fetch(SYNC_URL)
         .then(function(r) { return r.json(); })
         .then(function(remote) {
-          if (!remote || typeof remote !== 'object') { pushSync(); return; }
+          if (!remote || typeof remote !== 'object') { pushSync(); render(); return; }
           var remoteTs = remote._syncTs || 0;
           var localTs = data._syncTs || 0;
           if (remoteTs > localTs) {
-            // Remote is newer - pull it
             var hasData = false;
             SYNC_KEYS.forEach(function(k) {
               if (remote[k] !== undefined) hasData = true;
@@ -2146,13 +2145,12 @@
               });
               data._syncTs = remoteTs;
               _origSaveData();
-              render();
             }
           } else {
-            // Local is newer or same - push it
             pushSync();
           }
-        }).catch(function(){ pushSync(); });
+          render();
+        }).catch(function(){ pushSync(); render(); });
     }
 
     // Override saveData to also push to cloud
@@ -3621,8 +3619,11 @@
         document.querySelectorAll('.card.show-delete').forEach(function(c) { c.classList.remove('show-delete'); });
       }
     });
-    // INIT
-    render();
+    // INIT - show loading until sync completes
+    (function() {
+      var main = document.getElementById('main-area');
+      main.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;flex-direction:column;gap:12px"><div style="width:36px;height:36px;border-radius:8px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700">N</div><div style="font-size:13px;color:var(--fg-muted)">読み込み中...</div></div>';
+    })();
   
     // === Block Copy Buttons ===
     (function() {
