@@ -761,13 +761,26 @@
     }
 
     // NAVIGATION
-    let currentPage = window.innerWidth <= 768 ? 'dashboard' : 'home';
-    let pageParams = {};
+    let currentPage = (function() {
+      try {
+        var saved = JSON.parse(localStorage.getItem('bo_nav'));
+        if (saved && saved.page) return saved.page;
+      } catch(e) {}
+      return window.innerWidth <= 768 ? 'dashboard' : 'home';
+    })();
+    let pageParams = (function() {
+      try {
+        var saved = JSON.parse(localStorage.getItem('bo_nav'));
+        if (saved && saved.params) return saved.params;
+      } catch(e) {}
+      return {};
+    })();
     function navigate(page, params = {}) {
       // Close sidebar on mobile navigation
       var sb = document.querySelector('.sidebar'); if (sb && sb.classList.contains('open')) { sb.classList.remove('open'); var ov = document.getElementById('sidebar-overlay'); if (ov) ov.remove(); document.body.style.overflow = ''; }
       currentPage = page;
       pageParams = params;
+      try { localStorage.setItem('bo_nav', JSON.stringify({page: page, params: params})); } catch(e) {}
       document.querySelectorAll('.nav-item').forEach(el => {
         el.classList.toggle('active', el.dataset.page === page);
       });
