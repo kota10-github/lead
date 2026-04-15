@@ -387,8 +387,8 @@
 .todo-checkbox:not(.expanded):hover{transform:scale(1.08);box-shadow:0 2px 8px rgba(37,99,235,.3)}
 .todo-checkbox:not(.expanded):active{transform:scale(.95)}
 .todo-checkbox.checked:not(.expanded):hover{box-shadow:0 2px 8px rgba(5,150,105,.3)}
-.todo-checkbox.expanded{width:76px;height:32px;border-radius:999px;padding:0 8px;gap:8px;display:flex;align-items:center;justify-content:center;background:var(--primary);animation:expandPill .2s ease-out}
-@keyframes expandPill{from{width:32px;opacity:.8}to{width:76px;opacity:1}}
+.todo-checkbox.expanded{width:76px!important;height:32px!important;border-radius:999px;padding:0 8px;gap:8px;display:flex;align-items:center;justify-content:center;background:var(--primary);animation:expandPill .2s ease-out}
+@keyframes expandPill{from{transform:scaleX(.5);opacity:.8}to{transform:scaleX(1);opacity:1}}
 .todo-checkbox.expanded .action-icon{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;transition:all .15s;flex-shrink:0}
 .todo-checkbox.expanded .action-icon:hover{background:rgba(255,255,255,.25);transform:scale(1.15)}
 .todo-checkbox.expanded .action-icon:active{transform:scale(.85)}
@@ -609,11 +609,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
           マップ
         </button>
-        <!-- Hidden: 今日のタスク (recoverable) -->
-        <!--<button class="nav-item" data-page="todos" onclick="navigate('todos')">
+        <button class="nav-item" data-page="todos" onclick="navigate('todos')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
-          臨時タスク
-        </button>-->
+          タスク
+        </button>
         <div class="sidebar-section-label">設定</div>
         <button class="nav-item" data-page="users" onclick="navigate('users')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -950,6 +949,16 @@
     function getManualCountForProject(pid) { return data.manuals.filter(m => m.projectId === pid).length; }
     function getManualsByProject(pid) { return data.manuals.filter(m => m.projectId === pid); }
     function getTasksByProject(pid) { return (data.projectTasks || []).filter(function(t) { return t.projectId === pid; }); }
+    function dueBadgeHtml(t) {
+      if (!t.dueDate || t.done) return '';
+      var now = new Date(); now.setHours(0,0,0,0);
+      var due = new Date(t.dueDate); due.setHours(0,0,0,0);
+      var diff = Math.round((due - now) / 86400000);
+      if (diff < 0) return '<span style="font-size:10px;color:#ef4444;font-weight:600;margin-left:4px">期限切れ</span>';
+      if (diff === 0) return '<span style="font-size:10px;color:#f59e0b;font-weight:600;margin-left:4px">今日</span>';
+      if (diff <= 3) return '<span style="font-size:10px;color:#f59e0b;margin-left:4px">あと' + diff + '日</span>';
+      return '<span style="font-size:10px;color:var(--fg-muted);margin-left:4px">' + t.dueDate + '</span>';
+    }
     function getManualsByUser(uid) { return data.assignees.filter(a => a.userId === uid).map(a => ({ ...a, manual: getManual(a.manualId) })).filter(a => a.manual); }
     function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
         function getProjectMap() {
@@ -1003,6 +1012,7 @@
         case 'tasks': renderMyTasks(main); break;
         case 'goals': renderGoals(main); break;
         case 'todos': renderTodos(main); break;
+        case 'task-detail': renderProjectTaskDetail(main); break;
       case 'todo-detail': renderTodoDetail(main); break;
       case 'daily-detail': renderDailyDetail(main); break;
       case 'goal-detail': renderGoalDetail(main); break;
@@ -1131,17 +1141,24 @@
         });
         // Tasks inside
         mProjTasks.forEach(function(t) {
-          html += '<div style="padding:4px 0;font-size:12px;color:var(--fg-muted);display:flex;align-items:center;gap:6px;' + (t.done ? 'opacity:.5' : '') + '">';
+          html += '<div style="padding:4px 0;font-size:12px;color:var(--fg-muted);display:flex;align-items:center;gap:6px;cursor:pointer;' + (t.done ? 'opacity:.5' : '') + '" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})">';
           html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:20px;height:20px;font-size:8px" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
-          html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>';
+          html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>' + dueBadgeHtml(t);
           html += '</div>';
         });
         // Sub-projects
         if (proj.subProjects.length > 0) {
           proj.subProjects.forEach(function renderSub(sp) {
             var sc = getProjectColor(sp.projectId);
+            var spTasks = getTasksByProject(sp.projectId);
             html += '<div style="margin-top:6px;padding-left:10px;border-left:2px solid ' + sc.bg + '">';
             html += '<div style="font-size:12px;font-weight:500;color:' + sc.text + ';padding:2px 0" onclick="event.stopPropagation();navigate(\'project-detail\',{id:' + sp.projectId + '})">' + escapeHtml(sp.projectName) + '</div>';
+            spTasks.forEach(function(t) {
+              html += '<div style="padding:4px 0;font-size:12px;color:var(--fg-muted);display:flex;align-items:center;gap:6px;cursor:pointer;' + (t.done ? 'opacity:.5' : '') + '" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})">';
+              html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:20px;height:20px;font-size:8px" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
+              html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>' + dueBadgeHtml(t);
+              html += '</div>';
+            });
             sp.subProjects.forEach(renderSub);
             html += '</div>';
           });
@@ -1182,15 +1199,47 @@
       }
       html += `</div>`;
 
+      // Deadline reminders
+      var ptasks = data.projectTasks || [];
+      var now = new Date(); now.setHours(0,0,0,0);
+      var urgentTasks = ptasks.filter(function(t) {
+        if (t.done || !t.dueDate) return false;
+        var due = new Date(t.dueDate); due.setHours(0,0,0,0);
+        var diff = Math.round((due - now) / 86400000);
+        return diff <= 3;
+      }).sort(function(a, b) { return new Date(a.dueDate) - new Date(b.dueDate); });
+
+      if (urgentTasks.length > 0) {
+        html += '<div style="margin-bottom:16px">';
+        html += '<h3 style="font-size:14px;font-weight:600;margin-bottom:10px;color:var(--fg);display:flex;align-items:center;gap:6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>リマインダー</h3>';
+        urgentTasks.forEach(function(t) {
+          var due = new Date(t.dueDate); due.setHours(0,0,0,0);
+          var diff = Math.round((due - now) / 86400000);
+          var proj = getProject(t.projectId);
+          var projName = proj ? proj.name : '';
+          var c = getProjectColor(t.projectId);
+          var urgencyColor = diff < 0 ? '#ef4444' : '#f59e0b';
+          var urgencyLabel = diff < 0 ? '期限切れ' : (diff === 0 ? '今日' : 'あと' + diff + '日');
+          html += '<div class="card" style="padding:10px 14px;margin-bottom:6px;border-left:3px solid ' + urgencyColor + '">';
+          html += '<div style="display:flex;align-items:center;gap:10px">';
+          html += '<div class="todo-checkbox" style="width:24px;height:24px" onclick="event.stopPropagation();toggleProjectTask(' + t.id + ')"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>';
+          html += '<div style="flex:1;min-width:0">';
+          html += '<div style="font-size:13px;font-weight:500">' + escapeHtml(t.title) + '</div>';
+          html += '<div style="font-size:11px;color:var(--fg-muted);display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:' + c.bg + '"></span>' + escapeHtml(projName) + ' <span style="color:' + urgencyColor + ';font-weight:600">' + urgencyLabel + '</span></div>';
+          html += '</div></div></div>';
+        });
+        html += '</div>';
+      }
+
       // Quick navigation
       html += `<div class="mobile-quick-nav">
         <button class="mobile-quick-btn" onclick="navigate('home')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
           マップ
         </button>
-        <button class="mobile-quick-btn" onclick="navigate('tags')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.83z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-          タグ管理
+        <button class="mobile-quick-btn" onclick="navigate('todos')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg>
+          タスク
         </button>
         <button class="mobile-quick-btn" onclick="navigate('users')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/></svg>
@@ -1240,9 +1289,9 @@
             html += `<div class="node-manual-purpose">${escapeHtml(m.purpose||'')}</div></div>`;
           });
           projTasks.forEach(function(t) {
-            html += `<div class="node-manual" style="border-left:3px solid ${t.done ? '#059669' : c.bg};background:${c.light};opacity:${t.done ? '.5' : '1'}"><div class="node-manual-title" style="color:${c.bg};display:flex;align-items:center;gap:6px">`;
+            html += `<div class="node-manual" style="border-left:3px solid ${t.done ? '#059669' : c.bg};background:${c.light};opacity:${t.done ? '.5' : '1'};cursor:pointer" onclick="event.stopPropagation();navigate('task-detail',{id:${t.id}})"><div class="node-manual-title" style="color:${c.bg};display:flex;align-items:center;gap:6px">`;
             html += `<div class="todo-checkbox ${t.done ? 'checked' : ''}" style="width:24px;height:24px;font-size:10px" onclick="event.stopPropagation();expandProjectTaskActions(this,${t.id},${t.done})">${t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>'}</div>`;
-            html += `<span style="${t.done ? 'text-decoration:line-through' : ''}">${escapeHtml(t.title)}</span>`;
+            html += `<span style="${t.done ? 'text-decoration:line-through' : ''}">${escapeHtml(t.title)}</span>${dueBadgeHtml(t)}`;
             html += `</div></div>`;
           });
           if (proj.users.length > 0) {
@@ -1267,10 +1316,18 @@
 
         function renderSubBranch(sp) {
           var sc = getProjectColor(sp.projectId);
+          var spTasks = getTasksByProject(sp.projectId);
           html += '<div class="sub-tree-row">';
           html += '<div class="sub-tree-card-wrap">';
           html += `<div class="node-manual" data-node="sp-${sp.projectId}" onclick="navigate('project-detail',{id:${sp.projectId}})" style="border-left:3px solid ${sc.bg};background:${sc.light}"><div class="node-manual-title" style="color:${sc.bg}">${escapeHtml(sp.projectName)}</div>`;
-          html += `<div class="node-manual-purpose">${sp.subProjects.length > 0 ? '<span style="opacity:.6;font-size:10px">' + sp.subProjects.length + '件のサブ</span>' : ''}</div></div>`;
+          html += `<div class="node-manual-purpose">${sp.subProjects.length > 0 ? '<span style="opacity:.6;font-size:10px">' + sp.subProjects.length + '件のサブ</span>' : ''}${spTasks.length > 0 ? '<span style="opacity:.6;font-size:10px;margin-left:4px">' + spTasks.filter(function(t){return t.done}).length + '/' + spTasks.length + ' タスク</span>' : ''}</div></div>`;
+          // Tasks under sub-project card
+          spTasks.forEach(function(t) {
+            html += '<div class="node-manual" style="border-left:3px solid ' + (t.done ? '#059669' : sc.bg) + ';background:' + sc.light + ';opacity:' + (t.done ? '.5' : '1') + ';margin-top:2px;cursor:pointer" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})"><div class="node-manual-title" style="color:' + sc.bg + ';display:flex;align-items:center;gap:6px">';
+            html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:20px;height:20px;font-size:8px" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
+            html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>' + dueBadgeHtml(t);
+            html += '</div></div>';
+          });
           html += '</div>'; // close sub-tree-card-wrap
           // Children to the right
           html += '<div class="sub-tree-children">';
@@ -1930,36 +1987,51 @@
 
     function renderTodos(el) {
       var html = '';
-      var allTasks = collectAllTasks(data.todos, '', []);
-      var doneCount = allTasks.filter(function(t) { return t.node.done; }).length;
+      var tasks = data.projectTasks || [];
+      var doneCount = tasks.filter(function(t) { return t.done; }).length;
+      var pct = tasks.length > 0 ? Math.round(doneCount / tasks.length * 100) : 0;
 
-      var pct = allTasks.length > 0 ? Math.round(doneCount / allTasks.length * 100) : 0;
+      // Progress gauge
       html += '<div style="margin-bottom:12px">';
       html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">';
-      html += '<span style="font-size:12px;color:var(--fg-muted)">' + doneCount + '/' + allTasks.length + '</span>';
+      html += '<span style="font-size:12px;color:var(--fg-muted)">' + doneCount + '/' + tasks.length + '</span>';
       html += '<span style="font-size:12px;font-weight:600;color:' + (pct === 100 ? '#059669' : 'var(--fg)') + '">' + pct + '%</span>';
       html += '</div>';
       html += '<div style="width:100%;height:6px;background:var(--border);border-radius:3px;overflow:hidden">';
       html += '<div style="width:' + pct + '%;height:100%;background:' + (pct === 100 ? '#059669' : '#334155') + ';border-radius:3px;transition:width .3s ease"></div>';
       html += '</div></div>';
 
-      // Flat task list
-      allTasks.forEach(function(t) {
-        var indent = t.isChild ? 'padding-left:1em;' : '';
-        html += '<div class="todo-item' + (t.node.done ? ' done' : '') + '" style="margin:0;border:none;padding:3px 0;' + indent + '">';
-        html += '<div class="todo-checkbox ' + (t.node.done ? 'checked' : '') + '" data-checkbox-id="' + t.node.id + '" data-path="' + t.path + '" onclick="event.stopPropagation();expandTodoActions(this,\'' + t.path + '\',' + t.node.done + ')">' + (t.node.done ? icons.check : '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
-        html += '<div style="flex:1;min-width:0;cursor:pointer" onclick="event.stopPropagation();navigate(\'todo-detail\',{path:\'' + t.path + '\'})">';
-        html += '<div class="todo-title">' + escapeHtml(t.node.title) + '</div>';
-        html += '</div></div>';
+      // Group by project
+      var grouped = {};
+      tasks.forEach(function(t) {
+        var pid = t.projectId || 0;
+        if (!grouped[pid]) grouped[pid] = [];
+        grouped[pid].push(t);
       });
 
-      if (allTasks.length === 0) {
+      var projectIds = Object.keys(grouped);
+      if (projectIds.length > 0) {
+        projectIds.forEach(function(pid) {
+          var proj = getProject(Number(pid));
+          var projName = proj ? proj.name : 'その他';
+          var projColor = proj ? getProjectColor(Number(pid)) : { bg: '#94a3b8' };
+          html += '<div style="margin-bottom:16px">';
+          html += '<div style="font-size:11px;font-weight:600;color:' + projColor.bg + ';margin-bottom:4px;display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:' + projColor.bg + '"></span>' + escapeHtml(projName) + '</div>';
+          grouped[pid].forEach(function(t) {
+            html += '<div class="todo-item' + (t.done ? ' done' : '') + '" style="margin:0;border:none;padding:3px 0;cursor:pointer" onclick="navigate(\'task-detail\',{id:' + t.id + '})">';
+            html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? icons.check : '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
+            html += '<div style="flex:1;min-width:0">';
+            html += '<div class="todo-title">' + escapeHtml(t.title) + dueBadgeHtml(t) + '</div>';
+            html += '</div></div>';
+          });
+          html += '</div>';
+        });
+      } else {
         html += '<div class="empty" style="padding:24px 0"><p>タスクがありません</p></div>';
       }
 
-      // Add task button
-      html += '<div class="daily-add" onclick="showAddTaskFromProject()">' + icons.plus + ' タスクを追加</div>';
-
+      // Add task button with project picker
+      html += '<div class="daily-add" onclick="showAddTaskFromProjectPicker()">' + icons.plus + ' タスクを追加</div>';
       el.innerHTML = html;
     }
 
@@ -2374,6 +2446,7 @@
       var projName = project ? project.name : '';
       var bodyHtml = '<div class="form-group"><label class="label">タスク名</label><input class="input" id="d-pt-title" placeholder="タスク名を入力"></div>';
       bodyHtml += '<div class="form-group"><label class="label">プロジェクト</label><div style="font-size:13px;color:var(--fg-muted);padding:4px 0">' + escapeHtml(projName) + '</div></div>';
+      bodyHtml += '<div class="form-group"><label class="label">期日（任意）</label><input type="date" class="input" id="d-pt-due"></div>';
       showModal('タスクを追加', bodyHtml, [
         { label: 'キャンセル', onClick: function(o) { o.remove(); } },
         { label: '追加', class: 'btn btn-primary', onClick: function(o) {
@@ -2381,7 +2454,35 @@
           if (!title) { toast('タスク名を入力してください'); return; }
           if (!data.projectTasks) data.projectTasks = [];
           if (!data.nextProjectTaskId) data.nextProjectTaskId = 1;
-          data.projectTasks.push({ id: data.nextProjectTaskId++, projectId: projectId, title: title, done: false });
+          var task = { id: data.nextProjectTaskId++, projectId: projectId, title: title, done: false };
+          var due = document.getElementById('d-pt-due').value;
+          if (due) task.dueDate = due;
+          data.projectTasks.push(task);
+          saveData(); toast('タスクを追加しました'); o.remove(); render();
+        }}
+      ]);
+    }
+    function showAddTaskFromProjectPicker() {
+      var projects = data.projects || [];
+      var bodyHtml = '<div class="form-group"><label class="label">タスク名</label><input class="input" id="d-pt-title" placeholder="タスク名を入力"></div>';
+      bodyHtml += '<div class="form-group"><label class="label">プロジェクト</label><select class="input" id="d-pt-project">';
+      projects.forEach(function(p) {
+        bodyHtml += '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>';
+      });
+      bodyHtml += '</select></div>';
+      bodyHtml += '<div class="form-group"><label class="label">期日（任意）</label><input type="date" class="input" id="d-pt-due"></div>';
+      showModal('タスクを追加', bodyHtml, [
+        { label: 'キャンセル', onClick: function(o) { o.remove(); } },
+        { label: '追加', class: 'btn btn-primary', onClick: function(o) {
+          var title = document.getElementById('d-pt-title').value.trim();
+          if (!title) { toast('タスク名を入力してください'); return; }
+          var pid = Number(document.getElementById('d-pt-project').value);
+          if (!data.projectTasks) data.projectTasks = [];
+          if (!data.nextProjectTaskId) data.nextProjectTaskId = 1;
+          var task = { id: data.nextProjectTaskId++, projectId: pid, title: title, done: false };
+          var due = document.getElementById('d-pt-due').value;
+          if (due) task.dueDate = due;
+          data.projectTasks.push(task);
           saveData(); toast('タスクを追加しました'); o.remove(); render();
         }}
       ]);
@@ -2403,22 +2504,92 @@
         if (other !== el) {
           var wasChecked = other.classList.contains('checked');
           other.classList.remove('expanded');
-          other.style.width = '';
+          var ow = other.getAttribute('data-orig-w');
+          var oh = other.getAttribute('data-orig-h');
+          other.style.width = ow || '';
+          other.style.height = oh || '';
           other.innerHTML = wasChecked ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>';
         }
       });
+      el.setAttribute('data-orig-w', el.style.width || '');
+      el.setAttribute('data-orig-h', el.style.height || '');
       el.classList.add('expanded');
       el.innerHTML = '<span class="action-icon check-icon" onclick="event.stopPropagation();toggleProjectTask(' + taskId + ')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>' +
         '<span class="action-icon delete-icon" onclick="event.stopPropagation();deleteProjectTask(' + taskId + ')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></span>';
     }
     function collapseProjectTaskCheckbox(el, isDone) {
       el.classList.remove('expanded');
-      el.style.width = '';
+      var ow = el.getAttribute('data-orig-w');
+      var oh = el.getAttribute('data-orig-h');
+      el.style.width = ow || '';
+      el.style.height = oh || '';
       if (isDone) {
         el.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
       } else {
         el.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>';
       }
+    }
+
+    var _taskMemoTimer = null;
+    function autoSaveTaskMemo(taskId) {
+      var status = document.getElementById('task-memo-status');
+      if (status) status.textContent = '保存中...';
+      clearTimeout(_taskMemoTimer);
+      _taskMemoTimer = setTimeout(function() {
+        var task = (data.projectTasks || []).find(function(t) { return t.id === taskId; });
+        var el = document.getElementById('task-memo-editor');
+        if (task && el) { task.memo = el.value; saveData(); }
+        if (status) { status.textContent = '保存済み'; setTimeout(function() { if (status) status.textContent = ''; }, 2000); }
+      }, 800);
+    }
+    function updateTaskDueDate(taskId) {
+      var task = (data.projectTasks || []).find(function(t) { return t.id === taskId; });
+      var el = document.getElementById('task-due-input');
+      if (task && el) {
+        task.dueDate = el.value || undefined;
+        saveData();
+        toast('期日を更新しました');
+      }
+    }
+    function renderProjectTaskDetail(el) {
+      var taskId = pageParams.id;
+      var task = (data.projectTasks || []).find(function(t) { return t.id === taskId; });
+      if (!task) { el.innerHTML = '<div class="empty"><p>タスクが見つかりません</p></div>'; return; }
+      var project = getProject(task.projectId);
+      var projName = project ? project.name : '';
+      var c = getProjectColor(task.projectId);
+      var html = '';
+      // Breadcrumb
+      html += '<div class="breadcrumb"><span class="breadcrumb-item" onclick="navigate(\'home\')">マップ</span><span class="breadcrumb-sep">›</span><span class="breadcrumb-item" onclick="navigate(\'todos\')">タスク</span><span class="breadcrumb-sep">›</span><span class="breadcrumb-current">' + escapeHtml(task.title) + '</span></div>';
+      // Header
+      html += '<div class="page-header"><h1 class="page-title" style="display:flex;align-items:center;gap:12px">';
+      html += '<div class="todo-checkbox ' + (task.done ? 'checked' : '') + '" onclick="toggleProjectTask(' + task.id + ')" style="flex-shrink:0">' + (task.done ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
+      html += '<span style="' + (task.done ? 'text-decoration:line-through;opacity:.5' : '') + '">' + escapeHtml(task.title) + '</span>';
+      html += '</h1>';
+      html += '<button class="btn btn-destructive btn-sm" onclick="if(confirm(\'このタスクを削除しますか？\')){deleteProjectTask(' + task.id + ');navigate(\'todos\')}">削除</button>';
+      html += '</div>';
+      // Info card
+      html += '<div class="info-card">';
+      // Project
+      html += '<div class="info-section"><div class="info-section-label"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>プロジェクト</div>';
+      html += '<div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:50%;background:' + c.bg + '"></span><span style="font-size:13px;font-weight:500;cursor:pointer" onclick="navigate(\'project-detail\',{id:' + task.projectId + '})">' + escapeHtml(projName) + '</span></div>';
+      html += '</div>';
+      // Due date
+      html += '<div class="info-section"><div class="info-section-label"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>期日</div>';
+      html += '<div style="display:flex;align-items:center;gap:8px"><input type="date" class="input" id="task-due-input" value="' + (task.dueDate || '') + '" onchange="updateTaskDueDate(' + task.id + ')" style="max-width:200px">';
+      html += dueBadgeHtml(task) + '</div>';
+      html += '</div>';
+      // Status
+      html += '<div class="info-section"><div class="info-section-label"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>ステータス</div>';
+      html += '<span class="badge ' + (task.done ? 'badge-primary' : 'badge-secondary') + '">' + (task.done ? '完了' : '未完了') + '</span>';
+      html += '</div>';
+      html += '</div>';
+      // Memo
+      html += '<div style="margin-top:20px">';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><label class="label" style="margin-bottom:0">メモ</label><span id="task-memo-status" style="font-size:11px;color:var(--fg-muted)"></span></div>';
+      html += '<textarea class="textarea" id="task-memo-editor" rows="6" placeholder="メモを入力..." oninput="autoSaveTaskMemo(' + task.id + ')">' + escapeHtml(task.memo || '') + '</textarea>';
+      html += '</div>';
+      el.innerHTML = html;
     }
 
     // USERS
