@@ -792,6 +792,16 @@
       render();
       document.getElementById('sidebar').classList.remove('open');
     }
+    // Restore nav active state on load
+    (function() {
+      document.querySelectorAll('.nav-item').forEach(function(el) {
+        el.classList.toggle('active', el.dataset.page === currentPage);
+      });
+      var navTitle = document.querySelector('.nav-item[data-page="' + currentPage + '"]');
+      var titleText = navTitle ? navTitle.textContent.trim() : '';
+      var mt = document.getElementById('mobile-title');
+      if (mt) mt.textContent = (currentPage === 'home' || currentPage === 'dashboard') ? 'BOタスク' : titleText;
+    })();
     function toggleSidebar() {
       var sb = document.querySelector('.sidebar');
       sb.classList.toggle('open');
