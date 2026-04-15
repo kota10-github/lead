@@ -1131,9 +1131,10 @@
         });
         // Tasks inside
         mProjTasks.forEach(function(t) {
-          html += '<div style="padding:4px 0;font-size:12px;color:var(--fg-muted);display:flex;align-items:center;gap:6px;' + (t.done ? 'opacity:.5;text-decoration:line-through' : '') + '" onclick="event.stopPropagation();toggleProjectTask(' + t.id + ')">';
-          html += '<span style="width:12px;height:12px;border-radius:50%;background:' + (t.done ? '#059669' : '#334155') + ';color:#fff;display:flex;align-items:center;justify-content:center;font-size:8px;flex-shrink:0">' + (t.done ? '&#10003;' : '') + '</span>';
-          html += escapeHtml(t.title) + '</div>';
+          html += '<div style="padding:4px 0;font-size:12px;color:var(--fg-muted);display:flex;align-items:center;gap:6px;' + (t.done ? 'opacity:.5' : '') + '">';
+          html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:20px;height:20px;font-size:8px" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
+          html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>';
+          html += '</div>';
         });
         // Sub-projects
         if (proj.subProjects.length > 0) {
@@ -1240,9 +1241,8 @@
           });
           projTasks.forEach(function(t) {
             html += `<div class="node-manual" style="border-left:3px solid ${t.done ? '#059669' : c.bg};background:${c.light};opacity:${t.done ? '.5' : '1'}"><div class="node-manual-title" style="color:${c.bg};display:flex;align-items:center;gap:6px">`;
-            html += `<span style="width:14px;height:14px;border-radius:50%;background:${t.done ? '#059669' : '#334155'};color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0;cursor:pointer" onclick="event.stopPropagation();toggleProjectTask(${t.id})">${t.done ? '&#10003;' : ''}</span>`;
+            html += `<div class="todo-checkbox ${t.done ? 'checked' : ''}" style="width:24px;height:24px;font-size:10px" onclick="event.stopPropagation();expandProjectTaskActions(this,${t.id},${t.done})">${t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>'}</div>`;
             html += `<span style="${t.done ? 'text-decoration:line-through' : ''}">${escapeHtml(t.title)}</span>`;
-            html += `<span class="node-delete-btn" onclick="event.stopPropagation();deleteProjectTask(${t.id})" title="削除">×</span>`;
             html += `</div></div>`;
           });
           if (proj.users.length > 0) {
@@ -1490,9 +1490,8 @@
       } else {
         pTasks.forEach(function(t) {
           html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">`;
-          html += `<div style="width:20px;height:20px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;background:${t.done ? '#059669' : '#334155'};color:#fff;flex-shrink:0;font-size:11px" onclick="toggleProjectTask(${t.id})">${t.done ? '&#10003;' : ''}</div>`;
+          html += `<div class="todo-checkbox ${t.done ? 'checked' : ''}" style="width:28px;height:28px" onclick="event.stopPropagation();expandProjectTaskActions(this,${t.id},${t.done})">${t.done ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>'}</div>`;
           html += `<span style="flex:1;font-size:14px;${t.done ? 'text-decoration:line-through;opacity:.5' : ''}">${escapeHtml(t.title)}</span>`;
-          html += `<button class="btn btn-icon" onclick="event.stopPropagation();deleteProjectTask(${t.id})" style="width:24px;height:24px;color:var(--fg-muted)">${icons.trash}</button>`;
           html += `</div>`;
         });
       }
@@ -2392,9 +2391,34 @@
       if (task) { task.done = !task.done; saveData(); render(); }
     }
     function deleteProjectTask(taskId) {
-      if (!confirm('削除しますか？')) return;
       data.projectTasks = (data.projectTasks || []).filter(function(t) { return t.id !== taskId; });
       saveData(); render();
+    }
+    function expandProjectTaskActions(el, taskId, isDone) {
+      if (el.classList.contains('expanded')) {
+        collapseProjectTaskCheckbox(el, isDone);
+        return;
+      }
+      document.querySelectorAll('.todo-checkbox.expanded').forEach(function(other) {
+        if (other !== el) {
+          var wasChecked = other.classList.contains('checked');
+          other.classList.remove('expanded');
+          other.style.width = '';
+          other.innerHTML = wasChecked ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>';
+        }
+      });
+      el.classList.add('expanded');
+      el.innerHTML = '<span class="action-icon check-icon" onclick="event.stopPropagation();toggleProjectTask(' + taskId + ')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>' +
+        '<span class="action-icon delete-icon" onclick="event.stopPropagation();deleteProjectTask(' + taskId + ')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></span>';
+    }
+    function collapseProjectTaskCheckbox(el, isDone) {
+      el.classList.remove('expanded');
+      el.style.width = '';
+      if (isDone) {
+        el.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
+      } else {
+        el.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>';
+      }
     }
 
     // USERS
