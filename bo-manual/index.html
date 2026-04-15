@@ -1439,8 +1439,8 @@
           <button class="memo-toolbar-btn" onclick="memoExecCmd('link')" title="リンク">🔗 リンク</button>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('hr')" title="水平線">─ 線</button>
         </div>
-        <div class="memo-rich-editor" id="memo-rich-editor" contenteditable="true" data-placeholder="見出しや太字を使って自由に記入できます"></div>
-        <button class="btn btn-sm" style="margin-top:8px" onclick="saveProjectMemo(${project.id})">保存</button>
+        <div class="memo-rich-editor" id="memo-rich-editor" contenteditable="true" data-placeholder="見出しや太字を使って自由に記入できます" oninput="autoSaveProjectMemo(${project.id})"></div>
+        <div id="memo-save-status" style="font-size:11px;color:var(--fg-muted);margin-top:4px;min-height:16px"></div>
       </div>`;
       // Load memo into rich editor after render
       setTimeout(function() { loadMemoToEditor(project.id); }, 0);
@@ -2023,7 +2023,7 @@
     function saveDailyMemo(dateStr, id, value) {
       var tasks = data.dailyTasks[dateStr] || [];
       var t = tasks.find(function(x){return x.id===id});
-      if (t) { t.memo = value; saveData(); toast('メモを保存しました'); }
+      if (t) { t.memo = value; saveData(); }
     }
 
     // Cloud sync via jsonblob.com
@@ -2180,7 +2180,6 @@
       if (!node) return;
       node.memo = value;
       saveData();
-      toast('メモを保存しました');
     }
 
     function showAddChildDialog(pathStr, depth) {
@@ -2906,6 +2905,17 @@
       }
     }
 
+    var _memoAutoSaveTimer = null;
+    function autoSaveProjectMemo(projectId) {
+      var status = document.getElementById('memo-save-status');
+      if (status) status.textContent = '保存中...';
+      clearTimeout(_memoAutoSaveTimer);
+      _memoAutoSaveTimer = setTimeout(function() {
+        saveProjectMemo(projectId);
+        if (status) status.textContent = '保存済み';
+        setTimeout(function() { if (status) status.textContent = ''; }, 2000);
+      }, 800);
+    }
     function saveProjectMemo(projectId) {
       const project = getProject(projectId);
       if (!project) return;
@@ -2913,7 +2923,6 @@
       if (!editor) return;
       project.memo = htmlToMarkdown(editor);
       saveData();
-      showToast('\u30E1\u30E2\u3092\u4FDD\u5B58\u3057\u307E\u3057\u305F');
     }
 
     function handleFileUpload(projectId, files) {
