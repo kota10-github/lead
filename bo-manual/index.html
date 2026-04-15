@@ -1322,16 +1322,15 @@
           html += '<div class="sub-tree-card-wrap">';
           html += `<div class="node-manual" data-node="sp-${sp.projectId}" onclick="navigate('project-detail',{id:${sp.projectId}})" style="border-left:3px solid ${sc.bg};background:${sc.light}"><div class="node-manual-title" style="color:${sc.bg}">${escapeHtml(sp.projectName)}</div>`;
           html += `<div class="node-manual-purpose">${sp.subProjects.length > 0 ? '<span style="opacity:.6;font-size:10px">' + sp.subProjects.length + '件のサブ</span>' : ''}${spTasks.length > 0 ? '<span style="opacity:.6;font-size:10px;margin-left:4px">' + spTasks.filter(function(t){return t.done}).length + '/' + spTasks.length + ' タスク</span>' : ''}</div></div>`;
-          // Tasks under sub-project card
+          html += '</div>'; // close sub-tree-card-wrap
+          // Tasks and children to the right
+          html += '<div class="sub-tree-children">';
           spTasks.forEach(function(t) {
-            html += '<div class="node-manual" style="border-left:3px solid ' + (t.done ? '#059669' : sc.bg) + ';background:' + sc.light + ';opacity:' + (t.done ? '.5' : '1') + ';margin-top:2px;cursor:pointer" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})"><div class="node-manual-title" style="color:' + sc.bg + ';display:flex;align-items:center;gap:6px">';
+            html += '<div class="node-manual" style="border-left:3px solid ' + (t.done ? '#059669' : sc.bg) + ';background:' + sc.light + ';opacity:' + (t.done ? '.5' : '1') + ';cursor:pointer" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})"><div class="node-manual-title" style="color:' + sc.bg + ';display:flex;align-items:center;gap:6px">';
             html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:20px;height:20px;font-size:8px" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
             html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>' + dueBadgeHtml(t);
             html += '</div></div>';
           });
-          html += '</div>'; // close sub-tree-card-wrap
-          // Children to the right
-          html += '<div class="sub-tree-children">';
           if (sp.subProjects.length > 0) {
             sp.subProjects.forEach(function(child) { renderSubBranch(child); });
           }
