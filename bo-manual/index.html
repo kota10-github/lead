@@ -1988,18 +1988,6 @@
     function renderTodos(el) {
       var html = '';
       var tasks = data.projectTasks || [];
-      var doneCount = tasks.filter(function(t) { return t.done; }).length;
-      var pct = tasks.length > 0 ? Math.round(doneCount / tasks.length * 100) : 0;
-
-      // Progress gauge
-      html += '<div style="margin-bottom:12px">';
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">';
-      html += '<span style="font-size:12px;color:var(--fg-muted)">' + doneCount + '/' + tasks.length + '</span>';
-      html += '<span style="font-size:12px;font-weight:600;color:' + (pct === 100 ? '#059669' : 'var(--fg)') + '">' + pct + '%</span>';
-      html += '</div>';
-      html += '<div style="width:100%;height:6px;background:var(--border);border-radius:3px;overflow:hidden">';
-      html += '<div style="width:' + pct + '%;height:100%;background:' + (pct === 100 ? '#059669' : '#334155') + ';border-radius:3px;transition:width .3s ease"></div>';
-      html += '</div></div>';
 
       // Group by project
       var grouped = {};
