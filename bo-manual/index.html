@@ -1289,12 +1289,6 @@
             html += `<div class="node-manual" data-node="pm-${proj.projectId}-${m.id}" onclick="navigate('manual-detail',{id:${m.id}})" style="border-left:3px solid ${c.bg};background:${c.light}"><div class="node-manual-title" style="color:${c.bg}">${escapeHtml(m.title)}<span class="node-delete-btn" onclick="event.stopPropagation();confirmDeleteManual(${m.id})" title="削除">×</span></div>`;
             html += `<div class="node-manual-purpose">${escapeHtml(m.purpose||'')}</div></div>`;
           });
-          projTasks.forEach(function(t) {
-            html += `<div class="node-manual" style="border-left:3px solid ${t.done ? '#059669' : c.bg};background:${c.light};opacity:${t.done ? '.5' : '1'};cursor:pointer" onclick="event.stopPropagation();navigate('task-detail',{id:${t.id}})"><div class="node-manual-title" style="color:${c.bg};display:flex;align-items:center;gap:6px">`;
-            html += `<div class="todo-checkbox ${t.done ? 'checked' : ''}" style="width:24px;height:24px;font-size:10px" onclick="event.stopPropagation();expandProjectTaskActions(this,${t.id},${t.done})">${t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>'}</div>`;
-            html += `<span style="${t.done ? 'text-decoration:line-through' : ''}">${escapeHtml(t.title)}</span>${dueBadgeHtml(t)}`;
-            html += `</div></div>`;
-          });
           if (proj.users.length > 0) {
             html += `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">`;
             proj.users.forEach(u => { html += `<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:var(--bg-muted);color:var(--fg-muted)">${escapeHtml(u.name)}</span>`; });
@@ -1302,8 +1296,14 @@
           }
           html += `</div>`; // close project-items-col
           html += `</div>`; // close node-project-standalone
-          // Sub-projects branch to the right
+          // Sub-projects and tasks branch to the right
           html += `<div class="sub-tree-children" data-parent="proj-${proj.projectId}">`;
+          projTasks.forEach(function(t) {
+            html += `<div class="node-manual" style="border-left:3px solid ${t.done ? '#059669' : c.bg};background:${c.light};opacity:${t.done ? '.5' : '1'};cursor:pointer" onclick="event.stopPropagation();navigate('task-detail',{id:${t.id}})"><div class="node-manual-title" style="color:${c.bg};display:flex;align-items:center;gap:6px">`;
+            html += `<div class="todo-checkbox ${t.done ? 'checked' : ''}" style="width:24px;height:24px;font-size:10px" onclick="event.stopPropagation();expandProjectTaskActions(this,${t.id},${t.done})">${t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>'}</div>`;
+            html += `<span style="${t.done ? 'text-decoration:line-through' : ''}">${escapeHtml(t.title)}</span>${dueBadgeHtml(t)}`;
+            html += `</div></div>`;
+          });
           proj.subProjects.forEach(function(sp) { renderSubBranch(sp); });
           html += `<div class="map-add-options">
             <button class="map-add-branch" onclick="navigate('manual-form',{projectId:${proj.projectId}})">+ マニュアル</button>
