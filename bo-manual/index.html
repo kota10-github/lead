@@ -225,9 +225,12 @@
     .prose .callout-icon,.manual-rich-editor .callout-icon,.memo-rich-editor .callout-icon{font-size:20px;flex-shrink:0;line-height:1.4;min-width:24px;outline:none}
     .prose .callout-body,.manual-rich-editor .callout-body,.memo-rich-editor .callout-body{flex:1;min-width:0;line-height:1.6}
     .prose .callout-body p,.manual-rich-editor .callout-body p,.memo-rich-editor .callout-body p{margin:0}
-    /* Notion-style code block */
-    .prose pre.code-block,.manual-rich-editor pre.code-block,.memo-rich-editor pre.code-block{background:#0f172a;color:#e2e8f0;padding:16px 18px;border-radius:6px;overflow-x:auto;margin:12px 0;font-family:'SFMono-Regular',Menlo,Consolas,monospace;font-size:13px;line-height:1.6;white-space:pre;position:relative}
+    /* Notion-style code block — light, monospace, subtle border */
+    .prose pre.code-block,.manual-rich-editor pre.code-block,.memo-rich-editor pre.code-block{background:#f7f6f3;color:#37352f;padding:14px 16px;border-radius:3px;overflow-x:auto;margin:12px 0;font-family:'SFMono-Regular',Menlo,Consolas,'Liberation Mono',monospace;font-size:13px;line-height:1.6;white-space:pre;position:relative;border:1px solid rgba(55,53,47,.09)}
     .prose pre.code-block code,.manual-rich-editor pre.code-block code,.memo-rich-editor pre.code-block code{background:transparent;padding:0;color:inherit;font-family:inherit;font-size:inherit;display:block;outline:none}
+    /* Inline code - Notion style */
+    .prose code,.manual-rich-editor code,.memo-rich-editor code{background:rgba(135,131,120,.15);color:#eb5757;padding:2px 5px;border-radius:3px;font-family:'SFMono-Regular',Menlo,Consolas,monospace;font-size:.9em}
+    .prose pre code,.manual-rich-editor pre code,.memo-rich-editor pre code{background:transparent;color:inherit;padding:0;font-size:inherit}
     /* Collapsible details block */
     .prose details,.manual-rich-editor details,.memo-rich-editor details{border:1px solid var(--border);border-radius:var(--radius);margin:12px 0;background:var(--bg)}
     .prose summary,.manual-rich-editor summary,.memo-rich-editor summary{cursor:pointer;padding:10px 14px;font-weight:600;list-style:none;position:relative;user-select:none}
