@@ -163,7 +163,7 @@
     .memo-rich-editor:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
     .memo-rich-editor:empty::before{content:attr(data-placeholder);color:var(--fg-muted);pointer-events:none}
     .memo-rich-editor h1{font-size:24px;font-weight:700;margin:12px 0 6px;padding-bottom:6px;border-bottom:2px solid var(--border)}
-    .memo-rich-editor h2{font-size:18px;font-weight:600;margin:10px 0 4px;padding-left:10px;border-left:4px solid var(--primary)}
+    .memo-rich-editor h2{font-size:18px;font-weight:600;margin:10px 0 4px;padding:6px 12px;border-left:4px solid var(--primary);background:rgba(37,99,235,.06);border-radius:0 4px 4px 0}
     .memo-rich-editor h3{font-size:15px;font-weight:600;margin:8px 0 4px}
     .memo-rich-editor p{margin:4px 0}
     .memo-rich-editor strong{font-weight:700}
@@ -217,7 +217,7 @@
     /* Prose content */
     .prose{line-height:1.8;color:var(--fg)}
     .prose h1{font-size:28px;font-weight:700;margin:40px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--border);scroll-margin-top:20px}
-    .prose h2{font-size:20px;font-weight:600;margin:32px 0 8px;padding-left:12px;border-left:4px solid var(--primary);scroll-margin-top:20px}
+    .prose h2{font-size:20px;font-weight:600;margin:32px 0 8px;padding:8px 14px;border-left:4px solid var(--primary);background:rgba(37,99,235,.06);border-radius:0 4px 4px 0;scroll-margin-top:20px}
     .prose h3{font-size:17px;font-weight:600;margin:24px 0 6px;scroll-margin-top:20px}
     .prose blockquote{border-left:3px solid var(--primary);padding:12px 16px;margin:12px 0;color:var(--fg-muted);background:var(--bg-muted);border-radius:0 var(--radius) var(--radius) 0;white-space:pre-wrap}
     /* Callout block */
@@ -647,7 +647,7 @@
 .manual-rich-editor:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
 .manual-rich-editor:empty::before{content:attr(data-placeholder);color:var(--fg-muted);pointer-events:none}
 .manual-rich-editor h1{font-size:24px;font-weight:700;margin:12px 0 6px;padding-bottom:6px;border-bottom:2px solid var(--border)}
-.manual-rich-editor h2{font-size:18px;font-weight:600;margin:10px 0 4px;padding-left:10px;border-left:4px solid var(--primary)}
+.manual-rich-editor h2{font-size:18px;font-weight:600;margin:10px 0 4px;padding:6px 12px;border-left:4px solid var(--primary);background:rgba(37,99,235,.06);border-radius:0 4px 4px 0}
 .manual-rich-editor h3{font-size:15px;font-weight:600;margin:8px 0 4px}
 .manual-rich-editor p{margin:4px 0}
 .manual-rich-editor strong{font-weight:700}
@@ -2487,7 +2487,7 @@
           icon.setAttribute('contenteditable', 'true');
           var body2 = document.createElement('div');
           body2.className = 'callout-body';
-          body2.innerHTML = '<p>' + escapeHtml(sel.toString() || 'ここにメッセージを書く') + '</p>';
+          body2.innerHTML = '<p>' + escapeHtml(sel.toString() || '') + '<br></p>';
           callout.appendChild(icon);
           callout.appendChild(body2);
           if (range) { range.deleteContents(); range.insertNode(callout); range.collapse(false); }
@@ -2499,9 +2499,19 @@
           var pre = document.createElement('pre');
           pre.className = 'code-block';
           var code = document.createElement('code');
-          code.textContent = sel.toString() || '';
+          var selText = sel.toString();
+          if (selText) { code.textContent = selText; } else { code.innerHTML = '<br>'; }
           pre.appendChild(code);
-          if (range) { range.deleteContents(); range.insertNode(pre); range.collapse(false); }
+          if (range) {
+            range.deleteContents();
+            range.insertNode(pre);
+            // Move cursor inside <code> so the user can type immediately
+            var r = document.createRange();
+            r.selectNodeContents(code);
+            r.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(r);
+          }
           break;
         }
       }
@@ -4091,7 +4101,7 @@
           icon.setAttribute('contenteditable', 'true');
           const cbody = document.createElement('div');
           cbody.className = 'callout-body';
-          cbody.innerHTML = '<p>' + escapeHtml(sel.toString() || 'ここにメッセージを書く') + '</p>';
+          cbody.innerHTML = '<p>' + escapeHtml(sel.toString() || '') + '<br></p>';
           callout.appendChild(icon);
           callout.appendChild(cbody);
           if (range) { range.deleteContents(); range.insertNode(callout); range.collapse(false); }
@@ -4101,9 +4111,18 @@
           const pre = document.createElement('pre');
           pre.className = 'code-block';
           const code = document.createElement('code');
-          code.textContent = sel.toString() || '';
+          const selText = sel.toString();
+          if (selText) { code.textContent = selText; } else { code.innerHTML = '<br>'; }
           pre.appendChild(code);
-          if (range) { range.deleteContents(); range.insertNode(pre); range.collapse(false); }
+          if (range) {
+            range.deleteContents();
+            range.insertNode(pre);
+            const r = document.createRange();
+            r.selectNodeContents(code);
+            r.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(r);
+          }
           break;
         }
       }
