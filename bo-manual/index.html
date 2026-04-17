@@ -1773,7 +1773,8 @@
     }
     function renderPublicManual() {
       var urlParams = new URLSearchParams(location.search);
-      var mid = Number(urlParams.get('manual'));
+      var midRaw = urlParams.get('manual');
+      var mid = Number(midRaw);
       if (!mid) return false;
       document.querySelector('.sidebar').style.display = 'none';
       var mh = document.querySelector('.mobile-header'); if (mh) mh.style.display = 'none';
@@ -1782,11 +1783,15 @@
       main.style.maxWidth = '900px';
       main.style.margin = '0 auto';
       main.style.padding = '32px 24px';
-      fetch(SYNC_URL).then(function(r) { return r.json(); }).then(function(remote) {
-        var manuals = (remote && remote.manuals) || [];
-        var manual = manuals.find(function(m) { return m.id === mid; });
+      fetch('/api/sync').then(function(r) { return r.json(); }).then(function(remote) {
+        // Handle possible nesting: sometimes data is wrapped in { data: {...} }
+        var root = remote;
+        if (root && !root.manuals && root.data && root.data.manuals) root = root.data;
+        var manuals = (root && root.manuals) || [];
+        console.log('[public manual] looking for id', mid, 'among', manuals.length, 'manuals');
+        var manual = manuals.find(function(m) { return m.id == mid; });
         if (!manual) {
-          main.innerHTML = '<div class="empty" style="padding:80px 20px;text-align:center"><h2>マニュアルが見つかりません</h2></div>';
+          main.innerHTML = '<div class="empty" style="padding:80px 20px;text-align:center"><h2>マニュアルが見つかりません</h2><p style="font-size:13px;color:var(--fg-muted);margin-top:12px">ID: ' + mid + ' / 登録件数: ' + manuals.length + '</p></div>';
           return;
         }
         var isHtml = /<[a-z][\s\S]*>/i.test(manual.taskRoadmap || '');
