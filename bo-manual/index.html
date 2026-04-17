@@ -1871,9 +1871,13 @@
       html += `<h2 id="sec-memo" class="doc-section-title" style="font-size:15px;font-weight:600;color:var(--fg-muted);margin:32px 0 8px">メモ・思考整理</h2>`;
       html += `<div class="project-memo-area" style="margin-top:0">
         <div class="memo-toolbar sticky">
+          <button class="memo-toolbar-btn" onclick="memoExecCmd('undo')" title="戻す (Cmd+Z)">↶</button>
+          <button class="memo-toolbar-btn" onclick="memoExecCmd('redo')" title="進む (Cmd+Shift+Z)">↷</button>
+          <div class="memo-toolbar-sep"></div>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('h1')" title="見出し1">H1</button>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('h2')" title="見出し2">H2</button>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('h3')" title="見出し3">H3</button>
+          <button class="memo-toolbar-btn" onclick="memoExecCmd('p')" title="本文に戻す">本文</button>
           <div class="memo-toolbar-sep"></div>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('bold')" title="太字"><b>B</b></button>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('italic')" title="イタリック"><i>I</i></button>
@@ -2108,9 +2112,13 @@
       html += `<main>`;
       html += `<div class="form-group"><label class="label label-icon">${icons.book} マニュアル</label>
       <div class="memo-toolbar sticky">
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('undo')" title="戻す (Cmd+Z)">↶</button>
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('redo')" title="進む (Cmd+Shift+Z)">↷</button>
+        <div class="memo-toolbar-sep"></div>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('h1')" title="見出し1">H1</button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('h2')" title="見出し2">H2</button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('h3')" title="見出し3">H3</button>
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('p')" title="本文に戻す">本文</button>
         <div class="memo-toolbar-sep"></div>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('bold')" title="太字"><b>B</b></button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('italic')" title="イタリック"><i>I</i></button>
@@ -2345,9 +2353,12 @@
         editor.focus();
       }
       switch(type) {
+        case 'undo': document.execCommand('undo'); break;
+        case 'redo': document.execCommand('redo'); break;
         case 'h1': document.execCommand('formatBlock', false, 'h1'); break;
         case 'h2': document.execCommand('formatBlock', false, 'h2'); break;
         case 'h3': document.execCommand('formatBlock', false, 'h3'); break;
+        case 'p': document.execCommand('formatBlock', false, 'p'); break;
         case 'bold': document.execCommand('bold'); break;
         case 'italic': document.execCommand('italic'); break;
         case 'strike': document.execCommand('strikeThrough'); break;
@@ -3857,9 +3868,12 @@
       const sel = window.getSelection();
       const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
       switch(type) {
+        case 'undo': document.execCommand('undo'); break;
+        case 'redo': document.execCommand('redo'); break;
         case 'h1': document.execCommand('formatBlock', false, 'h1'); break;
         case 'h2': document.execCommand('formatBlock', false, 'h2'); break;
         case 'h3': document.execCommand('formatBlock', false, 'h3'); break;
+        case 'p': document.execCommand('formatBlock', false, 'p'); break;
         case 'bold': document.execCommand('bold'); break;
         case 'italic': document.execCommand('italic'); break;
         case 'strike': document.execCommand('strikeThrough'); break;
