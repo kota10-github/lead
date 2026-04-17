@@ -235,6 +235,7 @@
     .prose details,.manual-rich-editor details,.memo-rich-editor details{border:1px solid var(--border);border-radius:var(--radius);margin:12px 0;background:var(--bg)}
     .prose summary,.manual-rich-editor summary,.memo-rich-editor summary{cursor:pointer;padding:10px 14px;font-weight:600;list-style:none;position:relative;user-select:none}
     .prose summary::-webkit-details-marker,.manual-rich-editor summary::-webkit-details-marker,.memo-rich-editor summary::-webkit-details-marker{display:none}
+    .manual-rich-editor summary:empty::after,.memo-rich-editor summary:empty::after{content:'タイトル';color:var(--fg-muted2);font-weight:400}
     .prose summary::before,.manual-rich-editor summary::before,.memo-rich-editor summary::before{content:'▸';display:inline-block;width:16px;margin-right:6px;transition:transform .15s;color:var(--fg-muted)}
     .prose details[open] > summary::before,.manual-rich-editor details[open] > summary::before,.memo-rich-editor details[open] > summary::before{transform:rotate(90deg)}
     .prose .details-body,.manual-rich-editor .details-body,.memo-rich-editor .details-body{padding:0 14px 12px 36px;border-top:1px solid var(--border-light)}
@@ -2164,7 +2165,6 @@
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('ol')" title="番号リスト">1. リスト</button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('indent')" title="インデント">→</button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('outdent')" title="アウトデント">←</button>
-        <div class="memo-toolbar-sep"></div>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('quote')" title="引用">❮ 引用</button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('callout', this)" title="コールアウト">💡 コールアウト</button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('code')" title="コード">&lt;/&gt; コード</button>
@@ -2426,7 +2426,7 @@
           break;
         case 'quote': {
           var sel = window.getSelection();
-          var text = sel.toString() || '引用テキスト';
+          var text = sel.toString() || '';
           var bq = document.createElement('blockquote');
           bq.textContent = text;
           attachBlockquoteDelete(bq);
@@ -2472,7 +2472,7 @@
           var details = document.createElement('details');
           details.open = true;
           var summary = document.createElement('summary');
-          summary.textContent = sel.toString() || 'タイトル';
+          summary.textContent = sel.toString() || '';
           var body = document.createElement('div');
           body.className = 'details-body';
           body.innerHTML = '<p><br></p>';
@@ -2557,17 +2557,19 @@
         btn.className = 'copy-block-btn';
         btn.type = 'button';
         btn.setAttribute('contenteditable', 'false');
-        btn.innerHTML = '<svg viewBox="0 0 16 16"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg>Copy';
+        var COPY_SVG = '<svg viewBox="0 0 16 16"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg>';
+        var CHECK_SVG = '<svg viewBox="0 0 16 16"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg>';
+        btn.innerHTML = COPY_SVG + 'コピー';
         btn.onclick = function(e) {
           e.preventDefault(); e.stopPropagation();
           var body = block.querySelector('.copy-block-body');
           var text = body ? body.innerText : '';
           navigator.clipboard.writeText(text).then(function() {
             btn.classList.add('copied');
-            btn.innerHTML = '<svg viewBox="0 0 16 16"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg>Copied!';
+            btn.innerHTML = CHECK_SVG + 'コピー済';
             setTimeout(function() {
               btn.classList.remove('copied');
-              btn.innerHTML = '<svg viewBox="0 0 16 16"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg>Copy';
+              btn.innerHTML = COPY_SVG + 'コピー';
             }, 1500);
           });
         };
@@ -4115,7 +4117,7 @@
           const details = document.createElement('details');
           details.open = true;
           const summary = document.createElement('summary');
-          summary.textContent = sel.toString() || 'タイトル';
+          summary.textContent = sel.toString() || '';
           const body = document.createElement('div');
           body.className = 'details-body';
           body.innerHTML = '<p><br></p>';
