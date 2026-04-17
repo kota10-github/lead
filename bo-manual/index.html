@@ -852,6 +852,10 @@
       var titleText = navTitle ? navTitle.textContent.trim() : '';
       var mt = document.getElementById('mobile-title');
       if (mt) mt.textContent = (currentPage === 'home' || currentPage === 'dashboard') ? 'BOタスク' : titleText;
+      // Apply fullscreen state on initial load so sidebar doesn't flash on reload
+      var isFullscreen = currentPage === 'manual-detail' || currentPage === 'project-detail' || currentPage === 'member-page' || currentPage === 'member-manual';
+      document.querySelector('.sidebar').classList.toggle('hidden', isFullscreen);
+      document.getElementById('main-area').style.marginLeft = isFullscreen ? '0' : '';
     })();
     function toggleSidebar() {
       var sb = document.querySelector('.sidebar');
