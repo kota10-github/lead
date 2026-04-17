@@ -152,12 +152,12 @@
     /* Block hover delete (blockquote, callout, code, copy, collapse, details) */
     .manual-rich-editor blockquote,.memo-rich-editor blockquote{position:relative;cursor:text}
     .manual-rich-editor .callout,.memo-rich-editor .callout,.manual-rich-editor details,.memo-rich-editor details{position:relative}
-    .bq-delete,.block-delete{position:absolute;top:4px;right:4px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:var(--destructive);color:#fff;border:none;border-radius:50%;font-size:14px;font-weight:700;cursor:pointer;opacity:0;transition:opacity .15s;z-index:3;line-height:1;padding:0}
+    .bq-delete,.block-delete{position:absolute;top:4px;right:4px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:var(--destructive);color:#fff;border:none;border-radius:50%;font-size:14px;font-weight:700;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .15s;z-index:3;line-height:1;padding:0}
     .manual-rich-editor blockquote:hover .bq-delete,.memo-rich-editor blockquote:hover .bq-delete,
     .manual-rich-editor .callout:hover > .block-delete,.memo-rich-editor .callout:hover > .block-delete,
     .manual-rich-editor pre.code-block:hover > .block-delete,.memo-rich-editor pre.code-block:hover > .block-delete,
     .manual-rich-editor .copy-block:hover > .block-delete,.memo-rich-editor .copy-block:hover > .block-delete,
-    .manual-rich-editor details:hover > .block-delete,.memo-rich-editor details:hover > .block-delete{opacity:1}
+    .manual-rich-editor details:hover > .block-delete,.memo-rich-editor details:hover > .block-delete{opacity:1;pointer-events:auto}
     .bq-delete:hover,.block-delete:hover{background:#dc2626}
     /* When both copy button and delete button present, offset copy button to the left */
     .copy-block:has(.block-delete) .copy-block-btn,pre.code-block:has(.block-delete) .code-block-btn{right:40px}
@@ -627,8 +627,8 @@
     .copy-block{position:relative;border:1px solid var(--border);border-radius:6px;padding:14px 16px;margin:12px 0;background:var(--bg);line-height:1.7}
     .copy-block-body{outline:none;white-space:pre-wrap;word-wrap:break-word;min-height:1em}
     .copy-block-body:empty::before{content:'メッセージを入力…';color:var(--fg-muted2)}
-    .copy-block-btn,.code-block-btn{position:absolute;top:8px;right:8px;display:flex;align-items:center;gap:4px;padding:4px 10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--fg-muted);cursor:pointer;opacity:0;transition:opacity .15s;z-index:2;white-space:nowrap;line-height:1.2}
-    .copy-block:hover .copy-block-btn,pre.code-block:hover .code-block-btn{opacity:1}
+    .copy-block-btn,.code-block-btn{position:absolute;top:8px;right:8px;display:flex;align-items:center;gap:4px;padding:4px 10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--fg-muted);cursor:pointer;opacity:0;pointer-events:none;transition:opacity .15s;z-index:2;white-space:nowrap;line-height:1.2}
+    .copy-block:hover .copy-block-btn,pre.code-block:hover .code-block-btn{opacity:1;pointer-events:auto}
     .copy-block-btn:hover,.code-block-btn:hover{background:var(--bg-muted);color:var(--fg)}
     .copy-block-btn.copied,.code-block-btn.copied{background:#16a34a;border-color:#16a34a;color:#fff;opacity:1}
     .copy-block-btn svg,.code-block-btn svg{width:12px;height:12px;fill:currentColor}
@@ -2486,7 +2486,16 @@
           body.innerHTML = '<p><br></p>';
           details.appendChild(summary);
           details.appendChild(body);
-          if (range) { range.deleteContents(); range.insertNode(details); range.collapse(false); }
+          if (range) {
+            range.deleteContents();
+            range.insertNode(details);
+            // Move cursor into summary so the user can type the title immediately
+            var r3 = document.createRange();
+            r3.selectNodeContents(summary);
+            r3.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(r3);
+          }
           break;
         }
         case 'callout': {
@@ -4190,7 +4199,16 @@
           body.innerHTML = '<p><br></p>';
           details.appendChild(summary);
           details.appendChild(body);
-          if (range) { range.deleteContents(); range.insertNode(details); range.collapse(false); }
+          if (range) {
+            range.deleteContents();
+            range.insertNode(details);
+            // Move cursor into summary so the user can type the title immediately
+            var r3 = document.createRange();
+            r3.selectNodeContents(summary);
+            r3.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(r3);
+          }
           break;
         }
         case 'callout': {
