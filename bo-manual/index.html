@@ -2546,6 +2546,22 @@
       if (roadmapEditor) {
         const clone = roadmapEditor.cloneNode(true);
         clone.querySelectorAll('.bq-delete').forEach(function(b) { b.remove(); });
+        // Fix invalid nested lists: <ul>...<ul>Y</ul> should be <ul>...<li>...<ul>Y</ul></li></ul>
+        function fixNestedLists(root) {
+          var fixed = true;
+          while (fixed) {
+            fixed = false;
+            var invalidNested = root.querySelectorAll('ul > ul, ul > ol, ol > ul, ol > ol');
+            invalidNested.forEach(function(nested) {
+              var prev = nested.previousElementSibling;
+              if (prev && prev.tagName === 'LI') {
+                prev.appendChild(nested);
+                fixed = true;
+              }
+            });
+          }
+        }
+        fixNestedLists(clone);
         roadmap = clone.innerHTML;
       }
       if (!title || !purpose) { toast('タイトルと目的は必須です'); return; }
