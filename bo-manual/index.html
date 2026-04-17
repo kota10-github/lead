@@ -116,6 +116,10 @@
     .manuals-col{display:flex;flex-direction:column;gap:8px}
     .node-project-standalone{padding:8px 16px;border-radius:8px;font-weight:500;font-size:13px;border:2px solid #334155;background:#f1f5f9;color:#1e293b;cursor:pointer;transition:all .15s;white-space:nowrap;user-select:none;word-break:break-word;overflow-wrap:break-word}
     .node-project-standalone:hover{transform:scale(1.05);box-shadow:0 2px 8px rgba(30,41,59,.15)}
+    .node-project-standalone[draggable="true"],.node-manual[draggable="true"],.node-root[draggable]{cursor:grab}
+    .node-project-standalone[draggable="true"]:active,.node-manual[draggable="true"]:active{cursor:grabbing}
+    .drop-target{outline:3px dashed #2563eb!important;outline-offset:4px;background:rgba(37,99,235,.08)!important}
+    .dragging-source{opacity:.4}
     .project-col{display:flex;flex-direction:column;gap:12px}
     .project-branch{display:flex;align-items:flex-start;gap:16px}
     .project-items-col{display:flex;flex-direction:column;gap:8px}
@@ -1287,12 +1291,12 @@
         html += `<div class="breadcrumb"><span class="breadcrumb-item" onclick="navigate('home')">マップ</span></div>`;
         html += `<div class="mindmap-viewport" id="mindmap-viewport"><svg class="mindmap-svg" id="mindmap-svg"></svg>`;
         html += `<div class="mindmap-inner" id="mindmap-inner" style="transform:scale(${mapZoom})">`;
-        html += `<div style="display:flex;flex-direction:column;justify-content:center;padding-top:32px"><div class="node-root" data-node="root">BOチーム</div><button class="map-add-btn" onclick="showProjectDialog()">+ プロジェクト追加</button></div>`;
+        html += `<div style="display:flex;flex-direction:column;justify-content:center;padding-top:32px"><div class="node-root" data-node="root" ondragover="event.preventDefault();this.classList.add('drop-target')" ondragleave="this.classList.remove('drop-target')" ondrop="handleProjectDrop(event,null)">BOチーム</div><button class="map-add-btn" onclick="showProjectDialog()">+ プロジェクト追加</button></div>`;
         html += `<div class="project-col">`;
         projects.forEach((proj, pi) => {
           const c = getProjectColor(proj.projectId);
           html += `<div class="project-branch">`;
-          html += `<div class="node-project-standalone" data-node="proj-${proj.projectId}" style="border-color:${c.bg};background:${c.light};color:${c.text}" onclick="navigate('project-detail',{id:${proj.projectId}})">`;
+          html += `<div class="node-project-standalone" data-node="proj-${proj.projectId}" draggable="true" ondragstart="handleProjectDragStart(event,${proj.projectId})" ondragend="handleProjectDragEnd(event)" ondragover="handleProjectDragOver(event,${proj.projectId})" ondragleave="this.classList.remove('drop-target')" ondrop="handleProjectDrop(event,${proj.projectId})" style="border-color:${c.bg};background:${c.light};color:${c.text}" onclick="navigate('project-detail',{id:${proj.projectId}})">`;
           var projTasks = getTasksByProject(proj.projectId);
           html += `<div style="font-weight:600">${escapeHtml(proj.projectName)}<span style="opacity:.6;font-size:11px;margin-left:4px">(${proj.manuals.length + projTasks.length})</span></div>`;
           html += `<div class="project-items-col">`;
@@ -1331,7 +1335,7 @@
           var spTasks = getTasksByProject(sp.projectId);
           html += '<div class="sub-tree-row">';
           html += '<div class="sub-tree-card-wrap">';
-          html += `<div class="node-manual" data-node="sp-${sp.projectId}" onclick="navigate('project-detail',{id:${sp.projectId}})" style="border-left:3px solid ${sc.bg};background:${sc.light}"><div class="node-manual-title" style="color:${sc.bg}">${escapeHtml(sp.projectName)}</div>`;
+          html += `<div class="node-manual" data-node="sp-${sp.projectId}" draggable="true" ondragstart="handleProjectDragStart(event,${sp.projectId})" ondragend="handleProjectDragEnd(event)" ondragover="handleProjectDragOver(event,${sp.projectId})" ondragleave="this.classList.remove('drop-target')" ondrop="handleProjectDrop(event,${sp.projectId})" onclick="navigate('project-detail',{id:${sp.projectId}})" style="border-left:3px solid ${sc.bg};background:${sc.light}"><div class="node-manual-title" style="color:${sc.bg}">${escapeHtml(sp.projectName)}</div>`;
           html += `<div class="node-manual-purpose">${sp.subProjects.length > 0 ? '<span style="opacity:.6;font-size:10px">' + sp.subProjects.length + '件のサブ</span>' : ''}${spTasks.length > 0 ? '<span style="opacity:.6;font-size:10px;margin-left:4px">' + spTasks.filter(function(t){return t.done}).length + '/' + spTasks.length + ' タスク</span>' : ''}</div></div>`;
           html += '</div>'; // close sub-tree-card-wrap
           // Tasks and children to the right
@@ -1362,6 +1366,54 @@
         viewport.addEventListener('mousemove', function(e) { if (!isDragging) return; e.preventDefault(); viewport.scrollLeft = scrollLeft - (e.pageX - viewport.offsetLeft - startX); viewport.scrollTop = scrollTop - (e.pageY - viewport.offsetTop - startY); });
         requestAnimationFrame(() => requestAnimationFrame(() => drawMindmapLines(projects)));
       }
+      function isDescendantProject(ancestorId, candidateId) {
+        if (!candidateId) return false;
+        var cur = getProject(candidateId);
+        while (cur && cur.parentId != null) {
+          if (cur.parentId === ancestorId) return true;
+          cur = getProject(cur.parentId);
+        }
+        return false;
+      }
+      function handleProjectDragStart(e, projectId) {
+        e.stopPropagation();
+        e.dataTransfer.setData('text/plain', String(projectId));
+        e.dataTransfer.effectAllowed = 'move';
+        e.currentTarget.classList.add('dragging-source');
+        window._draggingProjectId = projectId;
+      }
+      function handleProjectDragEnd(e) {
+        e.currentTarget.classList.remove('dragging-source');
+        window._draggingProjectId = null;
+        document.querySelectorAll('.drop-target').forEach(function(el) { el.classList.remove('drop-target'); });
+      }
+      function handleProjectDragOver(e, targetId) {
+        var dragged = window._draggingProjectId;
+        if (!dragged || dragged === targetId) return;
+        if (isDescendantProject(dragged, targetId)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+        e.currentTarget.classList.add('drop-target');
+      }
+      function handleProjectDrop(e, targetId) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.currentTarget.classList.remove('drop-target');
+        var draggedId = Number(e.dataTransfer.getData('text/plain'));
+        if (!draggedId || draggedId === targetId) return;
+        if (targetId && isDescendantProject(draggedId, targetId)) { toast('循環構造は作れません'); return; }
+        var proj = getProject(draggedId);
+        if (!proj) return;
+        proj.parentId = targetId || null;
+        saveData();
+        toast('プロジェクトを移動しました');
+        render();
+      }
+      window.handleProjectDragStart = handleProjectDragStart;
+      window.handleProjectDragEnd = handleProjectDragEnd;
+      window.handleProjectDragOver = handleProjectDragOver;
+      window.handleProjectDrop = handleProjectDrop;
       function drawMindmapLines(projects) {
         var svg = document.getElementById('mindmap-svg');
         var inner = document.getElementById('mindmap-inner');
