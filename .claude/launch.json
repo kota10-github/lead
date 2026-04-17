@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "bo-manual",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8765", "-d", "/Users/kota/namaiki-ever-dashboard/bo-manual"],
+      "port": 8765
+    }
+  ]
+}

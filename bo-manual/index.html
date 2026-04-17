@@ -1714,7 +1714,7 @@
       html += `<button class="back-float" onclick="navigate('project-detail',{id:${manual.projectId}})">${icons.arrowLeft} 戻る</button>`;
       html += `<div class="manual-actions-float no-print" style="position:fixed;top:16px;right:16px;z-index:50;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-outline btn-sm" onclick="shareManualLink(${manual.id})">🔗 共有リンク</button>
-        <button class="btn btn-outline btn-sm" onclick="window.print()">📄 PDF出力</button>
+        <button class="btn btn-outline btn-sm" onclick="showManualHistory(${manual.id})">🕐 変更履歴</button>
         <button class="btn btn-outline btn-sm" onclick="navigate('manual-form',{editId:${manual.id}})">${icons.pencil} 編集</button>
         <button class="btn btn-outline btn-sm" style="color:var(--destructive)" onclick="confirmDeleteManual(${manual.id})">${icons.trash} 削除</button>
       </div>`;
@@ -1796,7 +1796,6 @@
         }
         var isHtml = /<[a-z][\s\S]*>/i.test(manual.taskRoadmap || '');
         var html = '';
-        html += '<div class="no-print" style="display:flex;justify-content:flex-end;margin-bottom:16px"><button class="btn btn-primary btn-sm" onclick="window.print()">📄 PDFで出力</button></div>';
         html += '<h1 class="doc-title" style="font-size:28px;font-weight:700;margin-bottom:16px">' + escapeHtml(manual.title) + '</h1>';
         html += '<div class="info-card">';
         html += '<div class="info-section"><div class="info-section-label" style="color:var(--primary)">🎯 <span style="text-transform:uppercase;letter-spacing:.05em">果たすべき責任（目的）</span></div><p style="font-weight:500;white-space:pre-wrap">' + escapeHtml(manual.purpose || '') + '</p></div>';
@@ -1946,12 +1945,95 @@
       if (!title || !purpose) { toast('タイトルと目的は必須です'); return; }
       if (editId) {
         const m = getManual(editId);
-        if (m) { Object.assign(m, { title, purpose, authority, operationPace: pace, responseSpeed: speed, taskRoadmap: roadmap }); saveData(); toast('マニュアルを更新しました'); navigate('manual-detail', { id: editId }); }
+        if (m) {
+          // Save snapshot to history before overwriting
+          if (!m.history) m.history = [];
+          var changed = m.title !== title || m.purpose !== purpose || m.authority !== authority || m.operationPace !== pace || m.responseSpeed !== speed || m.taskRoadmap !== roadmap;
+          if (changed) {
+            m.history.push({
+              ts: Date.now(),
+              title: m.title, purpose: m.purpose, authority: m.authority,
+              operationPace: m.operationPace, responseSpeed: m.responseSpeed,
+              taskRoadmap: m.taskRoadmap
+            });
+            // Keep last 50 versions only
+            if (m.history.length > 50) m.history = m.history.slice(-50);
+          }
+          Object.assign(m, { title, purpose, authority, operationPace: pace, responseSpeed: speed, taskRoadmap: roadmap });
+          saveData(); toast('マニュアルを更新しました'); navigate('manual-detail', { id: editId });
+        }
       } else {
         const id = data.nextManualId++;
-        data.manuals.push({ id, projectId, title, purpose, authority, operationPace: pace, responseSpeed: speed, taskRoadmap: roadmap, createdBy: 0 });
+        data.manuals.push({ id, projectId, title, purpose, authority, operationPace: pace, responseSpeed: speed, taskRoadmap: roadmap, history: [], createdBy: 0 });
         saveData(); toast('マニュアルを作成しました'); navigate('manual-detail', { id });
       }
+    }
+    function showManualHistory(manualId) {
+      var m = getManual(manualId);
+      if (!m || !m.history || m.history.length === 0) {
+        toast('変更履歴はまだありません');
+        return;
+      }
+      var bodyHtml = '<div style="max-height:480px;overflow-y:auto;margin:-8px 0">';
+      // Show newest first
+      var history = m.history.slice().reverse();
+      history.forEach(function(v, i) {
+        var d = new Date(v.ts);
+        var dateStr = d.getFullYear() + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+        var preview = (v.taskRoadmap || '').replace(/<[^>]*>/g,'').slice(0,80);
+        var origIdx = m.history.length - 1 - i;
+        bodyHtml += '<div style="padding:10px 12px;border:1px solid var(--border);border-radius:6px;margin-bottom:8px">';
+        bodyHtml += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px"><span style="font-size:12px;font-weight:600">' + dateStr + '</span>';
+        bodyHtml += '<span style="display:flex;gap:6px"><button class="btn btn-outline btn-sm" onclick="previewManualVersion(' + manualId + ',' + origIdx + ')">プレビュー</button><button class="btn btn-primary btn-sm" onclick="restoreManualVersion(' + manualId + ',' + origIdx + ')">この版に戻す</button></span></div>';
+        bodyHtml += '<div style="font-size:11px;color:var(--fg-muted);word-break:break-all">' + escapeHtml(preview) + (preview.length >= 80 ? '…' : '') + '</div>';
+        bodyHtml += '</div>';
+      });
+      bodyHtml += '</div>';
+      showModal('変更履歴 (' + m.history.length + '件)', bodyHtml, [
+        { label: '閉じる', onClick: function(o) { o.remove(); } }
+      ]);
+    }
+    function previewManualVersion(manualId, index) {
+      var m = getManual(manualId);
+      if (!m || !m.history || !m.history[index]) return;
+      var v = m.history[index];
+      var d = new Date(v.ts);
+      var dateStr = d.getFullYear() + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+      var bodyHtml = '<div style="max-height:500px;overflow-y:auto;border:1px solid var(--border);padding:16px;border-radius:6px;background:var(--bg-muted)">';
+      bodyHtml += '<h3 style="margin-bottom:8px">' + escapeHtml(v.title || '') + '</h3>';
+      if (v.purpose) bodyHtml += '<p style="font-size:13px;color:var(--fg-muted);margin-bottom:12px"><strong>目的：</strong>' + escapeHtml(v.purpose) + '</p>';
+      bodyHtml += '<div class="prose">' + (v.taskRoadmap || '') + '</div>';
+      bodyHtml += '</div>';
+      showModal('プレビュー - ' + dateStr, bodyHtml, [
+        { label: '閉じる', onClick: function(o) { o.remove(); } },
+        { label: 'この版に戻す', class: 'btn btn-primary', onClick: function(o) { o.remove(); restoreManualVersion(manualId, index); } }
+      ]);
+    }
+    function restoreManualVersion(manualId, index) {
+      var m = getManual(manualId);
+      if (!m || !m.history || !m.history[index]) return;
+      if (!confirm('この版に戻しますか？現在の内容は履歴に保存されます。')) return;
+      var v = m.history[index];
+      // Save current version first
+      m.history.push({
+        ts: Date.now(),
+        title: m.title, purpose: m.purpose, authority: m.authority,
+        operationPace: m.operationPace, responseSpeed: m.responseSpeed,
+        taskRoadmap: m.taskRoadmap
+      });
+      if (m.history.length > 50) m.history = m.history.slice(-50);
+      // Restore old version
+      m.title = v.title || m.title;
+      m.purpose = v.purpose || m.purpose;
+      m.authority = v.authority || '';
+      m.operationPace = v.operationPace || '';
+      m.responseSpeed = v.responseSpeed || '';
+      m.taskRoadmap = v.taskRoadmap || '';
+      saveData();
+      // Close any open modals
+      document.querySelectorAll('.modal-overlay').forEach(function(o) { o.remove(); });
+      toast('この版に戻しました');
+      render();
     }
 
     // MY TASKS
