@@ -220,6 +220,14 @@
     .prose h2{font-size:20px;font-weight:600;margin:32px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--border);scroll-margin-top:20px}
     .prose h3{font-size:17px;font-weight:600;margin:24px 0 6px;scroll-margin-top:20px}
     .prose blockquote{border-left:3px solid var(--primary);padding:12px 16px;margin:12px 0;color:var(--fg-muted);background:var(--bg-muted);border-radius:0 var(--radius) var(--radius) 0;white-space:pre-wrap}
+    /* Collapsible details block */
+    .prose details,.manual-rich-editor details,.memo-rich-editor details{border:1px solid var(--border);border-radius:var(--radius);margin:12px 0;background:var(--bg)}
+    .prose summary,.manual-rich-editor summary,.memo-rich-editor summary{cursor:pointer;padding:10px 14px;font-weight:600;list-style:none;position:relative;user-select:none}
+    .prose summary::-webkit-details-marker,.manual-rich-editor summary::-webkit-details-marker,.memo-rich-editor summary::-webkit-details-marker{display:none}
+    .prose summary::before,.manual-rich-editor summary::before,.memo-rich-editor summary::before{content:'▸';display:inline-block;width:16px;margin-right:6px;transition:transform .15s;color:var(--fg-muted)}
+    .prose details[open] > summary::before,.manual-rich-editor details[open] > summary::before,.memo-rich-editor details[open] > summary::before{transform:rotate(90deg)}
+    .prose .details-body,.manual-rich-editor .details-body,.memo-rich-editor .details-body{padding:0 14px 12px 36px;border-top:1px solid var(--border-light)}
+    .prose .details-body p,.manual-rich-editor .details-body p,.memo-rich-editor .details-body p{margin:8px 0}
     .prose blockquote p{margin:4px 0}
     .prose mark{background:#FEF08A;padding:2px 6px;border-radius:3px;font-weight:500}
     .prose p{margin:8px 0}
@@ -1890,6 +1898,7 @@
           <button class="memo-toolbar-btn" onclick="memoExecCmd('codeblock')" title="コード">&lt;/&gt;</button>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('quote')" title="引用">❮ 引用</button>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('link')" title="リンク">🔗 リンク</button>
+          <button class="memo-toolbar-btn" onclick="memoExecCmd('collapse')" title="折りたたみ">▸ 折りたたみ</button>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('hr')" title="水平線">─ 線</button>
         </div>
         <div class="memo-rich-editor" id="memo-rich-editor" contenteditable="true" data-placeholder="見出しや太字を使って自由に記入できます" oninput="autoSaveProjectMemo(${project.id});updateMemoToc()"></div>
@@ -2133,6 +2142,7 @@
         <div class="memo-toolbar-sep"></div>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('quote')" title="引用">❮ 引用</button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('codeblock')" title="コピー可能ブロック">&lt;/&gt;</button>
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('collapse')" title="折りたたみ">▸ 折りたたみ</button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('hr')" title="水平線">─ 線</button>
       </div>
       <div class="manual-rich-editor" id="f-roadmap-editor" contenteditable="true" data-placeholder="マニュアルの内容を記述できます（見出し・太字・リストなどが使えます）" oninput="updateManualFormToc()"></div>
@@ -2434,6 +2444,21 @@
           var range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
           var hr = document.createElement('hr');
           if (range) { range.collapse(false); range.insertNode(hr); }
+          break;
+        }
+        case 'collapse': {
+          var sel = window.getSelection();
+          var range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+          var details = document.createElement('details');
+          details.open = true;
+          var summary = document.createElement('summary');
+          summary.textContent = sel.toString() || 'クリックで開閉するタイトル';
+          var body = document.createElement('div');
+          body.className = 'details-body';
+          body.innerHTML = '<p>ここに内容を書いてください</p>';
+          details.appendChild(summary);
+          details.appendChild(body);
+          if (range) { range.deleteContents(); range.insertNode(details); range.collapse(false); }
           break;
         }
       }
@@ -3983,6 +4008,19 @@
             range.collapse(false);
             range.insertNode(hr);
           }
+          break;
+        }
+        case 'collapse': {
+          const details = document.createElement('details');
+          details.open = true;
+          const summary = document.createElement('summary');
+          summary.textContent = sel.toString() || 'クリックで開閉するタイトル';
+          const body = document.createElement('div');
+          body.className = 'details-body';
+          body.innerHTML = '<p>ここに内容を書いてください</p>';
+          details.appendChild(summary);
+          details.appendChild(body);
+          if (range) { range.deleteContents(); range.insertNode(details); range.collapse(false); }
           break;
         }
       }
