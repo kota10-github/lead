@@ -240,7 +240,8 @@
     .prose pre code,.manual-rich-editor pre code,.memo-rich-editor pre code{background:transparent;color:inherit;padding:0;font-size:inherit}
     /* Collapsible details block */
     .prose details,.manual-rich-editor details,.memo-rich-editor details{border:1px solid var(--border);border-radius:var(--radius);margin:12px 0;background:var(--bg)}
-    .prose summary,.manual-rich-editor summary,.memo-rich-editor summary{cursor:pointer;padding:10px 14px;font-weight:600;list-style:none;position:relative;user-select:none}
+    .prose summary{cursor:pointer;padding:10px 14px;font-weight:600;list-style:none;position:relative;user-select:none}
+    .manual-rich-editor summary,.memo-rich-editor summary{cursor:text;padding:10px 14px;font-weight:600;list-style:none;position:relative}
     .prose summary::-webkit-details-marker,.manual-rich-editor summary::-webkit-details-marker,.memo-rich-editor summary::-webkit-details-marker{display:none}
     .manual-rich-editor summary:empty::after,.memo-rich-editor summary:empty::after{content:'タイトル';color:var(--fg-muted2);font-weight:400}
     .prose summary::before,.manual-rich-editor summary::before,.memo-rich-editor summary::before{content:'▸';display:inline-block;width:16px;margin-right:6px;transition:transform .15s;color:var(--fg-muted)}
@@ -2709,12 +2710,16 @@
           Object.assign(m, { title, purpose, authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap });
           // Clear legacy operationPace when using new tag system
           if (paceTagId) m.operationPace = '';
-          saveData(); toast('マニュアルを更新しました'); navigate('manual-detail', { id: editId });
+          saveData();
+          if (typeof pushSyncNow === 'function') pushSyncNow();
+          toast('マニュアルを更新しました'); navigate('manual-detail', { id: editId });
         }
       } else {
         const id = data.nextManualId++;
         data.manuals.push({ id, projectId, title, purpose, authority, paceTagId: paceTagId, paceSchedule: paceSchedule, operationPace: '', responseSpeed: speed, taskRoadmap: roadmap, history: [], createdBy: 0 });
-        saveData(); toast('マニュアルを作成しました'); navigate('manual-detail', { id });
+        saveData();
+        if (typeof pushSyncNow === 'function') pushSyncNow();
+        toast('マニュアルを作成しました'); navigate('manual-detail', { id });
       }
     }
     function showManualHistory(manualId) {
@@ -3137,6 +3142,20 @@
           body: JSON.stringify(data)
         }).catch(function(){});
       }, 500);
+    }
+    // Force immediate push (used when the user explicitly saves)
+    function pushSyncNow() {
+      clearTimeout(syncDebounce);
+      data._syncTs = Date.now();
+      // Use keepalive so the request completes even if the page navigates/unloads
+      try {
+        return fetch(SYNC_URL, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+          keepalive: true
+        }).catch(function(){});
+      } catch (e) { return Promise.resolve(); }
     }
 
     // Pull remote data and overwrite local
