@@ -2527,15 +2527,41 @@
     }
     var _taskMemoTimer = null;
     function autoSaveTaskMemo(taskId) {
-      var status = document.getElementById('task-memo-status');
+      var status = document.getElementById('memo-save-status');
       if (status) status.textContent = '保存中...';
       clearTimeout(_taskMemoTimer);
       _taskMemoTimer = setTimeout(function() {
         var task = (data.projectTasks || []).find(function(t) { return t.id === taskId; });
-        var el = document.getElementById('task-memo-editor');
-        if (task && el) { task.memo = el.value; saveData(); }
+        var el = document.getElementById('memo-rich-editor');
+        if (task && el) { task.memo = htmlToMarkdown(el); saveData(); }
         if (status) { status.textContent = '保存済み'; setTimeout(function() { if (status) status.textContent = ''; }, 2000); }
       }, 800);
+    }
+    function loadTaskMemoToEditor(taskId) {
+      var task = (data.projectTasks || []).find(function(t) { return t.id === taskId; });
+      var editor = document.getElementById('memo-rich-editor');
+      if (!task || !editor) return;
+      if (task.memo) {
+        editor.innerHTML = markdownToHtml(task.memo);
+      }
+      editor.addEventListener('copy', function(e) {
+        var sel = window.getSelection();
+        if (!sel.rangeCount) return;
+        var container = document.createElement('div');
+        container.appendChild(sel.getRangeAt(0).cloneContents());
+        e.clipboardData.setData('text/plain', htmlToMarkdown(container));
+        e.preventDefault();
+      });
+      editor.addEventListener('cut', function(e) {
+        var sel = window.getSelection();
+        if (!sel.rangeCount) return;
+        var range = sel.getRangeAt(0);
+        var container = document.createElement('div');
+        container.appendChild(range.cloneContents());
+        e.clipboardData.setData('text/plain', htmlToMarkdown(container));
+        range.deleteContents();
+        e.preventDefault();
+      });
     }
     function updateTaskDueDate(taskId) {
       var task = (data.projectTasks || []).find(function(t) { return t.id === taskId; });
@@ -2579,12 +2605,32 @@
       html += '<span class="badge ' + (task.done ? 'badge-primary' : 'badge-secondary') + '">' + (task.done ? '完了' : '未完了') + '</span>';
       html += '</div>';
       html += '</div>';
-      // Memo
-      html += '<div style="margin-top:20px">';
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><label class="label" style="margin-bottom:0">メモ</label><span id="task-memo-status" style="font-size:11px;color:var(--fg-muted)"></span></div>';
-      html += '<textarea class="textarea" id="task-memo-editor" placeholder="メモを入力..." oninput="autoSaveTaskMemo(' + task.id + ')" style="min-height:400px;resize:vertical">' + escapeHtml(task.memo || '') + '</textarea>';
+      // Memo (rich editor same as project)
+      html += '<div class="project-memo-area">';
+      html += '<h3>📝 メモ・思考整理</h3>';
+      html += '<div class="memo-toolbar">';
+      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'h1\')" title="見出し1">H1</button>';
+      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'h2\')" title="見出し2">H2</button>';
+      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'h3\')" title="見出し3">H3</button>';
+      html += '<div class="memo-toolbar-sep"></div>';
+      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'bold\')" title="太字"><b>B</b></button>';
+      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'italic\')" title="イタリック"><i>I</i></button>';
+      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'strike\')" title="取り消し線"><s>S</s></button>';
+      html += '<div class="memo-toolbar-sep"></div>';
+      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'ul\')" title="箇条書き">• リスト</button>';
+      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'ol\')" title="番号リスト">1. リスト</button>';
+      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'check\')" title="チェックリスト">☑ TODO</button>';
+      html += '<div class="memo-toolbar-sep"></div>';
+      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'codeblock\')" title="コード">&lt;/&gt;</button>';
+      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'quote\')" title="引用">❮ 引用</button>';
+      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'link\')" title="リンク">🔗 リンク</button>';
+      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'hr\')" title="水平線">─ 線</button>';
+      html += '</div>';
+      html += '<div class="memo-rich-editor" id="memo-rich-editor" contenteditable="true" data-placeholder="見出しや太字を使って自由に記入できます" oninput="autoSaveTaskMemo(' + task.id + ')"></div>';
+      html += '<div id="memo-save-status" style="font-size:11px;color:var(--fg-muted);margin-top:4px;min-height:16px"></div>';
       html += '</div>';
       el.innerHTML = html;
+      setTimeout(function() { loadTaskMemoToEditor(task.id); }, 0);
     }
 
     // USERS
