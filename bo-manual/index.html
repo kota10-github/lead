@@ -138,7 +138,7 @@
     .memo-toolbar-sep{width:1px;height:20px;background:var(--border);margin:0 4px}
     .memo-rich-editor a{color:var(--primary);text-decoration:underline;cursor:pointer}
     .memo-rich-editor a:hover{opacity:.7}
-    .memo-rich-editor{width:100%;min-height:500px;padding:16px;border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius);font-family:var(--font);font-size:14px;line-height:1.8;background:var(--bg);outline:none;overflow-y:auto;white-space:pre-wrap;word-wrap:break-word;resize:vertical}
+    .memo-rich-editor{width:100%;min-height:calc(100vh - 280px);padding:16px;border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius);font-family:var(--font);font-size:14px;line-height:1.8;background:var(--bg);outline:none;overflow-y:auto;white-space:pre-wrap;word-wrap:break-word;resize:vertical}
     .memo-rich-editor:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
     .memo-rich-editor:empty::before{content:attr(data-placeholder);color:var(--fg-muted);pointer-events:none}
     .memo-rich-editor h1{font-size:22px;font-weight:700;margin:12px 0 6px;padding-bottom:6px;border-bottom:2px solid var(--border)}
@@ -585,7 +585,9 @@
 .nav-item.active svg{color:#fff}
 .nav-item.active:hover{background:#1d4ed8;color:#fff}
 /* Rich editor for manual form */
-.manual-rich-editor{width:100%;min-height:300px;padding:16px;border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius);font-family:var(--font);font-size:14px;line-height:1.8;background:var(--bg);outline:none;overflow-y:auto;white-space:pre-wrap;word-wrap:break-word}
+.manual-rich-editor{width:100%;min-height:calc(100vh - 240px);padding:16px;border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius);font-family:var(--font);font-size:14px;line-height:1.8;background:var(--bg);outline:none;overflow-y:auto;white-space:pre-wrap;word-wrap:break-word;resize:vertical}
+.manual-form-layout{display:grid;grid-template-columns:320px 1fr;gap:24px;align-items:start}
+@media(max-width:900px){.manual-form-layout{grid-template-columns:1fr}}
 .manual-rich-editor:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
 .manual-rich-editor:empty::before{content:attr(data-placeholder);color:var(--fg-muted);pointer-events:none}
 .manual-rich-editor h1{font-size:22px;font-weight:700;margin:12px 0 6px;padding-bottom:6px;border-bottom:2px solid var(--border)}
@@ -1807,17 +1809,21 @@
       let html = `<button class="btn btn-ghost btn-sm mb-4" onclick="${isEdit ? `navigate('manual-detail',{id:${pageParams.editId}})` : `navigate('project-detail',{id:${pageParams.projectId}})`}">${icons.arrowLeft} 戻る</button>`;
       html += renderBreadcrumb();
       html += `<h1 class="page-title mb-4">${isEdit ? 'マニュアル編集' : '新規マニュアル作成'}</h1>`;
-      html += `<div style="max-width:800px">`;
+      html += `<div class="manual-form-layout">`;
+      // Left sidebar: metadata
+      html += `<aside>`;
       html += `<div class="form-group"><label class="label">タイトル <span style="color:var(--destructive)">*</span></label><input class="input" id="f-title" value="${escapeHtml(existing?.title || '')}" placeholder="マニュアルのタイトル"></div>`;
-      html += `<div class="card mb-4" style="border:2px solid rgba(37,99,235,.2);background:rgba(37,99,235,.03)"><div style="padding:16px">
-        <label class="label label-icon" style="color:var(--primary);font-weight:600">${icons.target} 果たすべき責任（目的） <span style="color:var(--destructive)">*</span></label>
+      html += `<div class="card mb-4" style="border:2px solid rgba(37,99,235,.2);background:rgba(37,99,235,.03)"><div style="padding:12px">
+        <label class="label label-icon" style="color:var(--primary);font-weight:600;font-size:12px">${icons.target} 果たすべき責任（目的） <span style="color:var(--destructive)">*</span></label>
         <textarea class="textarea" id="f-purpose" rows="4" placeholder="このマニュアルの果たすべき責任・目的を記述してください">${escapeHtml(existing?.purpose || '')}</textarea>
       </div></div>`;
       html += `<div class="form-group"><label class="label label-icon">${icons.shield} 権限</label><textarea class="textarea" id="f-authority" rows="3" placeholder="責任者に付与される権限の範囲">${escapeHtml(existing?.authority || '')}</textarea></div>`;
-      html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">`;
-      html += `<div><label class="label label-icon">${icons.clock} 稼働ペース</label><textarea class="textarea" id="f-pace" rows="3" placeholder="例：週5日、9:00-18:00">${escapeHtml(existing?.operationPace || '')}</textarea></div>`;
-      html += `<div><label class="label label-icon">${icons.zap} 対応スピード</label><textarea class="textarea" id="f-speed" rows="3" placeholder="例：問い合わせから24時間以内に対応">${escapeHtml(existing?.responseSpeed || '')}</textarea></div>`;
-      html += `</div>`;
+      html += `<div class="form-group"><label class="label label-icon">${icons.clock} 稼働ペース</label><textarea class="textarea" id="f-pace" rows="2" placeholder="例：週5日、9:00-18:00">${escapeHtml(existing?.operationPace || '')}</textarea></div>`;
+      html += `<div class="form-group"><label class="label label-icon">${icons.zap} 対応スピード</label><textarea class="textarea" id="f-speed" rows="2" placeholder="例：問い合わせから24時間以内に対応">${escapeHtml(existing?.responseSpeed || '')}</textarea></div>`;
+      html += `<div class="flex gap-2" style="margin-top:16px"><button class="btn btn-primary" onclick="submitManualForm(${isEdit ? pageParams.editId : 'null'},${pageParams.projectId || 'null'})">${isEdit ? '更新' : '作成'}</button><button class="btn btn-outline" onclick="${isEdit ? `navigate('manual-detail',{id:${pageParams.editId}})` : `navigate('project-detail',{id:${pageParams.projectId}})`}">キャンセル</button></div>`;
+      html += `</aside>`;
+      // Right main: manual content editor (big)
+      html += `<main>`;
       html += `<div class="form-group"><label class="label label-icon">${icons.book} マニュアル</label>
       <div class="memo-toolbar">
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('h2')" title="見出し2">H2</button>
@@ -1835,6 +1841,8 @@
       </div>
       <div class="manual-rich-editor" id="f-roadmap-editor" contenteditable="true" data-placeholder="マニュアルの内容を記述できます（見出し・太字・リストなどが使えます）"></div>
       </div>`;
+      html += `</main>`;
+      html += `</div>`;
       // Load existing content into rich editor after render
       if (isEdit && existing && existing.taskRoadmap) {
         window._pendingManualContent = existing.taskRoadmap;
@@ -1847,8 +1855,6 @@
           editor.innerHTML = window._pendingManualContent;
         }
       }, 50);
-      html += `<div class="flex gap-2"><button class="btn btn-primary" onclick="submitManualForm(${isEdit ? pageParams.editId : 'null'},${pageParams.projectId || 'null'})">${isEdit ? '更新' : '作成'}</button><button class="btn btn-outline" onclick="${isEdit ? `navigate('manual-detail',{id:${pageParams.editId}})` : `navigate('project-detail',{id:${pageParams.projectId}})`}">キャンセル</button></div>`;
-      html += `</div>`;
       el.innerHTML = html;
     }
 
@@ -2739,12 +2745,15 @@
       // Breadcrumb - middle crumb goes to parent project
       html += '<div class="breadcrumb"><span class="breadcrumb-item" onclick="navigate(\'home\')">マップ</span><span class="breadcrumb-sep">›</span><span class="breadcrumb-item" onclick="navigate(\'project-detail\',{id:' + task.projectId + '})">' + escapeHtml(projName) + '</span><span class="breadcrumb-sep">›</span><span class="breadcrumb-current">' + escapeHtml(task.title) + '</span></div>';
       // Header
-      html += '<div class="page-header"><h1 class="page-title" style="display:flex;align-items:center;gap:12px">';
+      html += '<div class="page-header"><h1 class="page-title" style="display:flex;align-items:center;gap:12px;flex:1;min-width:0">';
       html += '<div class="todo-checkbox ' + (task.done ? 'checked' : '') + '" onclick="toggleProjectTask(' + task.id + ')" style="flex-shrink:0">' + (task.done ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
-      html += '<input class="input" id="task-title-input" value="' + escapeHtml(task.title).replace(/"/g, '&quot;') + '" oninput="autoSaveTaskTitle(' + task.id + ')" style="font-size:22px;font-weight:600;letter-spacing:-0.02em;border:none;padding:0;background:transparent;' + (task.done ? 'text-decoration:line-through;opacity:.5' : '') + '">';
+      html += '<input class="input" id="task-title-input" value="' + escapeHtml(task.title).replace(/"/g, '&quot;') + '" oninput="autoSaveTaskTitle(' + task.id + ')" style="font-size:22px;font-weight:600;letter-spacing:-0.02em;border:none;padding:0;background:transparent;flex:1;min-width:0;' + (task.done ? 'text-decoration:line-through;opacity:.5' : '') + '">';
       html += '</h1>';
       html += '<button class="btn btn-destructive btn-sm" onclick="if(confirm(\'このタスクを削除しますか？\')){deleteProjectTask(' + task.id + ');navigate(\'todos\')}">削除</button>';
       html += '</div>';
+      // 2-column layout: info on side, memo in main
+      html += '<div class="manual-form-layout">';
+      html += '<aside>';
       // Info card
       html += '<div class="info-card">';
       // Project
@@ -2761,8 +2770,10 @@
       html += '<span class="badge ' + (task.done ? 'badge-primary' : 'badge-secondary') + '">' + (task.done ? '完了' : '未完了') + '</span>';
       html += '</div>';
       html += '</div>';
-      // Memo (rich editor same as project)
-      html += '<div class="project-memo-area">';
+      html += '</aside>';
+      // Main: memo rich editor (big)
+      html += '<main>';
+      html += '<div class="project-memo-area" style="margin-top:0">';
       html += '<h3>📝 メモ・思考整理</h3>';
       html += '<div class="memo-toolbar">';
       html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'h1\')" title="見出し1">H1</button>';
@@ -2785,6 +2796,8 @@
       html += '<div class="memo-rich-editor" id="memo-rich-editor" contenteditable="true" data-placeholder="見出しや太字を使って自由に記入できます" oninput="autoSaveTaskMemo(' + task.id + ')"></div>';
       html += '<div id="memo-save-status" style="font-size:11px;color:var(--fg-muted);margin-top:4px;min-height:16px"></div>';
       html += '</div>';
+      html += '</main>';
+      html += '</div>'; // close manual-form-layout
       el.innerHTML = html;
       setTimeout(function() { loadTaskMemoToEditor(task.id); }, 0);
     }
