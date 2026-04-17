@@ -818,7 +818,7 @@
       });
       const navTitle = document.querySelector(`.nav-item[data-page="${page}"]`)?.textContent.trim() || '';
       document.getElementById('mobile-title').textContent = (page === 'home' && window.innerWidth <= 768) ? 'BOタスク' : (page === 'dashboard' ? 'BOタスク' : navTitle);
-      const isFullscreen = page === 'manual-detail' || page === 'member-page' || page === 'member-manual';
+      const isFullscreen = page === 'manual-detail' || page === 'project-detail' || page === 'member-page' || page === 'member-manual';
       document.querySelector('.sidebar').classList.toggle('hidden', isFullscreen);
       document.getElementById('main-area').style.marginLeft = isFullscreen ? '0' : '';
       render();
@@ -995,12 +995,17 @@
         data.projects.forEach(function(child) {
           if (child.parentId === p.id) node.subProjects.push(buildNode(child));
         });
-        data.assignees.forEach(function(a) {
+        // Include all manuals belonging to this project (even without assignees)
+        data.manuals.forEach(function(manual) {
+          if (manual.projectId !== p.id) return;
+          if (!node.manuals.find(function(m) { return m.id === manual.id; })) node.manuals.push(manual);
+        });
+        // Collect users from assignees
+        (data.assignees || []).forEach(function(a) {
           var manual = getManual(a.manualId);
           var user = getUser(a.userId);
           if (!manual || !user) return;
           if (manual.projectId !== p.id) return;
-          if (!node.manuals.find(function(m) { return m.id === manual.id; })) node.manuals.push(manual);
           if (!node.users.find(function(u) { return u.id === user.id; })) node.users.push(user);
         });
         return node;
@@ -1181,6 +1186,12 @@
             var spTasks = getTasksByProject(sp.projectId);
             html += '<div style="margin-top:6px;padding-left:10px;border-left:2px solid ' + sc.bg + '">';
             html += '<div style="font-size:12px;font-weight:500;color:' + sc.text + ';padding:2px 0" onclick="event.stopPropagation();navigate(\'project-detail\',{id:' + sp.projectId + '})">' + escapeHtml(sp.projectName) + '</div>';
+            (sp.manuals || []).forEach(function(m) {
+              html += '<div style="padding:4px 0;font-size:12px;color:var(--fg-muted);display:flex;align-items:center;gap:6px;cursor:pointer" onclick="event.stopPropagation();navigate(\'manual-detail\',{id:' + m.id + '})">';
+              html += '<span style="flex-shrink:0">📘</span>';
+              html += '<span>' + escapeHtml(m.title) + '</span>';
+              html += '</div>';
+            });
             spTasks.forEach(function(t) {
               html += '<div style="padding:4px 0;font-size:12px;color:var(--fg-muted);display:flex;align-items:center;gap:6px;cursor:pointer;' + (t.done ? 'opacity:.5' : '') + '" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})">';
               html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:20px;height:20px;font-size:8px" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
@@ -1311,20 +1322,19 @@
           html += `<div class="node-project-standalone" data-node="proj-${proj.projectId}" draggable="true" ondragstart="handleProjectDragStart(event,${proj.projectId})" ondragend="handleProjectDragEnd(event)" ondragover="handleProjectDragOver(event,${proj.projectId})" ondragleave="this.classList.remove('drop-target','drop-before','drop-after')" ondrop="handleProjectDrop(event,${proj.projectId})" style="border-color:${c.bg};background:${c.light};color:${c.text}" onclick="navigate('project-detail',{id:${proj.projectId}})">`;
           var projTasks = getTasksByProject(proj.projectId);
           html += `<div style="font-weight:600">${escapeHtml(proj.projectName)}<span style="opacity:.6;font-size:11px;margin-left:4px">(${proj.manuals.length + projTasks.length})</span></div>`;
-          html += `<div class="project-items-col">`;
-          proj.manuals.forEach(m => {
-            html += `<div class="node-manual" data-node="pm-${proj.projectId}-${m.id}" onclick="navigate('manual-detail',{id:${m.id}})" style="border-left:3px solid ${c.bg};background:${c.light}"><div class="node-manual-title" style="color:${c.bg}">${escapeHtml(m.title)}<span class="node-delete-btn" onclick="event.stopPropagation();confirmDeleteManual(${m.id})" title="削除">×</span></div>`;
-            html += `<div class="node-manual-purpose">${escapeHtml(m.purpose||'')}</div></div>`;
-          });
           if (proj.users.length > 0) {
-            html += `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">`;
+            html += `<div class="project-items-col"><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">`;
             proj.users.forEach(u => { html += `<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:var(--bg-muted);color:var(--fg-muted)">${escapeHtml(u.name)}</span>`; });
-            html += `</div>`;
+            html += `</div></div>`;
           }
-          html += `</div>`; // close project-items-col
           html += `</div>`; // close node-project-standalone
-          // Sub-projects and tasks branch to the right
+          // Manuals, tasks, and sub-projects branch to the right
           html += `<div class="sub-tree-children" data-parent="proj-${proj.projectId}">`;
+          proj.manuals.forEach(m => {
+            html += `<div class="node-manual" data-node="pm-${proj.projectId}-${m.id}" onclick="navigate('manual-detail',{id:${m.id}})" style="border-left:3px solid ${c.bg};background:${c.light};cursor:pointer"><div class="node-manual-title" style="color:${c.bg};display:flex;align-items:center;gap:6px">📘 <span>${escapeHtml(m.title)}</span><span class="node-delete-btn" onclick="event.stopPropagation();confirmDeleteManual(${m.id})" title="削除">×</span></div>`;
+            if (m.purpose) html += `<div class="node-manual-purpose">${escapeHtml(m.purpose)}</div>`;
+            html += `</div>`;
+          });
           projTasks.forEach(function(t) {
             html += `<div class="node-manual" style="border-left:3px solid ${t.done ? '#059669' : c.bg};background:${c.light};opacity:${t.done ? '.5' : '1'};cursor:pointer" onclick="event.stopPropagation();navigate('task-detail',{id:${t.id}})"><div class="node-manual-title" style="color:${c.bg};display:flex;align-items:center;gap:6px">`;
             html += `<div class="todo-checkbox ${t.done ? 'checked' : ''}" style="width:24px;height:24px;font-size:10px" onclick="event.stopPropagation();expandProjectTaskActions(this,${t.id},${t.done})">${t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>'}</div>`;
@@ -1352,6 +1362,11 @@
           html += '</div>'; // close sub-tree-card-wrap
           // Tasks and children to the right
           html += '<div class="sub-tree-children">';
+          (sp.manuals || []).forEach(function(m) {
+            html += '<div class="node-manual" onclick="event.stopPropagation();navigate(\'manual-detail\',{id:' + m.id + '})" style="border-left:3px solid ' + sc.bg + ';background:' + sc.light + ';cursor:pointer"><div class="node-manual-title" style="color:' + sc.bg + ';display:flex;align-items:center;gap:6px">📘 <span>' + escapeHtml(m.title) + '</span><span class="node-delete-btn" onclick="event.stopPropagation();confirmDeleteManual(' + m.id + ')" title="削除">×</span></div>';
+            if (m.purpose) html += '<div class="node-manual-purpose">' + escapeHtml(m.purpose) + '</div>';
+            html += '</div>';
+          });
           spTasks.forEach(function(t) {
             html += '<div class="node-manual" style="border-left:3px solid ' + (t.done ? '#059669' : sc.bg) + ';background:' + sc.light + ';opacity:' + (t.done ? '.5' : '1') + ';cursor:pointer" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})"><div class="node-manual-title" style="color:' + sc.bg + ';display:flex;align-items:center;gap:6px">';
             html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:20px;height:20px;font-size:8px" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
@@ -1361,6 +1376,7 @@
           if (sp.subProjects.length > 0) {
             sp.subProjects.forEach(function(child) { renderSubBranch(child); });
           }
+          html += '<button class="sub-add-btn" onclick="event.stopPropagation();navigate(\'manual-form\',{projectId:' + sp.projectId + '})">+ マニュアル</button>';
           html += '<button class="sub-add-btn" onclick="event.stopPropagation();showAddProjectTask(' + sp.projectId + ')">+ タスク</button>';
           html += '<button class="sub-add-btn" onclick="event.stopPropagation();showProjectDialog(' + sp.projectId + ')">+ サブ</button>';
           html += '</div>'; // close sub-tree-children
@@ -1568,56 +1584,85 @@
       if (!project.files) project.files = [];
       const manuals = getManualsByProject(project.id);
       const subProjects = data.projects.filter(p => p.parentId === project.id);
-      let html = project.parentId ? `<button class="btn btn-ghost btn-sm mb-4" onclick="navigate('project-detail',{id:${project.parentId}})">${icons.arrowLeft} 親プロジェクトへ戻る</button>` : `<button class="btn btn-ghost btn-sm mb-4" onclick="navigate('home')">${icons.arrowLeft} マップ</button>`;
-      html += renderBreadcrumb();
-      html += `<div style="margin-bottom:24px"><div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap"><div style="flex:1;min-width:200px"><h1 class="page-title editable-title" contenteditable="true" id="proj-title-edit" onblur="saveProjectTitleInline(${project.id})" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">${escapeHtml(project.name)}</h1></div><div style="display:flex;gap:8px;flex-shrink:0;align-items:center"><button class="btn btn-primary" onclick="navigate('manual-form',{projectId:${project.id}})">${icons.plus} マニュアル作成</button><button class="btn btn-outline btn-sm" style="color:var(--destructive);border-color:var(--destructive)" onclick="confirmDeleteProject(${project.id})">${icons.trash} 削除</button></div></div><p class="editable-desc" contenteditable="true" id="proj-desc-edit" data-placeholder="説明を追加..." onblur="saveProjectDescInline(${project.id})" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur()}" style="margin-top:4px">${project.description ? escapeHtml(project.description) : ''}</p></div>`;
-      // Tag selector
+      var pTasks = getTasksByProject(project.id);
       const currentTag = (data.tags||[]).find(t=>t.id===project.tagId);
-      html += `<div style="margin-top:8px;margin-bottom:16px;display:flex;align-items:center;gap:8px">
-        <span style="font-size:13px;color:var(--muted-foreground)">タグ:</span>
-        <select id="proj-tag-select" onchange="changeProjectTag(${project.id}, this.value)" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--card);cursor:pointer">
-          <option value="">タグなし</option>
-          ${(data.tags||[]).map(t=>'<option value="'+t.id+'"'+(project.tagId===t.id?' selected':'')+' style="color:'+t.color+'">'+escapeHtml(t.name)+'</option>').join('')}
-        </select>
-        ${currentTag ? '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:'+currentTag.color+'"></span>' : ''}
+      const backLabel = project.parentId ? '親プロジェクトへ戻る' : 'マップ';
+      const backAction = project.parentId ? `navigate('project-detail',{id:${project.parentId}})` : `navigate('home')`;
+
+      let html = `<div class="doc-page">`;
+      html += `<button class="back-float" onclick="${backAction}">${icons.arrowLeft} ${backLabel}</button>`;
+      html += `<div class="manual-actions-float no-print" style="position:fixed;top:16px;right:16px;z-index:50;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="navigate('manual-form',{projectId:${project.id}})">${icons.plus} マニュアル作成</button>
+        <button class="btn btn-outline btn-sm" style="color:var(--destructive);border-color:var(--destructive)" onclick="confirmDeleteProject(${project.id})">${icons.trash} 削除</button>
       </div>`;
-      // 3-column layout: [metadata aside] [memo main] [TOC aside]
-      html += `<div class="manual-form-layout">`;
-      html += `<aside>`;
-      // Manuals & sub-projects
-      if (manuals.length > 0 || subProjects.length > 0) {
-        html += `<div style="margin-bottom:16px"><h3 style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--fg-muted)">マニュアル・サブプロジェクト</h3>`;
+      html += `<div class="doc-layout">`;
+      // Left TOC
+      html += `<aside class="doc-toc">
+        <div class="doc-toc-title">目次</div>
+        <a href="#sec-overview">概要</a>
+        <a href="#sec-children">マニュアル・サブプロジェクト</a>
+        <a href="#sec-tasks">タスク</a>
+        <a href="#sec-files">資料・ファイル</a>
+        <a href="#sec-memo">メモ・思考整理</a>
+        <div id="memo-toc" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"></div>
+      </aside>`;
+      // Main doc
+      html += `<main class="doc-main">`;
+      html += renderBreadcrumb();
+      html += `<h1 class="doc-title editable-title" contenteditable="true" id="proj-title-edit" onblur="saveProjectTitleInline(${project.id})" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">${escapeHtml(project.name)}</h1>`;
+      html += `<p class="editable-desc" contenteditable="true" id="proj-desc-edit" data-placeholder="説明を追加..." onblur="saveProjectDescInline(${project.id})" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur()}" style="color:var(--fg-muted);margin-bottom:16px">${project.description ? escapeHtml(project.description) : ''}</p>`;
+      // Overview info-card: tag
+      html += `<div class="info-card" id="sec-overview">
+        <div class="info-section">
+          <div class="info-section-label">🏷 <span>タグ</span></div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <select id="proj-tag-select" onchange="changeProjectTag(${project.id}, this.value)" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--card);cursor:pointer">
+              <option value="">タグなし</option>
+              ${(data.tags||[]).map(t=>'<option value="'+t.id+'"'+(project.tagId===t.id?' selected':'')+' style="color:'+t.color+'">'+escapeHtml(t.name)+'</option>').join('')}
+            </select>
+            ${currentTag ? '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:'+currentTag.color+'"></span>' : ''}
+          </div>
+        </div>
+      </div>`;
+      // Section: Manuals & sub-projects
+      html += `<h2 id="sec-children" class="doc-section-title" style="font-size:20px;font-weight:600;margin:32px 0 12px;padding-bottom:4px;border-bottom:1px solid var(--border)">${icons.book} マニュアル・サブプロジェクト <span class="badge badge-secondary" style="font-size:11px">${manuals.length + subProjects.length}</span></h2>`;
+      if (manuals.length === 0 && subProjects.length === 0) {
+        html += `<p style="color:var(--fg-muted2);font-size:13px;font-style:italic">まだありません</p>`;
+      } else {
         subProjects.forEach(sp => {
-          html += `<div class="card mb-2" onclick="navigate('project-detail',{id:${sp.id}})" style="cursor:pointer;border-left:3px solid var(--primary);padding:8px 12px">
+          html += `<div class="card mb-2" onclick="navigate('project-detail',{id:${sp.id}})" style="cursor:pointer;border-left:3px solid var(--primary);padding:10px 14px">
             <div class="flex items-center gap-2">${icons.folder}<span style="font-size:13px;font-weight:500">${escapeHtml(sp.name)}</span></div>
           </div>`;
         });
         manuals.forEach(m => {
-          html += `<div class="card mb-2" onclick="navigate('manual-detail',{id:${m.id}})" style="cursor:pointer;padding:8px 12px">
+          html += `<div class="card mb-2" onclick="navigate('manual-detail',{id:${m.id}})" style="cursor:pointer;padding:10px 14px">
             <div class="flex items-center gap-2">${icons.book}<span style="font-size:13px;font-weight:500">${escapeHtml(m.title)}</span></div>
           </div>`;
         });
-        html += `</div>`;
       }
-      // Project tasks
-      var pTasks = getTasksByProject(project.id);
-      html += `<div class="card mb-4"><div class="card-header" style="padding:10px 12px"><span style="font-size:12px;font-weight:600;color:var(--fg-muted)">タスク <span class="badge badge-secondary">${pTasks.length}</span></span><button class="btn btn-primary btn-sm" onclick="showAddProjectTask(${project.id})" style="margin-left:auto;font-size:11px;padding:3px 8px">${icons.plus}</button></div><div class="card-body" style="padding:4px 12px 8px">`;
+      html += `<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="navigate('manual-form',{projectId:${project.id}})" style="color:var(--primary);font-size:12px">+ マニュアル作成</button>
+        <button class="btn btn-ghost btn-sm" onclick="showProjectDialog(${project.id})" style="color:var(--primary);font-size:12px">+ サブプロジェクト追加</button>
+      </div>`;
+      // Section: Tasks
+      html += `<h2 id="sec-tasks" class="doc-section-title" style="font-size:20px;font-weight:600;margin:32px 0 12px;padding-bottom:4px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">✅ タスク <span class="badge badge-secondary" style="font-size:11px">${pTasks.length}</span><button class="btn btn-primary btn-sm" onclick="showAddProjectTask(${project.id})" style="margin-left:auto;font-size:11px;padding:3px 10px">${icons.plus} 追加</button></h2>`;
       if (pTasks.length === 0) {
-        html += `<div style="text-align:center;padding:8px;color:var(--fg-muted);font-size:12px">タスクなし</div>`;
+        html += `<p style="color:var(--fg-muted2);font-size:13px;font-style:italic">タスクはありません</p>`;
       } else {
-        pTasks.forEach(function(t) {
-          html += `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-light);cursor:pointer" onclick="navigate('task-detail',{id:${t.id}})">`;
+        html += `<div class="card" style="padding:4px 14px">`;
+        pTasks.forEach(function(t, idx) {
+          html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;${idx < pTasks.length - 1 ? 'border-bottom:1px solid var(--border-light);' : ''}cursor:pointer" onclick="navigate('task-detail',{id:${t.id}})">`;
           html += `<div class="todo-checkbox ${t.done ? 'checked' : ''}" style="width:22px;height:22px" onclick="event.stopPropagation();expandProjectTaskActions(this,${t.id},${t.done})">${t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>'}</div>`;
-          html += `<span style="flex:1;font-size:12px;${t.done ? 'text-decoration:line-through;opacity:.5' : ''}">${escapeHtml(t.title)}${dueBadgeHtml(t)}</span>`;
+          html += `<span style="flex:1;font-size:13px;${t.done ? 'text-decoration:line-through;opacity:.5' : ''}">${escapeHtml(t.title)}${dueBadgeHtml(t)}</span>`;
           html += `</div>`;
         });
+        html += `</div>`;
       }
-      html += `</div></div>`;
-      // File upload
+      // Section: Files
+      html += `<h2 id="sec-files" class="doc-section-title" style="font-size:20px;font-weight:600;margin:32px 0 12px;padding-bottom:4px;border-bottom:1px solid var(--border)">📎 資料・ファイル</h2>`;
       html += `<div class="project-files-area" style="margin-top:0">
-        <h3 style="font-size:13px">📎 資料・ファイル</h3>
-        <div class="file-upload-zone" id="file-upload-zone" onclick="document.getElementById('file-input').click()" style="font-size:11px;padding:12px">
-          クリックまたはD&Dでアップロード
+        <div class="file-upload-zone" id="file-upload-zone" onclick="document.getElementById('file-input').click()">
+          クリックまたはドラッグ&ドロップでファイルをアップロード
           <input type="file" id="file-input" multiple style="display:none" onchange="handleFileUpload(${project.id}, this.files)">
         </div>
         <div class="file-list" id="file-list">`;
@@ -1632,12 +1677,9 @@
         </div>`;
       });
       html += `</div></div>`;
-      html += `<div style="margin-top:12px"><button class="btn btn-ghost btn-sm" onclick="showProjectDialog(${project.id})" style="color:var(--primary);font-size:12px">+ サブプロジェクト追加</button></div>`;
-      html += `</aside>`;
-      // Main: memo rich editor
-      html += `<main>`;
+      // Section: Memo
+      html += `<h2 id="sec-memo" class="doc-section-title" style="font-size:20px;font-weight:600;margin:32px 0 12px;padding-bottom:4px;border-bottom:1px solid var(--border)">📝 メモ・思考整理</h2>`;
       html += `<div class="project-memo-area" style="margin-top:0">
-        <h3>📝 メモ・思考整理</h3>
         <div class="memo-toolbar">
           <button class="memo-toolbar-btn" onclick="memoExecCmd('h1')" title="見出し1">H1</button>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('h2')" title="見出し2">H2</button>
@@ -1660,9 +1702,8 @@
         <div id="memo-save-status" style="font-size:11px;color:var(--fg-muted);margin-top:4px;min-height:16px"></div>
       </div>`;
       html += `</main>`;
-      // Right aside: TOC
-      html += `<aside><div class="manual-toc"><div class="manual-toc-title">📑 目次</div><div id="memo-toc"><div class="manual-toc-empty">見出しを追加すると目次が表示されます</div></div></div></aside>`;
-      html += `</div>`; // close manual-form-layout
+      html += `</div>`; // close doc-layout
+      html += `</div>`; // close doc-page
       // Load memo into rich editor after render
       setTimeout(function() { loadMemoToEditor(project.id); updateMemoToc(); }, 0);
       el.innerHTML = html;
