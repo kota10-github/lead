@@ -79,6 +79,11 @@
     /* Info card sections */
     .info-card{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:24px}
     .info-section{padding:10px 14px}
+    .pace-radio{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border:1px solid var(--border);border-radius:14px;font-size:12px;cursor:pointer;background:#fff}
+    .pace-radio input{margin:0}
+    .pace-radio:has(input:checked){border-color:var(--primary);background:var(--primary-light);color:var(--primary)}
+    .pace-day{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:1px solid var(--border);border-radius:50%;font-size:12px;cursor:pointer;user-select:none;background:#fff}
+    .pace-day.on{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
     .info-section + .info-section{border-top:1px solid var(--border)}
     .info-section-label{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;color:var(--fg-muted);margin-bottom:8px}
     .info-section-label svg{width:14px;height:14px}
@@ -772,6 +777,14 @@
         { id: 4, name: 'バックオフィス', color: '#10b981' },
       ],
       nextTagId: 5,
+      paceTags: [
+        { id: 1, name: '平日毎日 9-18時', color: '#2563eb' },
+        { id: 2, name: '週3日', color: '#8b5cf6' },
+        { id: 3, name: '週1日', color: '#06b6d4' },
+        { id: 4, name: 'スポット対応', color: '#10b981' },
+        { id: 5, name: '手動スケジュール', color: '#f59e0b', isManual: true },
+      ],
+      nextPaceTagId: 6,
       projectTasks: [],
       nextProjectTaskId: 1,
     };
@@ -793,6 +806,8 @@
       if (!data.nextDailyId) data.nextDailyId = 1;
       if (!data.tags) data.tags = [{id:1,name:'マーケ',color:'#3b82f6'},{id:2,name:'セールス',color:'#8b5cf6'},{id:3,name:'CS',color:'#06b6d4'},{id:4,name:'バックオフィス',color:'#10b981'}];
       if (!data.nextTagId) data.nextTagId = 5;
+      if (!data.paceTags) data.paceTags = [{id:1,name:'平日毎日 9-18時',color:'#2563eb'},{id:2,name:'週3日',color:'#8b5cf6'},{id:3,name:'週1日',color:'#06b6d4'},{id:4,name:'スポット対応',color:'#10b981'},{id:5,name:'手動スケジュール',color:'#f59e0b',isManual:true}];
+      if (!data.nextPaceTagId) data.nextPaceTagId = 6;
       if (!data.projectTasks) data.projectTasks = [];
       if (!data.nextProjectTaskId) data.nextProjectTaskId = 1;
       // Ensure project memo and files fields
@@ -1000,6 +1015,49 @@
     function getManualCountForProject(pid) { return data.manuals.filter(m => m.projectId === pid).length; }
     function getManualsByProject(pid) { return data.manuals.filter(m => m.projectId === pid); }
     function getTasksByProject(pid) { return (data.projectTasks || []).filter(function(t) { return t.projectId === pid; }); }
+    // Pace tag + schedule helpers
+    function getPaceTag(id) { return (data.paceTags || []).find(function(t) { return t.id === id; }); }
+    function formatSchedule(s) {
+      if (!s || !s.type) return '';
+      var days = ['日','月','火','水','木','金','土'];
+      if (s.type === 'frequency') {
+        var unit = { day: '日', week: '週', month: 'ヶ月' }[s.unit] || '';
+        return '1' + unit + 'に' + (s.count || 1) + '回';
+      }
+      if (s.type === 'weekly') {
+        var d = (s.days || []).map(function(i){ return days[i]; }).join('・');
+        return '毎週 ' + d + (s.time ? ' ' + s.time : '');
+      }
+      if (s.type === 'monthly') {
+        return '毎月 ' + (s.day || 1) + '日' + (s.time ? ' ' + s.time : '');
+      }
+      if (s.type === 'daily') {
+        return '毎日 ' + ((s.times || []).join(', ') || '');
+      }
+      if (s.type === 'interval') {
+        return (s.hours || 1) + '時間おき';
+      }
+      return '';
+    }
+    function formatPace(manual) {
+      if (!manual) return '';
+      if (manual.paceTagId) {
+        var tag = getPaceTag(manual.paceTagId);
+        if (tag) {
+          if (tag.isManual) {
+            var desc = formatSchedule(manual.paceSchedule);
+            return desc ? tag.name + '（' + desc + '）' : tag.name;
+          }
+          return tag.name;
+        }
+      }
+      return manual.operationPace || '';
+    }
+    function paceTagColor(manual) {
+      if (!manual || !manual.paceTagId) return '';
+      var tag = getPaceTag(manual.paceTagId);
+      return tag ? tag.color : '';
+    }
     function dueBadgeHtml(t) {
       if (!t.dueDate || t.done) return '';
       var now = new Date(); now.setHours(0,0,0,0);
@@ -1251,7 +1309,7 @@
         allTasks.slice(0, 5).forEach(t => {
           html += `<div class="mobile-today-task" onclick="navigate('manual-detail',{id:${t.manual.id}})">
             <div class="task-title">${escapeHtml(t.manual.title)}</div>
-            <div class="task-meta">${escapeHtml(t.project?.name || '')} · ${escapeHtml(t.user.name)}${t.manual.operationPace ? ' · ' + escapeHtml(t.manual.operationPace) : ''}</div>
+            <div class="task-meta">${escapeHtml(t.project?.name || '')} · ${escapeHtml(t.user.name)}${(function(){var p = formatPace(t.manual); return p ? ' · ' + escapeHtml(p) : '';})()}</div>
           </div>`;
         });
         if (allTasks.length > 5) {
@@ -1823,7 +1881,15 @@
       html += `<div class="info-card">`;
       html += `<div class="info-section"><div class="info-section-label" style="color:var(--primary)">${icons.target} <span style="text-transform:uppercase;letter-spacing:.05em">果たすべき責任（目的）</span></div><p style="font-weight:500;white-space:pre-wrap;font-size:13px">${escapeHtml(manual.purpose)}</p></div>`;
       html += `<div class="info-section"><div class="info-section-label">${icons.shield} <span>権限</span></div><p class="text-sm" style="white-space:pre-wrap">${manual.authority ? escapeHtml(manual.authority) : '<em style="color:var(--fg-muted2)">未設定</em>'}</p></div>`;
-      html += `<div class="info-section"><div class="info-section-label" style="color:#2563eb">${icons.clock} <span>稼働ペース</span></div><p class="text-sm">${manual.operationPace ? escapeHtml(manual.operationPace) : '<em style="color:var(--fg-muted2)">未設定</em>'}</p></div>`;
+      html += `<div class="info-section"><div class="info-section-label" style="color:#2563eb">${icons.clock} <span>稼働ペース</span></div>${(function(){
+        var tag = manual.paceTagId ? getPaceTag(manual.paceTagId) : null;
+        if (tag) {
+          var chip = '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:' + tag.color + '22;color:' + tag.color + ';font-size:12px;font-weight:500">' + escapeHtml(tag.name) + '</span>';
+          var sch = tag.isManual && manual.paceSchedule ? '<div class="text-sm" style="margin-top:4px">' + escapeHtml(formatSchedule(manual.paceSchedule)) + '</div>' : '';
+          return chip + sch;
+        }
+        return '<p class="text-sm">' + (manual.operationPace ? escapeHtml(manual.operationPace) : '<em style="color:var(--fg-muted2)">未設定</em>') + '</p>';
+      })()}</div>`;
       html += `<div class="info-section"><div class="info-section-label" style="color:#d97706">${icons.zap} <span>対応スピード</span></div><p class="text-sm">${manual.responseSpeed ? escapeHtml(manual.responseSpeed) : '<em style="color:var(--fg-muted2)">未設定</em>'}</p></div>`;
       html += `</div></aside>`;
       html += `</div></div>`;
@@ -1889,9 +1955,10 @@
         if (manual.authority) {
           html += '<div class="info-section"><div class="info-section-label">🛡 <span>権限</span></div><p class="text-sm" style="white-space:pre-wrap">' + escapeHtml(manual.authority) + '</p></div>';
         }
-        if (manual.operationPace || manual.responseSpeed) {
+        var paceText = formatPace(manual);
+        if (paceText || manual.responseSpeed) {
           html += '<div class="info-grid">';
-          html += '<div><div class="info-section-label" style="color:#2563eb">⏱ <span>稼働ペース</span></div><p class="text-sm">' + (manual.operationPace ? escapeHtml(manual.operationPace) : '<em style="color:var(--fg-muted2)">未設定</em>') + '</p></div>';
+          html += '<div><div class="info-section-label" style="color:#2563eb">⏱ <span>稼働ペース</span></div><p class="text-sm">' + (paceText ? escapeHtml(paceText) : '<em style="color:var(--fg-muted2)">未設定</em>') + '</p></div>';
           html += '<div><div class="info-section-label" style="color:#d97706">⚡ <span>対応スピード</span></div><p class="text-sm">' + (manual.responseSpeed ? escapeHtml(manual.responseSpeed) : '<em style="color:var(--fg-muted2)">未設定</em>') + '</p></div>';
           html += '</div>';
         }
@@ -1922,7 +1989,29 @@
         <textarea class="textarea" id="f-purpose" rows="4" placeholder="このマニュアルの果たすべき責任・目的を記述してください">${escapeHtml(existing?.purpose || '')}</textarea>
       </div></div>`;
       html += `<div class="form-group"><label class="label label-icon">${icons.shield} 権限</label><textarea class="textarea" id="f-authority" rows="3" placeholder="責任者に付与される権限の範囲">${escapeHtml(existing?.authority || '')}</textarea></div>`;
-      html += `<div class="form-group"><label class="label label-icon">${icons.clock} 稼働ペース</label><textarea class="textarea" id="f-pace" rows="2" placeholder="例：週5日、9:00-18:00">${escapeHtml(existing?.operationPace || '')}</textarea></div>`;
+      // Pace tag selector + manual schedule builder
+      const existingPaceTagId = existing?.paceTagId || null;
+      const existingSchedule = existing?.paceSchedule || {};
+      const paceTagsList = (data.paceTags || []);
+      html += `<div class="form-group"><label class="label label-icon">${icons.clock} 稼働ペース</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <select id="f-pace-tag" class="input" style="flex:1" onchange="onPaceTagChange()">
+            <option value="">未設定</option>
+            ${paceTagsList.map(t => `<option value="${t.id}" data-manual="${t.isManual ? 1 : 0}" ${existingPaceTagId === t.id ? 'selected' : ''}>${escapeHtml(t.name)}</option>`).join('')}
+          </select>
+          <button type="button" class="btn btn-outline btn-sm" onclick="showPaceTagDialog()" title="新しいタグを追加">+</button>
+        </div>
+        <div id="f-pace-schedule" style="margin-top:10px;padding:10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-muted);display:none">
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px">
+            <label class="pace-radio"><input type="radio" name="schedule-type" value="frequency" onchange="onScheduleTypeChange()"> 頻度</label>
+            <label class="pace-radio"><input type="radio" name="schedule-type" value="weekly" onchange="onScheduleTypeChange()"> 曜日指定</label>
+            <label class="pace-radio"><input type="radio" name="schedule-type" value="monthly" onchange="onScheduleTypeChange()"> 日付指定</label>
+            <label class="pace-radio"><input type="radio" name="schedule-type" value="daily" onchange="onScheduleTypeChange()"> 時刻指定</label>
+            <label class="pace-radio"><input type="radio" name="schedule-type" value="interval" onchange="onScheduleTypeChange()"> 時間間隔</label>
+          </div>
+          <div id="f-pace-schedule-fields" data-initial='${JSON.stringify(existingSchedule).replace(/'/g,"&#39;")}'></div>
+        </div>
+      </div>`;
       html += `<div class="form-group"><label class="label label-icon">${icons.zap} 対応スピード</label><textarea class="textarea" id="f-speed" rows="2" placeholder="例：問い合わせから24時間以内に対応">${escapeHtml(existing?.responseSpeed || '')}</textarea></div>`;
       html += `<div class="flex gap-2" style="margin-top:16px"><button class="btn btn-primary" onclick="submitManualForm(${isEdit ? pageParams.editId : 'null'},${pageParams.projectId || 'null'})">${isEdit ? '更新' : '作成'}</button><button class="btn btn-outline" onclick="${isEdit ? `navigate('manual-detail',{id:${pageParams.editId}})` : `navigate('project-detail',{id:${pageParams.projectId}})`}">キャンセル</button></div>`;
       html += `</aside>`;
@@ -1962,6 +2051,8 @@
           editor.innerHTML = window._pendingManualContent;
         }
         updateManualFormToc();
+        // Initialize pace schedule builder visibility/state
+        if (typeof onPaceTagChange === 'function') onPaceTagChange();
       }, 50);
       el.innerHTML = html;
     }
@@ -1991,6 +2082,122 @@
     }
 
     
+    // Pace tag selector + schedule builder
+    function onPaceTagChange() {
+      var sel = document.getElementById('f-pace-tag');
+      var box = document.getElementById('f-pace-schedule');
+      if (!sel || !box) return;
+      var opt = sel.options[sel.selectedIndex];
+      var isManual = opt && opt.getAttribute('data-manual') === '1';
+      box.style.display = isManual ? 'block' : 'none';
+      if (isManual) {
+        var fields = document.getElementById('f-pace-schedule-fields');
+        var initial = {};
+        try { initial = JSON.parse(fields.getAttribute('data-initial') || '{}'); } catch(e) {}
+        var type = initial.type || 'frequency';
+        var radio = document.querySelector('input[name="schedule-type"][value="' + type + '"]');
+        if (radio) radio.checked = true;
+        renderScheduleFields(type, initial);
+      }
+    }
+    function onScheduleTypeChange() {
+      var r = document.querySelector('input[name="schedule-type"]:checked');
+      if (r) renderScheduleFields(r.value, {});
+    }
+    function renderScheduleFields(type, s) {
+      var el = document.getElementById('f-pace-schedule-fields');
+      if (!el) return;
+      s = s && s.type === type ? s : {};
+      var html = '';
+      if (type === 'frequency') {
+        html += '<div style="display:flex;gap:6px;align-items:center;font-size:13px">1<select class="input" id="s-freq-unit" style="width:auto"><option value="day"' + (s.unit==='day'?' selected':'') + '>日</option><option value="week"' + ((!s.unit||s.unit==='week')?' selected':'') + '>週</option><option value="month"' + (s.unit==='month'?' selected':'') + '>ヶ月</option></select>に<input class="input" id="s-freq-count" type="number" min="1" max="99" style="width:60px" value="' + (s.count || 1) + '">回</div>';
+      } else if (type === 'weekly') {
+        var dayNames = ['日','月','火','水','木','金','土'];
+        var picked = s.days || [];
+        html += '<div style="display:flex;gap:4px;margin-bottom:6px">';
+        for (var i = 0; i < 7; i++) {
+          var on = picked.indexOf(i) >= 0;
+          html += '<label class="pace-day' + (on ? ' on' : '') + '"><input type="checkbox" value="' + i + '" ' + (on ? 'checked' : '') + ' onchange="this.parentElement.classList.toggle(\'on\', this.checked)" style="display:none">' + dayNames[i] + '</label>';
+        }
+        html += '</div>';
+        html += '<div style="display:flex;gap:6px;align-items:center;font-size:13px">時刻:<input class="input" id="s-week-time" type="time" value="' + (s.time || '') + '" style="width:auto"></div>';
+      } else if (type === 'monthly') {
+        html += '<div style="display:flex;gap:6px;align-items:center;font-size:13px">毎月<input class="input" id="s-month-day" type="number" min="1" max="31" style="width:60px" value="' + (s.day || 1) + '">日 <input class="input" id="s-month-time" type="time" value="' + (s.time || '') + '" style="width:auto"></div>';
+      } else if (type === 'daily') {
+        html += '<div id="s-daily-times" style="display:flex;flex-direction:column;gap:4px">';
+        var times = (s.times && s.times.length) ? s.times : [''];
+        times.forEach(function(t, idx) {
+          html += '<div class="s-daily-row" style="display:flex;gap:4px;align-items:center"><input class="input s-daily-time" type="time" value="' + escapeHtml(t) + '" style="width:auto"><button type="button" class="btn btn-ghost btn-sm" onclick="this.parentElement.remove()">×</button></div>';
+        });
+        html += '</div><button type="button" class="btn btn-outline btn-sm" style="margin-top:6px;font-size:12px" onclick="addDailyTimeRow()">+ 時刻を追加</button>';
+      } else if (type === 'interval') {
+        html += '<div style="display:flex;gap:6px;align-items:center;font-size:13px"><input class="input" id="s-interval-hours" type="number" min="1" max="24" style="width:60px" value="' + (s.hours || 1) + '">時間おき</div>';
+      }
+      el.innerHTML = html;
+    }
+    function addDailyTimeRow() {
+      var container = document.getElementById('s-daily-times');
+      if (!container) return;
+      var div = document.createElement('div');
+      div.className = 's-daily-row';
+      div.style.cssText = 'display:flex;gap:4px;align-items:center';
+      div.innerHTML = '<input class="input s-daily-time" type="time" value="" style="width:auto"><button type="button" class="btn btn-ghost btn-sm" onclick="this.parentElement.remove()">×</button>';
+      container.appendChild(div);
+    }
+    function collectPaceSchedule() {
+      var r = document.querySelector('input[name="schedule-type"]:checked');
+      if (!r) return null;
+      var type = r.value;
+      if (type === 'frequency') {
+        return { type: 'frequency', unit: document.getElementById('s-freq-unit').value, count: Number(document.getElementById('s-freq-count').value) || 1 };
+      }
+      if (type === 'weekly') {
+        var days = Array.from(document.querySelectorAll('.pace-day input[type="checkbox"]:checked')).map(function(c){ return Number(c.value); });
+        return { type: 'weekly', days: days, time: document.getElementById('s-week-time').value || '' };
+      }
+      if (type === 'monthly') {
+        return { type: 'monthly', day: Number(document.getElementById('s-month-day').value) || 1, time: document.getElementById('s-month-time').value || '' };
+      }
+      if (type === 'daily') {
+        var times = Array.from(document.querySelectorAll('.s-daily-time')).map(function(i){ return i.value; }).filter(Boolean);
+        return { type: 'daily', times: times };
+      }
+      if (type === 'interval') {
+        return { type: 'interval', hours: Number(document.getElementById('s-interval-hours').value) || 1 };
+      }
+      return null;
+    }
+    function showPaceTagDialog() {
+      var bodyHtml = '<div class="form-group"><label>タグ名</label><input type="text" class="input" id="pace-tag-name" placeholder="例: 隔週"></div>'
+        + '<div class="form-group"><label>色</label><input type="color" id="pace-tag-color" value="#8b5cf6"></div>'
+        + '<div class="form-group"><label><input type="checkbox" id="pace-tag-manual"> 手動スケジュールで詳細指定</label></div>';
+      showModal('新しい稼働ペースタグ', bodyHtml, [
+        { label: 'キャンセル', class: 'btn-outline', onClick: function(ov) { ov.remove(); } },
+        { label: '作成', class: 'btn-primary', onClick: function(ov) {
+          var name = document.getElementById('pace-tag-name').value.trim();
+          if (!name) { toast('タグ名を入力してください'); return; }
+          var color = document.getElementById('pace-tag-color').value;
+          var isManual = document.getElementById('pace-tag-manual').checked;
+          if (!data.paceTags) data.paceTags = [];
+          if (!data.nextPaceTagId) data.nextPaceTagId = (data.paceTags.reduce(function(m,t){return Math.max(m,t.id)},0) || 0) + 1;
+          var newTag = { id: data.nextPaceTagId++, name: name, color: color };
+          if (isManual) newTag.isManual = true;
+          data.paceTags.push(newTag);
+          saveData();
+          // Add option to select and choose it
+          var sel = document.getElementById('f-pace-tag');
+          var opt = document.createElement('option');
+          opt.value = newTag.id;
+          opt.textContent = newTag.name;
+          opt.setAttribute('data-manual', isManual ? '1' : '0');
+          sel.appendChild(opt);
+          sel.value = String(newTag.id);
+          onPaceTagChange();
+          ov.remove();
+          toast('タグを追加しました');
+        }}
+      ]);
+    }
     function manualFormExecCmd(type) {
       var editor = document.getElementById('f-roadmap-editor');
       if (!editor) return;
@@ -2027,7 +2234,10 @@
       const title = document.getElementById('f-title').value.trim();
       const purpose = document.getElementById('f-purpose').value.trim();
       const authority = document.getElementById('f-authority').value.trim();
-      const pace = document.getElementById('f-pace').value.trim();
+      const paceTagSel = document.getElementById('f-pace-tag');
+      const paceTagId = paceTagSel && paceTagSel.value ? Number(paceTagSel.value) : null;
+      const paceTag = paceTagId ? getPaceTag(paceTagId) : null;
+      const paceSchedule = (paceTag && paceTag.isManual) ? collectPaceSchedule() : null;
       const speed = document.getElementById('f-speed').value.trim();
       const roadmapEditor = document.getElementById('f-roadmap-editor');
       const roadmap = roadmapEditor ? roadmapEditor.innerHTML : '';
@@ -2037,23 +2247,28 @@
         if (m) {
           // Save snapshot to history before overwriting
           if (!m.history) m.history = [];
-          var changed = m.title !== title || m.purpose !== purpose || m.authority !== authority || m.operationPace !== pace || m.responseSpeed !== speed || m.taskRoadmap !== roadmap;
+          var prevScheduleStr = JSON.stringify(m.paceSchedule || null);
+          var newScheduleStr = JSON.stringify(paceSchedule || null);
+          var changed = m.title !== title || m.purpose !== purpose || m.authority !== authority || m.paceTagId !== paceTagId || prevScheduleStr !== newScheduleStr || m.responseSpeed !== speed || m.taskRoadmap !== roadmap;
           if (changed) {
             m.history.push({
               ts: Date.now(),
               title: m.title, purpose: m.purpose, authority: m.authority,
+              paceTagId: m.paceTagId, paceSchedule: m.paceSchedule,
               operationPace: m.operationPace, responseSpeed: m.responseSpeed,
               taskRoadmap: m.taskRoadmap
             });
             // Keep last 50 versions only
             if (m.history.length > 50) m.history = m.history.slice(-50);
           }
-          Object.assign(m, { title, purpose, authority, operationPace: pace, responseSpeed: speed, taskRoadmap: roadmap });
+          Object.assign(m, { title, purpose, authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap });
+          // Clear legacy operationPace when using new tag system
+          if (paceTagId) m.operationPace = '';
           saveData(); toast('マニュアルを更新しました'); navigate('manual-detail', { id: editId });
         }
       } else {
         const id = data.nextManualId++;
-        data.manuals.push({ id, projectId, title, purpose, authority, operationPace: pace, responseSpeed: speed, taskRoadmap: roadmap, history: [], createdBy: 0 });
+        data.manuals.push({ id, projectId, title, purpose, authority, paceTagId: paceTagId, paceSchedule: paceSchedule, operationPace: '', responseSpeed: speed, taskRoadmap: roadmap, history: [], createdBy: 0 });
         saveData(); toast('マニュアルを作成しました'); navigate('manual-detail', { id });
       }
     }
@@ -2150,7 +2365,7 @@
           <div class="flex items-center gap-2 mb-2"><span style="font-weight:600;font-size:13px;word-break:break-word">${escapeHtml(t.manual.title)}</span></div>
           <div class="purpose-box mb-2"><div class="flex items-center gap-2">${icons.target}<p class="text-sm" style="word-break:break-word">${escapeHtml(t.manual.purpose)}</p></div></div>
           <div class="flex items-center gap-3 text-xs" style="color:var(--fg-muted);flex-wrap:wrap">${icons.folder} ${escapeHtml(project?.name || '')}
-            ${t.manual.operationPace ? `<span class="badge badge-outline">${escapeHtml(t.manual.operationPace)}</span>` : ''}
+            ${(function(){var p = formatPace(t.manual); return p ? `<span class="badge badge-outline">${escapeHtml(p)}</span>` : '';})()}
             ${t.manual.responseSpeed ? `<span class="badge badge-outline">${escapeHtml(t.manual.responseSpeed)}</span>` : ''}
           </div>
         </div>`;
@@ -2464,7 +2679,7 @@
     // Cloud sync via jsonblob.com
     var SYNC_URL = '/api/sync';
     var syncDebounce = null;
-    var SYNC_KEYS = ['users','projects','manuals','goals','todos','dailyTasks','tags','permissions','assignees','nextId','nextTodoId','nextProjectId','nextManualId','nextGoalId','nextTagId','nextUserId','nextDailyId','projectTasks','nextProjectTaskId'];
+    var SYNC_KEYS = ['users','projects','manuals','goals','todos','dailyTasks','tags','paceTags','permissions','assignees','nextId','nextTodoId','nextProjectId','nextManualId','nextGoalId','nextTagId','nextPaceTagId','nextUserId','nextDailyId','projectTasks','nextProjectTaskId'];
 
     // Push local data to remote (debounced)
     function pushSync() {
