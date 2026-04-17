@@ -198,8 +198,12 @@
     .doc-assignees{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:32px}
     /* Prose content */
     .prose{line-height:1.8;color:var(--fg)}
+    .prose h1{font-size:24px;font-weight:700;margin:40px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--border);scroll-margin-top:20px}
     .prose h2{font-size:20px;font-weight:600;margin:32px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--border);scroll-margin-top:20px}
     .prose h3{font-size:17px;font-weight:600;margin:24px 0 6px;scroll-margin-top:20px}
+    .prose blockquote{border-left:3px solid var(--primary);padding:12px 16px;margin:12px 0;color:var(--fg-muted);background:var(--bg-muted);border-radius:0 var(--radius) var(--radius) 0;white-space:pre-wrap}
+    .prose blockquote p{margin:4px 0}
+    .prose mark{background:#FEF08A;padding:2px 6px;border-radius:3px;font-weight:500}
     .prose p{margin:8px 0}
     .prose ul,.prose ol{padding-left:24px;margin:8px 0}
     .prose li{margin:4px 0}
@@ -1818,13 +1822,14 @@
         const content = document.getElementById('manual-content');
         const tocLinks = document.getElementById('toc-links');
         if (!content || !tocLinks) return;
-        const headings = content.querySelectorAll('h2,h3');
+        const headings = content.querySelectorAll('h1,h2,h3');
         headings.forEach((h, i) => {
           h.id = `heading-${i}`;
           const a = document.createElement('a');
           a.href = `#heading-${i}`;
           a.textContent = h.textContent;
-          a.style.paddingLeft = h.tagName === 'H3' ? '16px' : '0';
+          a.style.paddingLeft = h.tagName === 'H3' ? '16px' : (h.tagName === 'H2' ? '0' : '0');
+          a.style.fontWeight = h.tagName === 'H1' ? '600' : '400';
           tocLinks.appendChild(a);
         });
       }, 50);
@@ -1915,6 +1920,7 @@
       html += `<main>`;
       html += `<div class="form-group"><label class="label label-icon">${icons.book} マニュアル</label>
       <div class="memo-toolbar">
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('h1')" title="見出し1">H1</button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('h2')" title="見出し2">H2</button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('h3')" title="見出し3">H3</button>
         <div class="memo-toolbar-sep"></div>
@@ -1980,6 +1986,7 @@
       if (!editor) return;
       editor.focus();
       switch(type) {
+        case 'h1': document.execCommand('formatBlock', false, 'h1'); break;
         case 'h2': document.execCommand('formatBlock', false, 'h2'); break;
         case 'h3': document.execCommand('formatBlock', false, 'h3'); break;
         case 'bold': document.execCommand('bold'); break;
