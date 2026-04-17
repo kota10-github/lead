@@ -132,7 +132,7 @@
     .memo-toolbar-sep{width:1px;height:20px;background:var(--border);margin:0 4px}
     .memo-rich-editor a{color:var(--primary);text-decoration:underline;cursor:pointer}
     .memo-rich-editor a:hover{opacity:.7}
-    .memo-rich-editor{width:100%;min-height:250px;padding:16px;border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius);font-family:var(--font);font-size:14px;line-height:1.8;background:var(--bg);outline:none;overflow-y:auto;white-space:pre-wrap;word-wrap:break-word}
+    .memo-rich-editor{width:100%;min-height:500px;padding:16px;border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius);font-family:var(--font);font-size:14px;line-height:1.8;background:var(--bg);outline:none;overflow-y:auto;white-space:pre-wrap;word-wrap:break-word;resize:vertical}
     .memo-rich-editor:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
     .memo-rich-editor:empty::before{content:attr(data-placeholder);color:var(--fg-muted);pointer-events:none}
     .memo-rich-editor h1{font-size:22px;font-weight:700;margin:12px 0 6px;padding-bottom:6px;border-bottom:2px solid var(--border)}
@@ -1476,7 +1476,60 @@
         </select>
         ${currentTag ? '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:'+currentTag.color+'"></span>' : ''}
       </div>`;
-      // Memo section
+      // Manuals section
+      if (manuals.length > 0 || subProjects.length > 0) {
+        html += `<div style="margin-top:8px;margin-bottom:16px"><h3 style="font-size:15px;font-weight:600;margin-bottom:12px">マニュアル・サブプロジェクト</h3>`;
+        html += `<div class="grid grid-2">`;
+        subProjects.forEach(sp => {
+          html += `<div class="card" onclick="navigate('project-detail',{id:${sp.id}})" style="cursor:pointer;border-left:3px solid var(--primary)">
+            <div class="card-header"><div class="flex items-center gap-2">${icons.folder}<span class="card-title">${escapeHtml(sp.name)}</span></div></div>
+            <div class="card-body">${sp.description ? `<p class="text-sm" style="color:var(--fg-muted)">${escapeHtml(sp.description)}</p>` : ''}</div>
+          </div>`;
+        });
+        manuals.forEach(m => {
+          const assignees = getAssigneesForManual(m.id);
+          html += `<div class="card" onclick="navigate('manual-detail',{id:${m.id}})" style="cursor:pointer">
+            <div class="card-header"><div class="flex items-center gap-2">${icons.book}<span class="card-title">${escapeHtml(m.title)}</span></div></div>
+            <div class="card-body"><div class="purpose-box"><div class="purpose-label">${icons.target} 果たすべき責任（目的）</div><p class="text-sm line-clamp-2">${escapeHtml(m.purpose)}</p></div></div>
+          </div>`;
+        });
+        html += `</div></div>`;
+      }
+      // Project tasks section
+      var pTasks = getTasksByProject(project.id);
+      html += `<div class="card mb-4"><div class="card-header"><span class="text-xs" style="font-weight:600;color:var(--fg-muted)">タスク <span class="badge badge-secondary">${pTasks.length}</span></span><button class="btn btn-primary btn-sm" onclick="showAddProjectTask(${project.id})" style="margin-left:auto">${icons.plus} タスク追加</button></div><div class="card-body">`;
+      if (pTasks.length === 0) {
+        html += `<div style="text-align:center;padding:12px;color:var(--fg-muted);font-size:13px">タスクがありません</div>`;
+      } else {
+        pTasks.forEach(function(t) {
+          html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="navigate('task-detail',{id:${t.id}})">`;
+          html += `<div class="todo-checkbox ${t.done ? 'checked' : ''}" style="width:28px;height:28px" onclick="event.stopPropagation();expandProjectTaskActions(this,${t.id},${t.done})">${t.done ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>'}</div>`;
+          html += `<span style="flex:1;font-size:14px;${t.done ? 'text-decoration:line-through;opacity:.5' : ''}">${escapeHtml(t.title)}${dueBadgeHtml(t)}</span>`;
+          html += `</div>`;
+        });
+      }
+      html += `</div></div>`;
+      // File upload section
+      html += `<div class="project-files-area">
+        <h3>📎 資料・ファイル</h3>
+        <div class="file-upload-zone" id="file-upload-zone" onclick="document.getElementById('file-input').click()">
+          クリックまたはドラッグ＆ドロップでファイルをアップロード
+          <input type="file" id="file-input" multiple style="display:none" onchange="handleFileUpload(${project.id}, this.files)">
+        </div>
+        <div class="file-list" id="file-list">`;
+      project.files.forEach((f, fi) => {
+        const isImage = f.type && f.type.startsWith('image/');
+        html += `<div class="file-item">
+          ${isImage ? `<img src="${f.dataUrl}" class="file-item-preview">` : ''}
+          <span class="file-item-name">${escapeHtml(f.name)}</span>
+          <span class="file-item-size">${formatFileSize(f.size)}</span>
+          ${isImage ? `<span class="file-item-delete" onclick="window.open('${f.dataUrl}','_blank')" title="開く">${icons.external}</span>` : ''}
+          <span class="file-item-delete" onclick="deleteProjectFile(${project.id},${fi})" title="削除">${icons.x}</span>
+        </div>`;
+      });
+      html += `</div></div>`;
+      html += `<div style="margin-top:8px;margin-bottom:16px"><button class="btn btn-ghost btn-sm" onclick="showProjectDialog(${project.id})" style="color:var(--primary)">+ サブプロジェクト追加</button></div>`;
+      // Memo section (moved to bottom with bigger area)
       html += `<div class="project-memo-area">
         <h3>📝 メモ・思考整理</h3>
         <div class="memo-toolbar">
@@ -1502,60 +1555,6 @@
       </div>`;
       // Load memo into rich editor after render
       setTimeout(function() { loadMemoToEditor(project.id); }, 0);
-      // File upload section
-      html += `<div class="project-files-area">
-        <h3>📎 資料・ファイル</h3>
-        <div class="file-upload-zone" id="file-upload-zone" onclick="document.getElementById('file-input').click()">
-          クリックまたはドラッグ＆ドロップでファイルをアップロード
-          <input type="file" id="file-input" multiple style="display:none" onchange="handleFileUpload(${project.id}, this.files)">
-        </div>
-        <div class="file-list" id="file-list">`;
-      project.files.forEach((f, fi) => {
-        const isImage = f.type && f.type.startsWith('image/');
-        html += `<div class="file-item">
-          ${isImage ? `<img src="${f.dataUrl}" class="file-item-preview">` : ''}
-          <span class="file-item-name">${escapeHtml(f.name)}</span>
-          <span class="file-item-size">${formatFileSize(f.size)}</span>
-          ${isImage ? `<span class="file-item-delete" onclick="window.open('${f.dataUrl}','_blank')" title="開く">${icons.external}</span>` : ''}
-          <span class="file-item-delete" onclick="deleteProjectFile(${project.id},${fi})" title="削除">${icons.x}</span>
-        </div>`;
-      });
-      html += `</div></div>`;
-      // Manuals section
-      if (manuals.length > 0 || subProjects.length > 0) {
-        html += `<div style="margin-top:24px"><h3 style="font-size:15px;font-weight:600;margin-bottom:12px">マニュアル・サブプロジェクト</h3>`;
-        html += `<div class="grid grid-2">`;
-        subProjects.forEach(sp => {
-          html += `<div class="card" onclick="navigate('project-detail',{id:${sp.id}})" style="cursor:pointer;border-left:3px solid var(--primary)">
-            <div class="card-header"><div class="flex items-center gap-2">${icons.folder}<span class="card-title">${escapeHtml(sp.name)}</span></div></div>
-            <div class="card-body">${sp.description ? `<p class="text-sm" style="color:var(--fg-muted)">${escapeHtml(sp.description)}</p>` : ''}</div>
-          </div>`;
-        });
-        manuals.forEach(m => {
-          const assignees = getAssigneesForManual(m.id);
-          html += `<div class="card" onclick="navigate('manual-detail',{id:${m.id}})" style="cursor:pointer">
-            <div class="card-header"><div class="flex items-center gap-2">${icons.book}<span class="card-title">${escapeHtml(m.title)}</span></div></div>
-            <div class="card-body"><div class="purpose-box"><div class="purpose-label">${icons.target} 果たすべき責任（目的）</div><p class="text-sm line-clamp-2">${escapeHtml(m.purpose)}</p></div></div>
-          </div>`;
-        });
-        html += `</div></div>`;
-      }
-      // Project tasks section
-      var pTasks = getTasksByProject(project.id);
-      html += `<div class="card mb-4"><div class="card-header"><span class="text-xs" style="font-weight:600;color:var(--fg-muted)">タスク <span class="badge badge-secondary">${pTasks.length}</span></span><button class="btn btn-primary btn-sm" onclick="showAddProjectTask(${project.id})" style="margin-left:auto">${icons.plus} タスク追加</button></div><div class="card-body">`;
-      if (pTasks.length === 0) {
-        html += `<div style="text-align:center;padding:12px;color:var(--fg-muted);font-size:13px">タスクがありません</div>`;
-      } else {
-        pTasks.forEach(function(t) {
-          html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">`;
-          html += `<div class="todo-checkbox ${t.done ? 'checked' : ''}" style="width:28px;height:28px" onclick="event.stopPropagation();expandProjectTaskActions(this,${t.id},${t.done})">${t.done ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>'}</div>`;
-          html += `<span style="flex:1;font-size:14px;${t.done ? 'text-decoration:line-through;opacity:.5' : ''}">${escapeHtml(t.title)}</span>`;
-          html += `</div>`;
-        });
-      }
-      html += `</div></div>`;
-
-      html += `<div style="margin-top:16px"><button class="btn btn-ghost btn-sm" onclick="showProjectDialog(${project.id})" style="color:var(--primary)">+ サブプロジェクト追加</button></div>`;
       el.innerHTML = html;
       // Setup drag & drop
       const zone = document.getElementById('file-upload-zone');
