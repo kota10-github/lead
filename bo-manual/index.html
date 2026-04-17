@@ -119,6 +119,8 @@
     .node-project-standalone[draggable="true"],.node-manual[draggable="true"],.node-root[draggable]{cursor:grab}
     .node-project-standalone[draggable="true"]:active,.node-manual[draggable="true"]:active{cursor:grabbing}
     .drop-target{outline:3px dashed #2563eb!important;outline-offset:4px;background:rgba(37,99,235,.08)!important}
+    .drop-before{box-shadow:0 -3px 0 0 #2563eb!important}
+    .drop-after{box-shadow:0 3px 0 0 #2563eb!important}
     .dragging-source{opacity:.4}
     .project-col{display:flex;flex-direction:column;gap:12px}
     .project-branch{display:flex;align-items:flex-start;gap:16px}
@@ -1291,12 +1293,12 @@
         html += `<div class="breadcrumb"><span class="breadcrumb-item" onclick="navigate('home')">マップ</span></div>`;
         html += `<div class="mindmap-viewport" id="mindmap-viewport"><svg class="mindmap-svg" id="mindmap-svg"></svg>`;
         html += `<div class="mindmap-inner" id="mindmap-inner" style="transform:scale(${mapZoom})">`;
-        html += `<div style="display:flex;flex-direction:column;justify-content:center;padding-top:32px"><div class="node-root" data-node="root" ondragover="event.preventDefault();this.classList.add('drop-target')" ondragleave="this.classList.remove('drop-target')" ondrop="handleProjectDrop(event,null)">BOチーム</div><button class="map-add-btn" onclick="showProjectDialog()">+ プロジェクト追加</button></div>`;
+        html += `<div style="display:flex;flex-direction:column;justify-content:center;padding-top:32px"><div class="node-root" data-node="root" ondragover="event.preventDefault();this.classList.add('drop-target')" ondragleave="this.classList.remove('drop-target','drop-before','drop-after')" ondrop="handleProjectDrop(event,null)">BOチーム</div><button class="map-add-btn" onclick="showProjectDialog()">+ プロジェクト追加</button></div>`;
         html += `<div class="project-col">`;
         projects.forEach((proj, pi) => {
           const c = getProjectColor(proj.projectId);
           html += `<div class="project-branch">`;
-          html += `<div class="node-project-standalone" data-node="proj-${proj.projectId}" draggable="true" ondragstart="handleProjectDragStart(event,${proj.projectId})" ondragend="handleProjectDragEnd(event)" ondragover="handleProjectDragOver(event,${proj.projectId})" ondragleave="this.classList.remove('drop-target')" ondrop="handleProjectDrop(event,${proj.projectId})" style="border-color:${c.bg};background:${c.light};color:${c.text}" onclick="navigate('project-detail',{id:${proj.projectId}})">`;
+          html += `<div class="node-project-standalone" data-node="proj-${proj.projectId}" draggable="true" ondragstart="handleProjectDragStart(event,${proj.projectId})" ondragend="handleProjectDragEnd(event)" ondragover="handleProjectDragOver(event,${proj.projectId})" ondragleave="this.classList.remove('drop-target','drop-before','drop-after')" ondrop="handleProjectDrop(event,${proj.projectId})" style="border-color:${c.bg};background:${c.light};color:${c.text}" onclick="navigate('project-detail',{id:${proj.projectId}})">`;
           var projTasks = getTasksByProject(proj.projectId);
           html += `<div style="font-weight:600">${escapeHtml(proj.projectName)}<span style="opacity:.6;font-size:11px;margin-left:4px">(${proj.manuals.length + projTasks.length})</span></div>`;
           html += `<div class="project-items-col">`;
@@ -1335,7 +1337,7 @@
           var spTasks = getTasksByProject(sp.projectId);
           html += '<div class="sub-tree-row">';
           html += '<div class="sub-tree-card-wrap">';
-          html += `<div class="node-manual" data-node="sp-${sp.projectId}" draggable="true" ondragstart="handleProjectDragStart(event,${sp.projectId})" ondragend="handleProjectDragEnd(event)" ondragover="handleProjectDragOver(event,${sp.projectId})" ondragleave="this.classList.remove('drop-target')" ondrop="handleProjectDrop(event,${sp.projectId})" onclick="navigate('project-detail',{id:${sp.projectId}})" style="border-left:3px solid ${sc.bg};background:${sc.light}"><div class="node-manual-title" style="color:${sc.bg}">${escapeHtml(sp.projectName)}</div>`;
+          html += `<div class="node-manual" data-node="sp-${sp.projectId}" draggable="true" ondragstart="handleProjectDragStart(event,${sp.projectId})" ondragend="handleProjectDragEnd(event)" ondragover="handleProjectDragOver(event,${sp.projectId})" ondragleave="this.classList.remove('drop-target','drop-before','drop-after')" ondrop="handleProjectDrop(event,${sp.projectId})" onclick="navigate('project-detail',{id:${sp.projectId}})" style="border-left:3px solid ${sc.bg};background:${sc.light}"><div class="node-manual-title" style="color:${sc.bg}">${escapeHtml(sp.projectName)}</div>`;
           html += `<div class="node-manual-purpose">${sp.subProjects.length > 0 ? '<span style="opacity:.6;font-size:10px">' + sp.subProjects.length + '件のサブ</span>' : ''}${spTasks.length > 0 ? '<span style="opacity:.6;font-size:10px;margin-left:4px">' + spTasks.filter(function(t){return t.done}).length + '/' + spTasks.length + ' タスク</span>' : ''}</div></div>`;
           html += '</div>'; // close sub-tree-card-wrap
           // Tasks and children to the right
@@ -1385,7 +1387,15 @@
       function handleProjectDragEnd(e) {
         e.currentTarget.classList.remove('dragging-source');
         window._draggingProjectId = null;
-        document.querySelectorAll('.drop-target').forEach(function(el) { el.classList.remove('drop-target'); });
+        document.querySelectorAll('.drop-target,.drop-before,.drop-after').forEach(function(el) { el.classList.remove('drop-target','drop-before','drop-after'); });
+      }
+      function getDropZone(e, el) {
+        var rect = el.getBoundingClientRect();
+        var y = e.clientY - rect.top;
+        var h = rect.height;
+        if (y < h * 0.25) return 'before';
+        if (y > h * 0.75) return 'after';
+        return 'inside';
       }
       function handleProjectDragOver(e, targetId) {
         var dragged = window._draggingProjectId;
@@ -1394,20 +1404,43 @@
         e.preventDefault();
         e.stopPropagation();
         e.dataTransfer.dropEffect = 'move';
-        e.currentTarget.classList.add('drop-target');
+        var el = e.currentTarget;
+        var zone = getDropZone(e, el);
+        el.classList.remove('drop-target','drop-before','drop-after');
+        if (zone === 'before') el.classList.add('drop-before');
+        else if (zone === 'after') el.classList.add('drop-after');
+        else el.classList.add('drop-target');
       }
       function handleProjectDrop(e, targetId) {
         e.preventDefault();
         e.stopPropagation();
-        e.currentTarget.classList.remove('drop-target');
+        var el = e.currentTarget;
+        var zone = targetId ? getDropZone(e, el) : 'inside';
+        el.classList.remove('drop-target','drop-before','drop-after');
         var draggedId = Number(e.dataTransfer.getData('text/plain'));
         if (!draggedId || draggedId === targetId) return;
         if (targetId && isDescendantProject(draggedId, targetId)) { toast('循環構造は作れません'); return; }
         var proj = getProject(draggedId);
         if (!proj) return;
-        proj.parentId = targetId || null;
+        if (zone === 'inside') {
+          // Make child of target (or root if targetId null)
+          proj.parentId = targetId || null;
+          // Move to end of its new parent's children in array
+          var idx = data.projects.indexOf(proj);
+          if (idx >= 0) { data.projects.splice(idx, 1); data.projects.push(proj); }
+        } else {
+          // Reorder as sibling of target
+          var target = getProject(targetId);
+          if (!target) return;
+          proj.parentId = target.parentId != null ? target.parentId : null;
+          var fromIdx = data.projects.indexOf(proj);
+          if (fromIdx >= 0) data.projects.splice(fromIdx, 1);
+          var toIdx = data.projects.indexOf(target);
+          if (zone === 'after') toIdx += 1;
+          data.projects.splice(toIdx, 0, proj);
+        }
         saveData();
-        toast('プロジェクトを移動しました');
+        toast(zone === 'inside' ? 'プロジェクトを移動しました' : '並び順を変更しました');
         render();
       }
       window.handleProjectDragStart = handleProjectDragStart;
