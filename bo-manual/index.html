@@ -1603,62 +1603,60 @@
         <a href="#sec-tasks">タスク</a>
         <a href="#sec-files">資料・ファイル</a>
         <a href="#sec-memo">メモ・思考整理</a>
-        <div id="memo-toc" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"></div>
+        <div id="memo-toc" style="margin-top:12px"></div>
       </aside>`;
       // Main doc
       html += `<main class="doc-main">`;
       html += renderBreadcrumb();
       html += `<h1 class="doc-title editable-title" contenteditable="true" id="proj-title-edit" onblur="saveProjectTitleInline(${project.id})" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">${escapeHtml(project.name)}</h1>`;
       html += `<p class="editable-desc" contenteditable="true" id="proj-desc-edit" data-placeholder="説明を追加..." onblur="saveProjectDescInline(${project.id})" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur()}" style="color:var(--fg-muted);margin-bottom:16px">${project.description ? escapeHtml(project.description) : ''}</p>`;
-      // Overview info-card: tag
-      html += `<div class="info-card" id="sec-overview">
-        <div class="info-section">
-          <div class="info-section-label"><span>タグ</span></div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <select id="proj-tag-select" onchange="changeProjectTag(${project.id}, this.value)" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--card);cursor:pointer">
-              <option value="">タグなし</option>
-              ${(data.tags||[]).map(t=>'<option value="'+t.id+'"'+(project.tagId===t.id?' selected':'')+' style="color:'+t.color+'">'+escapeHtml(t.name)+'</option>').join('')}
-            </select>
-            ${currentTag ? '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:'+currentTag.color+'"></span>' : ''}
-          </div>
-        </div>
+      // Overview: inline tag
+      html += `<div id="sec-overview" style="display:flex;align-items:center;gap:8px;margin-bottom:24px;font-size:13px;color:var(--fg-muted)">
+        <span>タグ</span>
+        <select id="proj-tag-select" onchange="changeProjectTag(${project.id}, this.value)" style="padding:2px 6px;border:none;background:transparent;color:var(--fg);font-size:13px;cursor:pointer">
+          <option value="">なし</option>
+          ${(data.tags||[]).map(t=>'<option value="'+t.id+'"'+(project.tagId===t.id?' selected':'')+'>'+escapeHtml(t.name)+'</option>').join('')}
+        </select>
+        ${currentTag ? '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+currentTag.color+'"></span>' : ''}
       </div>`;
       // Section: Manuals & sub-projects
-      html += `<h2 id="sec-children" class="doc-section-title" style="font-size:20px;font-weight:600;margin:32px 0 12px;padding-bottom:4px;border-bottom:1px solid var(--border)">マニュアル・サブプロジェクト <span class="badge badge-secondary" style="font-size:11px">${manuals.length + subProjects.length}</span></h2>`;
+      html += `<h2 id="sec-children" class="doc-section-title" style="font-size:15px;font-weight:600;color:var(--fg-muted);margin:32px 0 8px">マニュアル・サブプロジェクト${(manuals.length + subProjects.length) > 0 ? ' <span style="color:var(--fg-muted2);font-weight:400">' + (manuals.length + subProjects.length) + '</span>' : ''}</h2>`;
       if (manuals.length === 0 && subProjects.length === 0) {
-        html += `<p style="color:var(--fg-muted2);font-size:13px;font-style:italic">まだありません</p>`;
+        html += `<p style="color:var(--fg-muted2);font-size:13px">—</p>`;
       } else {
+        html += `<div style="display:flex;flex-direction:column">`;
         subProjects.forEach(sp => {
-          html += `<div class="card mb-2" onclick="navigate('project-detail',{id:${sp.id}})" style="cursor:pointer;border-left:3px solid var(--primary);padding:10px 14px">
-            <div class="flex items-center gap-2">${icons.folder}<span style="font-size:13px;font-weight:500">${escapeHtml(sp.name)}</span></div>
+          html += `<div onclick="navigate('project-detail',{id:${sp.id}})" style="cursor:pointer;padding:8px 0;display:flex;align-items:center;gap:8px;font-size:14px" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color=''">
+            <span style="color:var(--fg-muted2);font-size:12px">▸</span><span>${escapeHtml(sp.name)}</span>
           </div>`;
         });
         manuals.forEach(m => {
-          html += `<div class="card mb-2" onclick="navigate('manual-detail',{id:${m.id}})" style="cursor:pointer;padding:10px 14px">
-            <div class="flex items-center gap-2">${icons.book}<span style="font-size:13px;font-weight:500">${escapeHtml(m.title)}</span></div>
+          html += `<div onclick="navigate('manual-detail',{id:${m.id}})" style="cursor:pointer;padding:8px 0;display:flex;align-items:center;gap:8px;font-size:14px" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color=''">
+            <span style="color:var(--fg-muted2);font-size:12px">•</span><span>${escapeHtml(m.title)}</span>
           </div>`;
         });
+        html += `</div>`;
       }
-      html += `<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-        <button class="btn btn-ghost btn-sm" onclick="navigate('manual-form',{projectId:${project.id}})" style="color:var(--primary);font-size:12px">+ マニュアル作成</button>
-        <button class="btn btn-ghost btn-sm" onclick="showProjectDialog(${project.id})" style="color:var(--primary);font-size:12px">+ サブプロジェクト追加</button>
+      html += `<div style="display:flex;gap:16px;margin-top:8px;flex-wrap:wrap">
+        <button onclick="navigate('manual-form',{projectId:${project.id}})" style="background:none;border:none;padding:0;color:var(--primary);font-size:13px;cursor:pointer">+ マニュアル</button>
+        <button onclick="showProjectDialog(${project.id})" style="background:none;border:none;padding:0;color:var(--primary);font-size:13px;cursor:pointer">+ サブプロジェクト</button>
       </div>`;
       // Section: Tasks
-      html += `<h2 id="sec-tasks" class="doc-section-title" style="font-size:20px;font-weight:600;margin:32px 0 12px;padding-bottom:4px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">タスク <span class="badge badge-secondary" style="font-size:11px">${pTasks.length}</span><button class="btn btn-primary btn-sm" onclick="showAddProjectTask(${project.id})" style="margin-left:auto;font-size:11px;padding:3px 10px">${icons.plus} 追加</button></h2>`;
+      html += `<h2 id="sec-tasks" class="doc-section-title" style="font-size:15px;font-weight:600;color:var(--fg-muted);margin:32px 0 8px;display:flex;align-items:center;gap:8px">タスク${pTasks.length > 0 ? ' <span style="color:var(--fg-muted2);font-weight:400">' + pTasks.length + '</span>' : ''}<button onclick="showAddProjectTask(${project.id})" style="margin-left:auto;background:none;border:none;padding:0;color:var(--primary);font-size:13px;cursor:pointer;font-weight:400">+ 追加</button></h2>`;
       if (pTasks.length === 0) {
-        html += `<p style="color:var(--fg-muted2);font-size:13px;font-style:italic">タスクはありません</p>`;
+        html += `<p style="color:var(--fg-muted2);font-size:13px">—</p>`;
       } else {
-        html += `<div class="card" style="padding:4px 14px">`;
-        pTasks.forEach(function(t, idx) {
-          html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;${idx < pTasks.length - 1 ? 'border-bottom:1px solid var(--border-light);' : ''}cursor:pointer" onclick="navigate('task-detail',{id:${t.id}})">`;
-          html += `<div class="todo-checkbox ${t.done ? 'checked' : ''}" style="width:22px;height:22px" onclick="event.stopPropagation();expandProjectTaskActions(this,${t.id},${t.done})">${t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>'}</div>`;
-          html += `<span style="flex:1;font-size:13px;${t.done ? 'text-decoration:line-through;opacity:.5' : ''}">${escapeHtml(t.title)}${dueBadgeHtml(t)}</span>`;
+        html += `<div style="display:flex;flex-direction:column">`;
+        pTasks.forEach(function(t) {
+          html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer" onclick="navigate('task-detail',{id:${t.id}})">`;
+          html += `<div class="todo-checkbox ${t.done ? 'checked' : ''}" style="width:20px;height:20px" onclick="event.stopPropagation();expandProjectTaskActions(this,${t.id},${t.done})">${t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>'}</div>`;
+          html += `<span style="flex:1;font-size:14px;${t.done ? 'text-decoration:line-through;opacity:.5' : ''}">${escapeHtml(t.title)}${dueBadgeHtml(t)}</span>`;
           html += `</div>`;
         });
         html += `</div>`;
       }
       // Section: Files
-      html += `<h2 id="sec-files" class="doc-section-title" style="font-size:20px;font-weight:600;margin:32px 0 12px;padding-bottom:4px;border-bottom:1px solid var(--border)">資料・ファイル</h2>`;
+      html += `<h2 id="sec-files" class="doc-section-title" style="font-size:15px;font-weight:600;color:var(--fg-muted);margin:32px 0 8px">資料・ファイル</h2>`;
       html += `<div class="project-files-area" style="margin-top:0">
         <div class="file-upload-zone" id="file-upload-zone" onclick="document.getElementById('file-input').click()">
           クリックまたはドラッグ&ドロップでファイルをアップロード
@@ -1677,7 +1675,7 @@
       });
       html += `</div></div>`;
       // Section: Memo
-      html += `<h2 id="sec-memo" class="doc-section-title" style="font-size:20px;font-weight:600;margin:32px 0 12px;padding-bottom:4px;border-bottom:1px solid var(--border)">メモ・思考整理</h2>`;
+      html += `<h2 id="sec-memo" class="doc-section-title" style="font-size:15px;font-weight:600;color:var(--fg-muted);margin:32px 0 8px">メモ・思考整理</h2>`;
       html += `<div class="project-memo-area" style="margin-top:0">
         <div class="memo-toolbar">
           <button class="memo-toolbar-btn" onclick="memoExecCmd('h1')" title="見出し1">H1</button>
