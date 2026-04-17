@@ -145,6 +145,15 @@
     .project-memo-area{margin-top:24px}
     .project-memo-area h3{font-size:15px;font-weight:600;margin-bottom:8px}
     .memo-toolbar{display:flex;gap:4px;padding:6px 8px;background:var(--bg-muted);border:1px solid var(--border);border-bottom:none;border-radius:var(--radius) var(--radius) 0 0;flex-wrap:wrap;align-items:center}
+    .memo-toolbar.sticky{position:sticky;top:0;z-index:20;background:var(--bg-muted);box-shadow:0 1px 3px rgba(0,0,0,.06)}
+    .color-popup{position:absolute;background:#fff;border:1px solid var(--border);border-radius:6px;padding:6px;box-shadow:0 4px 12px rgba(0,0,0,.12);z-index:100;display:flex;gap:4px;flex-wrap:wrap;width:160px}
+    .color-swatch{width:22px;height:22px;border-radius:4px;cursor:pointer;border:1px solid rgba(0,0,0,.1)}
+    .color-swatch:hover{transform:scale(1.1)}
+    /* Blockquote hover delete */
+    .manual-rich-editor blockquote,.memo-rich-editor blockquote{position:relative;cursor:text}
+    .bq-delete{position:absolute;top:4px;right:4px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:var(--destructive);color:#fff;border:none;border-radius:50%;font-size:14px;font-weight:700;cursor:pointer;opacity:0;transition:opacity .15s;z-index:2;line-height:1;padding:0}
+    .manual-rich-editor blockquote:hover .bq-delete,.memo-rich-editor blockquote:hover .bq-delete{opacity:1}
+    .bq-delete:hover{background:#dc2626}
     .memo-toolbar-btn{padding:4px 8px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg);cursor:pointer;transition:all .15s;font-weight:500;line-height:1.4}
     .memo-toolbar-btn:hover{background:var(--primary-light);border-color:var(--primary);color:var(--primary)}
     .memo-toolbar-sep{width:1px;height:20px;background:var(--border);margin:0 4px}
@@ -1150,10 +1159,15 @@
     function renderTags(el) {
       var html = '';
       html += renderBreadcrumb();
-      html += '<div class="page-header"><h1 class="page-title">タグ管理</h1>';
-      html += '<button class="btn btn-primary" onclick="showTagDialog()">+ 新規タグ</button></div>';
+      html += '<h1 class="page-title" style="margin-bottom:24px">タグ管理</h1>';
+
+      // Project tags section
+      html += '<section style="margin-bottom:32px">';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
+      html += '<h2 style="font-size:16px;font-weight:600">プロジェクトタグ</h2>';
+      html += '<button class="btn btn-primary btn-sm" onclick="showTagDialog()">+ 新規</button></div>';
       if (!data.tags || data.tags.length === 0) {
-        html += '<div class="empty"><p>タグがありません</p></div>';
+        html += '<div class="empty" style="padding:20px"><p style="font-size:13px;color:var(--fg-muted2)">タグがありません</p></div>';
       } else {
         html += '<div style="display:flex;flex-direction:column;gap:8px">';
         data.tags.forEach(function(tag) {
@@ -1164,7 +1178,82 @@
         });
         html += '</div>';
       }
+      html += '</section>';
+
+      // Pace tags section
+      html += '<section>';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
+      html += '<h2 style="font-size:16px;font-weight:600">稼働ペースタグ</h2>';
+      html += '<button class="btn btn-primary btn-sm" onclick="showPaceTagManageDialog()">+ 新規</button></div>';
+      if (!data.paceTags || data.paceTags.length === 0) {
+        html += '<div class="empty" style="padding:20px"><p style="font-size:13px;color:var(--fg-muted2)">タグがありません</p></div>';
+      } else {
+        html += '<div style="display:flex;flex-direction:column;gap:8px">';
+        data.paceTags.forEach(function(tag) {
+          var manCount = data.manuals.filter(function(m) { return m.paceTagId === tag.id; }).length;
+          html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg)">';
+          html += '<div style="display:flex;align-items:center;gap:12px"><span style="width:16px;height:16px;border-radius:50%;background:' + tag.color + ';flex-shrink:0"></span><span style="font-weight:500;font-size:14px">' + escapeHtml(tag.name) + '</span>';
+          if (tag.isManual) html += '<span class="badge badge-outline" style="font-size:10px">手動スケジュール</span>';
+          html += '<span class="badge badge-secondary">' + manCount + ' マニュアル</span></div>';
+          html += '<div style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm" onclick="showPaceTagManageDialog(' + tag.id + ')">' + icons.pencil + '</button><button class="btn btn-ghost btn-sm" style="color:var(--destructive)" onclick="confirmDeletePaceTag(' + tag.id + ')">' + icons.trash + '</button></div></div>';
+        });
+        html += '</div>';
+      }
+      html += '</section>';
       el.innerHTML = html;
+    }
+
+    function showPaceTagManageDialog(editId) {
+      var editTag = editId ? (data.paceTags || []).find(function(t) { return t.id === editId; }) : null;
+      var colorOptions = TAG_PRESET_COLORS.map(function(c) {
+        var sel = (editTag && editTag.color === c) ? ' style="outline:3px solid var(--fg);outline-offset:2px;border-radius:50%"' : '';
+        return '<span class="tag-color-opt" data-color="' + c + '"' + sel + ' onclick="document.querySelectorAll(\'.tag-color-opt\').forEach(function(e){e.style.outline=\'\'});this.style.outline=\'3px solid var(--fg)\';this.style.outlineOffset=\'2px\';this.style.borderRadius=\'50%\'" style="width:28px;height:28px;border-radius:50%;background:' + c + ';cursor:pointer;display:inline-block"></span>';
+      }).join('');
+      var manualChecked = editTag && editTag.isManual ? 'checked' : '';
+      showModal(editTag ? '稼働ペースタグ編集' : '新規稼働ペースタグ',
+        '<div class="form-group"><label class="label">タグ名</label><input class="input" id="d-pt-name" value="' + escapeHtml(editTag ? editTag.name : '') + '" placeholder="例: 週3日"></div>'
+        + '<div class="form-group"><label class="label">カラー</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">' + colorOptions + '</div></div>'
+        + '<div class="form-group"><label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="d-pt-manual" ' + manualChecked + '> 手動スケジュールで詳細指定できるタグ</label></div>',
+        [
+          { label: 'キャンセル', onClick: function(o) { o.remove(); } },
+          { label: editTag ? '更新' : '作成', class: 'btn btn-primary', onClick: function(o) {
+            var name = document.getElementById('d-pt-name').value.trim();
+            if (!name) { toast('タグ名を入力してください'); return; }
+            var selColor = document.querySelector('.tag-color-opt[style*="outline: 3px"]') || document.querySelector('.tag-color-opt[style*="outline:3px"]');
+            var color = selColor ? selColor.getAttribute('data-color') : TAG_PRESET_COLORS[0];
+            var isManual = document.getElementById('d-pt-manual').checked;
+            if (editTag) {
+              editTag.name = name; editTag.color = color;
+              if (isManual) editTag.isManual = true; else delete editTag.isManual;
+              toast('タグを更新しました');
+            } else {
+              if (!data.paceTags) data.paceTags = [];
+              if (!data.nextPaceTagId) data.nextPaceTagId = (data.paceTags.reduce(function(m,t){return Math.max(m,t.id)},0) || 0) + 1;
+              var newTag = { id: data.nextPaceTagId++, name: name, color: color };
+              if (isManual) newTag.isManual = true;
+              data.paceTags.push(newTag);
+              toast('タグを作成しました');
+            }
+            saveData(); o.remove(); render();
+          }}
+        ]
+      );
+    }
+
+    function confirmDeletePaceTag(tagId) {
+      var tag = (data.paceTags || []).find(function(t) { return t.id === tagId; });
+      if (!tag) return;
+      showModal('稼働ペースタグの削除',
+        '<p class="confirm-text">タグ「' + escapeHtml(tag.name) + '」を削除しますか？このタグが付いたマニュアルの稼働ペースは解除されます。</p>',
+        [
+          { label: 'キャンセル', onClick: function(o) { o.remove(); } },
+          { label: '削除', class: 'btn btn-destructive', onClick: function(o) {
+            data.paceTags = (data.paceTags || []).filter(function(t) { return t.id !== tagId; });
+            data.manuals.forEach(function(m) { if (m.paceTagId === tagId) { m.paceTagId = null; m.paceSchedule = null; } });
+            saveData(); o.remove(); render(); toast('タグを削除しました');
+          }}
+        ]
+      );
     }
 
     var TAG_PRESET_COLORS = ['#3b82f6','#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#6366f1','#14b8a6','#f97316'];
@@ -1999,7 +2088,7 @@
             <option value="">未設定</option>
             ${paceTagsList.map(t => `<option value="${t.id}" data-manual="${t.isManual ? 1 : 0}" ${existingPaceTagId === t.id ? 'selected' : ''}>${escapeHtml(t.name)}</option>`).join('')}
           </select>
-          <button type="button" class="btn btn-outline btn-sm" onclick="showPaceTagDialog()" title="新しいタグを追加">+</button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="navigate('tags')" title="タグを管理">管理</button>
         </div>
         <div id="f-pace-schedule" style="margin-top:10px;padding:10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-muted);display:none">
           <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px">
@@ -2018,7 +2107,7 @@
       // Right main: manual content editor (big)
       html += `<main>`;
       html += `<div class="form-group"><label class="label label-icon">${icons.book} マニュアル</label>
-      <div class="memo-toolbar">
+      <div class="memo-toolbar sticky">
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('h1')" title="見出し1">H1</button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('h2')" title="見出し2">H2</button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('h3')" title="見出し3">H3</button>
@@ -2026,11 +2115,16 @@
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('bold')" title="太字"><b>B</b></button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('italic')" title="イタリック"><i>I</i></button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('strike')" title="取り消し線"><s>S</s></button>
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('color', this)" title="文字色"><span style="border-bottom:3px solid #ef4444;padding-bottom:1px">A</span></button>
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('highlight', this)" title="ハイライト"><span style="background:#FEF08A;padding:0 3px;border-radius:2px">H</span></button>
         <div class="memo-toolbar-sep"></div>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('ul')" title="箇条書き">• リスト</button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('ol')" title="番号リスト">1. リスト</button>
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('indent')" title="インデント">→</button>
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('outdent')" title="アウトデント">←</button>
         <div class="memo-toolbar-sep"></div>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('quote')" title="引用">❮ 引用</button>
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('codeblock')" title="コピー可能ブロック">&lt;/&gt;</button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('hr')" title="水平線">─ 線</button>
       </div>
       <div class="manual-rich-editor" id="f-roadmap-editor" contenteditable="true" data-placeholder="マニュアルの内容を記述できます（見出し・太字・リストなどが使えます）" oninput="updateManualFormToc()"></div>
@@ -2053,6 +2147,25 @@
         updateManualFormToc();
         // Initialize pace schedule builder visibility/state
         if (typeof onPaceTagChange === 'function') onPaceTagChange();
+        // Decorate existing blockquotes with delete buttons
+        if (editor) {
+          decorateBlockquotes(editor);
+          // Re-decorate on any edit
+          editor.addEventListener('input', function() { decorateBlockquotes(editor); });
+          // Tab / Shift+Tab for list nesting
+          editor.addEventListener('keydown', function(e) {
+            if (e.key === 'Tab') {
+              var sel = window.getSelection();
+              if (sel.rangeCount > 0) {
+                var node = sel.anchorNode;
+                while (node && node !== editor) {
+                  if (node.nodeName === 'LI') { e.preventDefault(); document.execCommand(e.shiftKey ? 'outdent' : 'indent'); return; }
+                  node = node.parentNode;
+                }
+              }
+            }
+          });
+        }
       }, 50);
       el.innerHTML = html;
     }
@@ -2198,10 +2311,39 @@
         }}
       ]);
     }
-    function manualFormExecCmd(type) {
+    var COLOR_PALETTE = ['#1e293b','#ef4444','#f97316','#f59e0b','#eab308','#22c55e','#14b8a6','#06b6d4','#3b82f6','#8b5cf6','#ec4899','#78716c'];
+    var HIGHLIGHT_PALETTE = ['transparent','#FEF08A','#FDE68A','#BBF7D0','#A7F3D0','#BFDBFE','#DDD6FE','#FECACA','#FBCFE8'];
+    function showColorPopup(anchor, palette, onPick) {
+      document.querySelectorAll('.color-popup').forEach(function(p){ p.remove(); });
+      var popup = document.createElement('div');
+      popup.className = 'color-popup';
+      palette.forEach(function(c) {
+        var sw = document.createElement('span');
+        sw.className = 'color-swatch';
+        sw.style.background = c === 'transparent' ? 'repeating-linear-gradient(45deg,#fff,#fff 4px,#e5e7eb 4px,#e5e7eb 8px)' : c;
+        sw.onmousedown = function(e) { e.preventDefault(); onPick(c); popup.remove(); };
+        popup.appendChild(sw);
+      });
+      var rect = anchor.getBoundingClientRect();
+      popup.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+      popup.style.left = (rect.left + window.scrollX) + 'px';
+      document.body.appendChild(popup);
+      setTimeout(function() {
+        var closer = function(e) { if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('mousedown', closer); } };
+        document.addEventListener('mousedown', closer);
+      }, 0);
+    }
+    function manualFormExecCmd(type, anchor) {
       var editor = document.getElementById('f-roadmap-editor');
       if (!editor) return;
-      editor.focus();
+      // Save selection for color/highlight popups
+      var savedRange = null;
+      if (type === 'color' || type === 'highlight') {
+        var s = window.getSelection();
+        if (s.rangeCount) savedRange = s.getRangeAt(0).cloneRange();
+      } else {
+        editor.focus();
+      }
       switch(type) {
         case 'h1': document.execCommand('formatBlock', false, 'h1'); break;
         case 'h2': document.execCommand('formatBlock', false, 'h2'); break;
@@ -2211,13 +2353,69 @@
         case 'strike': document.execCommand('strikeThrough'); break;
         case 'ul': document.execCommand('insertUnorderedList'); break;
         case 'ol': document.execCommand('insertOrderedList'); break;
+        case 'indent': document.execCommand('indent'); break;
+        case 'outdent': document.execCommand('outdent'); break;
+        case 'color':
+          showColorPopup(anchor, COLOR_PALETTE, function(color) {
+            editor.focus();
+            if (savedRange) { var s2 = window.getSelection(); s2.removeAllRanges(); s2.addRange(savedRange); }
+            document.execCommand('styleWithCSS', false, true);
+            document.execCommand('foreColor', false, color);
+          });
+          break;
+        case 'highlight':
+          showColorPopup(anchor, HIGHLIGHT_PALETTE, function(color) {
+            editor.focus();
+            if (savedRange) { var s3 = window.getSelection(); s3.removeAllRanges(); s3.addRange(savedRange); }
+            document.execCommand('styleWithCSS', false, true);
+            if (color === 'transparent') {
+              document.execCommand('hiliteColor', false, 'transparent');
+            } else {
+              document.execCommand('hiliteColor', false, color);
+            }
+          });
+          break;
         case 'quote': {
           var sel = window.getSelection();
           var text = sel.toString() || '引用テキスト';
           var bq = document.createElement('blockquote');
           bq.textContent = text;
+          attachBlockquoteDelete(bq);
           var range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
           if (range) { range.deleteContents(); range.insertNode(bq); }
+          break;
+        }
+        case 'codeblock': {
+          var sel = window.getSelection();
+          var range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+          var text = sel.toString() || 'ここにコピーしたいテキスト';
+          var wrapper = document.createElement('div');
+          wrapper.className = 'code-textbox-wrapper';
+          wrapper.setAttribute('contenteditable', 'false');
+          wrapper.style.cssText = 'position:relative;margin:8px 0';
+          var ta = document.createElement('textarea');
+          ta.className = 'code-textbox';
+          ta.value = text;
+          ta.style.cssText = 'width:100%;min-height:80px;padding:12px 60px 12px 12px;background:var(--bg-muted);border:1px solid var(--border);border-radius:6px;font-family:var(--font);font-size:13px;line-height:1.6;resize:vertical;white-space:pre-wrap;outline:none';
+          wrapper.appendChild(ta);
+          var copyBtn = document.createElement('button');
+          copyBtn.type = 'button';
+          copyBtn.className = 'code-textbox-copy-btn';
+          copyBtn.setAttribute('contenteditable', 'false');
+          copyBtn.innerHTML = '<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg>Copy';
+          copyBtn.onclick = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            navigator.clipboard.writeText(ta.value).then(function() {
+              copyBtn.classList.add('copied');
+              copyBtn.innerHTML = '<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg>Copied!';
+              setTimeout(function() {
+                copyBtn.classList.remove('copied');
+                copyBtn.innerHTML = '<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg>Copy';
+              }, 1500);
+            });
+          };
+          wrapper.appendChild(copyBtn);
+          if (range) { range.deleteContents(); range.insertNode(wrapper); range.collapse(false); }
           break;
         }
         case 'hr': {
@@ -2228,6 +2426,33 @@
           break;
         }
       }
+    }
+    function attachBlockquoteDelete(bq) {
+      // Handled via event delegation; this is just a marker hook
+      bq.setAttribute('data-bq', '1');
+    }
+    // Event delegation for blockquote delete button + editor Tab handling
+    document.addEventListener('click', function(e) {
+      if (e.target && e.target.classList && e.target.classList.contains('bq-delete')) {
+        e.preventDefault();
+        var bq = e.target.closest('blockquote');
+        if (bq) bq.remove();
+      }
+    });
+    // Add delete button to existing blockquotes on editor focus/input
+    function decorateBlockquotes(editor) {
+      if (!editor) return;
+      editor.querySelectorAll('blockquote').forEach(function(bq) {
+        if (!bq.querySelector('.bq-delete')) {
+          var btn = document.createElement('button');
+          btn.className = 'bq-delete';
+          btn.type = 'button';
+          btn.contentEditable = 'false';
+          btn.textContent = '×';
+          btn.title = '削除';
+          bq.appendChild(btn);
+        }
+      });
     }
 
     function submitManualForm(editId, projectId) {
@@ -2240,7 +2465,13 @@
       const paceSchedule = (paceTag && paceTag.isManual) ? collectPaceSchedule() : null;
       const speed = document.getElementById('f-speed').value.trim();
       const roadmapEditor = document.getElementById('f-roadmap-editor');
-      const roadmap = roadmapEditor ? roadmapEditor.innerHTML : '';
+      // Clone editor and strip transient UI elements (bq-delete buttons) before saving
+      let roadmap = '';
+      if (roadmapEditor) {
+        const clone = roadmapEditor.cloneNode(true);
+        clone.querySelectorAll('.bq-delete').forEach(function(b) { b.remove(); });
+        roadmap = clone.innerHTML;
+      }
       if (!title || !purpose) { toast('タイトルと目的は必須です'); return; }
       if (editId) {
         const m = getManual(editId);
