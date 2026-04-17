@@ -159,9 +159,8 @@
     .manual-rich-editor .copy-block:hover > .block-delete,.memo-rich-editor .copy-block:hover > .block-delete,
     .manual-rich-editor details:hover > .block-delete,.memo-rich-editor details:hover > .block-delete{opacity:1}
     .bq-delete:hover,.block-delete:hover{background:#dc2626}
-    /* When both copy button and delete button present, offset copy button */
-    .copy-block .block-delete + .copy-block-btn,pre.code-block .block-delete + .code-block-btn{right:36px}
-    .copy-block-btn + .block-delete,.code-block-btn + .block-delete{right:4px;top:4px}
+    /* When both copy button and delete button present, offset copy button to the left */
+    .copy-block:has(.block-delete) .copy-block-btn,pre.code-block:has(.block-delete) .code-block-btn{right:40px}
     .memo-toolbar-btn{padding:4px 8px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg);cursor:pointer;transition:all .15s;font-weight:500;line-height:1.4}
     .memo-toolbar-btn:hover{background:var(--primary-light);border-color:var(--primary);color:var(--primary)}
     .memo-toolbar-sep{width:1px;height:20px;background:var(--border);margin:0 4px}
