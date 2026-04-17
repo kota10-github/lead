@@ -220,6 +220,14 @@
     .prose h2{font-size:20px;font-weight:600;margin:32px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--border);scroll-margin-top:20px}
     .prose h3{font-size:17px;font-weight:600;margin:24px 0 6px;scroll-margin-top:20px}
     .prose blockquote{border-left:3px solid var(--primary);padding:12px 16px;margin:12px 0;color:var(--fg-muted);background:var(--bg-muted);border-radius:0 var(--radius) var(--radius) 0;white-space:pre-wrap}
+    /* Callout block */
+    .prose .callout,.manual-rich-editor .callout,.memo-rich-editor .callout{display:flex;gap:12px;padding:14px 16px;margin:12px 0;background:#f1f5f9;border-radius:6px;border-left:3px solid #cbd5e1}
+    .prose .callout-icon,.manual-rich-editor .callout-icon,.memo-rich-editor .callout-icon{font-size:20px;flex-shrink:0;line-height:1.4;min-width:24px;outline:none}
+    .prose .callout-body,.manual-rich-editor .callout-body,.memo-rich-editor .callout-body{flex:1;min-width:0;line-height:1.6}
+    .prose .callout-body p,.manual-rich-editor .callout-body p,.memo-rich-editor .callout-body p{margin:0}
+    /* Notion-style code block */
+    .prose pre.code-block,.manual-rich-editor pre.code-block,.memo-rich-editor pre.code-block{background:#0f172a;color:#e2e8f0;padding:16px 18px;border-radius:6px;overflow-x:auto;margin:12px 0;font-family:'SFMono-Regular',Menlo,Consolas,monospace;font-size:13px;line-height:1.6;white-space:pre;position:relative}
+    .prose pre.code-block code,.manual-rich-editor pre.code-block code,.memo-rich-editor pre.code-block code{background:transparent;padding:0;color:inherit;font-family:inherit;font-size:inherit;display:block;outline:none}
     /* Collapsible details block */
     .prose details,.manual-rich-editor details,.memo-rich-editor details{border:1px solid var(--border);border-radius:var(--radius);margin:12px 0;background:var(--bg)}
     .prose summary,.manual-rich-editor summary,.memo-rich-editor summary{cursor:pointer;padding:10px 14px;font-weight:600;list-style:none;position:relative;user-select:none}
@@ -1897,6 +1905,8 @@
           <div class="memo-toolbar-sep"></div>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('codeblock')" title="コード">&lt;/&gt;</button>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('quote')" title="引用">❮ 引用</button>
+          <button class="memo-toolbar-btn" onclick="memoExecCmd('callout')" title="コールアウト">💡 コールアウト</button>
+          <button class="memo-toolbar-btn" onclick="memoExecCmd('code')" title="コード">&lt;/&gt; コード</button>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('link')" title="リンク">🔗 リンク</button>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('collapse')" title="折りたたみ">▸ 折りたたみ</button>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('hr')" title="水平線">─ 線</button>
@@ -2141,7 +2151,9 @@
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('outdent')" title="アウトデント">←</button>
         <div class="memo-toolbar-sep"></div>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('quote')" title="引用">❮ 引用</button>
-        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('codeblock')" title="コピー可能ブロック">&lt;/&gt;</button>
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('callout', this)" title="コールアウト">💡 コールアウト</button>
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('code')" title="コード">&lt;/&gt; コード</button>
+        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('codeblock')" title="コピー可能テキスト">📋 コピー</button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('collapse')" title="折りたたみ">▸ 折りたたみ</button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('hr')" title="水平線">─ 線</button>
       </div>
@@ -2459,6 +2471,34 @@
           details.appendChild(summary);
           details.appendChild(body);
           if (range) { range.deleteContents(); range.insertNode(details); range.collapse(false); }
+          break;
+        }
+        case 'callout': {
+          var sel = window.getSelection();
+          var range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+          var callout = document.createElement('div');
+          callout.className = 'callout';
+          var icon = document.createElement('div');
+          icon.className = 'callout-icon';
+          icon.textContent = '💡';
+          icon.setAttribute('contenteditable', 'true');
+          var body2 = document.createElement('div');
+          body2.className = 'callout-body';
+          body2.innerHTML = '<p>' + escapeHtml(sel.toString() || 'ここにメッセージを書く') + '</p>';
+          callout.appendChild(icon);
+          callout.appendChild(body2);
+          if (range) { range.deleteContents(); range.insertNode(callout); range.collapse(false); }
+          break;
+        }
+        case 'code': {
+          var sel = window.getSelection();
+          var range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+          var pre = document.createElement('pre');
+          pre.className = 'code-block';
+          var code = document.createElement('code');
+          code.textContent = sel.toString() || '';
+          pre.appendChild(code);
+          if (range) { range.deleteContents(); range.insertNode(pre); range.collapse(false); }
           break;
         }
       }
@@ -4021,6 +4061,30 @@
           details.appendChild(summary);
           details.appendChild(body);
           if (range) { range.deleteContents(); range.insertNode(details); range.collapse(false); }
+          break;
+        }
+        case 'callout': {
+          const callout = document.createElement('div');
+          callout.className = 'callout';
+          const icon = document.createElement('div');
+          icon.className = 'callout-icon';
+          icon.textContent = '💡';
+          icon.setAttribute('contenteditable', 'true');
+          const cbody = document.createElement('div');
+          cbody.className = 'callout-body';
+          cbody.innerHTML = '<p>' + escapeHtml(sel.toString() || 'ここにメッセージを書く') + '</p>';
+          callout.appendChild(icon);
+          callout.appendChild(cbody);
+          if (range) { range.deleteContents(); range.insertNode(callout); range.collapse(false); }
+          break;
+        }
+        case 'code': {
+          const pre = document.createElement('pre');
+          pre.className = 'code-block';
+          const code = document.createElement('code');
+          code.textContent = sel.toString() || '';
+          pre.appendChild(code);
+          if (range) { range.deleteContents(); range.insertNode(pre); range.collapse(false); }
           break;
         }
       }
