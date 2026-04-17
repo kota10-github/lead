@@ -212,6 +212,16 @@
     .user-link code{font-size:11px;color:var(--fg-muted);background:var(--bg-muted);padding:2px 8px;border-radius:4px;font-family:'Fira Code',monospace}
     .user-actions{display:flex;gap:4px}
     /* Responsive */
+    @media print{
+      .sidebar,.mobile-header,.back-float,.manual-actions-float,.doc-toc,.no-print{display:none!important}
+      .main-area{margin-left:0!important;padding:0!important}
+      .doc-layout{display:block!important}
+      .doc-main{max-width:100%!important;padding:0!important}
+      body{background:#fff!important}
+      .info-card{break-inside:avoid;page-break-inside:avoid}
+      h1,h2,h3{break-after:avoid;page-break-after:avoid}
+      .breadcrumb{display:none!important}
+    }
     @media(max-width:768px){
       .app{flex-direction:column}
       .sidebar{transform:translateX(-100%);z-index:50;width:260px}
@@ -1602,7 +1612,9 @@
       const isHtml = /<[a-z][\s\S]*>/i.test(manual.taskRoadmap || '');
       let html = `<div class="doc-page">`;
       html += `<button class="back-float" onclick="navigate('project-detail',{id:${manual.projectId}})">${icons.arrowLeft} 戻る</button>`;
-      html += `<div style="position:fixed;top:16px;right:16px;z-index:50;display:flex;gap:8px">
+      html += `<div class="manual-actions-float no-print" style="position:fixed;top:16px;right:16px;z-index:50;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="shareManualLink(${manual.id})">🔗 共有リンク</button>
+        <button class="btn btn-outline btn-sm" onclick="window.print()">📄 PDF出力</button>
         <button class="btn btn-outline btn-sm" onclick="navigate('manual-form',{editId:${manual.id}})">${icons.pencil} 編集</button>
         <button class="btn btn-outline btn-sm" style="color:var(--destructive)" onclick="confirmDeleteManual(${manual.id})">${icons.trash} 削除</button>
       </div>`;
@@ -1644,6 +1656,63 @@
           tocLinks.appendChild(a);
         });
       }, 50);
+    }
+
+    function shareManualLink(manualId) {
+      var url = location.origin + location.pathname + '?manual=' + manualId;
+      var fallback = function() {
+        window.prompt('このリンクをコピーして共有してください:', url);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(function() {
+          toast('共有リンクをコピーしました');
+        }).catch(fallback);
+      } else {
+        fallback();
+      }
+    }
+    function renderPublicManual() {
+      var urlParams = new URLSearchParams(location.search);
+      var mid = Number(urlParams.get('manual'));
+      if (!mid) return false;
+      document.querySelector('.sidebar').style.display = 'none';
+      var mh = document.querySelector('.mobile-header'); if (mh) mh.style.display = 'none';
+      var main = document.getElementById('main-area');
+      main.style.marginLeft = '0';
+      main.style.maxWidth = '900px';
+      main.style.margin = '0 auto';
+      main.style.padding = '32px 24px';
+      fetch(SYNC_URL).then(function(r) { return r.json(); }).then(function(remote) {
+        var manuals = (remote && remote.manuals) || [];
+        var manual = manuals.find(function(m) { return m.id === mid; });
+        if (!manual) {
+          main.innerHTML = '<div class="empty" style="padding:80px 20px;text-align:center"><h2>マニュアルが見つかりません</h2></div>';
+          return;
+        }
+        var isHtml = /<[a-z][\s\S]*>/i.test(manual.taskRoadmap || '');
+        var html = '';
+        html += '<div class="no-print" style="display:flex;justify-content:flex-end;margin-bottom:16px"><button class="btn btn-primary btn-sm" onclick="window.print()">📄 PDFで出力</button></div>';
+        html += '<h1 class="doc-title" style="font-size:28px;font-weight:700;margin-bottom:16px">' + escapeHtml(manual.title) + '</h1>';
+        html += '<div class="info-card">';
+        html += '<div class="info-section"><div class="info-section-label" style="color:var(--primary)">🎯 <span style="text-transform:uppercase;letter-spacing:.05em">果たすべき責任（目的）</span></div><p style="font-weight:500;white-space:pre-wrap">' + escapeHtml(manual.purpose || '') + '</p></div>';
+        if (manual.authority) {
+          html += '<div class="info-section"><div class="info-section-label">🛡 <span>権限</span></div><p class="text-sm" style="white-space:pre-wrap">' + escapeHtml(manual.authority) + '</p></div>';
+        }
+        if (manual.operationPace || manual.responseSpeed) {
+          html += '<div class="info-grid">';
+          html += '<div><div class="info-section-label" style="color:#2563eb">⏱ <span>稼働ペース</span></div><p class="text-sm">' + (manual.operationPace ? escapeHtml(manual.operationPace) : '<em style="color:var(--fg-muted2)">未設定</em>') + '</p></div>';
+          html += '<div><div class="info-section-label" style="color:#d97706">⚡ <span>対応スピード</span></div><p class="text-sm">' + (manual.responseSpeed ? escapeHtml(manual.responseSpeed) : '<em style="color:var(--fg-muted2)">未設定</em>') + '</p></div>';
+          html += '</div>';
+        }
+        html += '</div>';
+        if (manual.taskRoadmap) {
+          html += '<div class="prose" style="margin-top:24px">' + (isHtml ? manual.taskRoadmap : '<p style="white-space:pre-wrap">' + escapeHtml(manual.taskRoadmap) + '</p>') + '</div>';
+        }
+        main.innerHTML = html;
+      }).catch(function() {
+        main.innerHTML = '<div class="empty" style="padding:80px 20px;text-align:center"><h2>読み込みに失敗しました</h2></div>';
+      });
+      return true;
     }
 
     // MANUAL FORM
@@ -2159,12 +2228,14 @@
       pushSync();
     };
 
-    // On load: smart sync with timestamp comparison
-    setTimeout(initSync, 300);
+    // On load: smart sync with timestamp comparison (skip in public manual view)
+    if (!new URLSearchParams(location.search).get('manual')) {
+      setTimeout(initSync, 300);
+    }
 
-    // On tab focus: pull latest from remote
+    // On tab focus: pull latest from remote (skip in public manual view)
     document.addEventListener('visibilitychange', function() {
-      if (!document.hidden) pullSync();
+      if (!document.hidden && !new URLSearchParams(location.search).get('manual')) pullSync();
     });
 
 
@@ -3664,9 +3735,15 @@
         document.querySelectorAll('.card.show-delete').forEach(function(c) { c.classList.remove('show-delete'); });
       }
     });
-    // INIT - show loading until sync completes
+    // INIT - check for public manual view first
     (function() {
       var main = document.getElementById('main-area');
+      var urlParams = new URLSearchParams(location.search);
+      if (urlParams.get('manual')) {
+        main.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;flex-direction:column;gap:12px"><div style="width:36px;height:36px;border-radius:8px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700">N</div><div style="font-size:13px;color:var(--fg-muted)">読み込み中...</div></div>';
+        renderPublicManual();
+        return;
+      }
       main.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;flex-direction:column;gap:12px"><div style="width:36px;height:36px;border-radius:8px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700">N</div><div style="font-size:13px;color:var(--fg-muted)">読み込み中...</div></div>';
     })();
   
