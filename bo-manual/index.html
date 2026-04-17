@@ -2583,7 +2583,7 @@
       // Memo
       html += '<div style="margin-top:20px">';
       html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><label class="label" style="margin-bottom:0">メモ</label><span id="task-memo-status" style="font-size:11px;color:var(--fg-muted)"></span></div>';
-      html += '<textarea class="textarea" id="task-memo-editor" rows="6" placeholder="メモを入力..." oninput="autoSaveTaskMemo(' + task.id + ')">' + escapeHtml(task.memo || '') + '</textarea>';
+      html += '<textarea class="textarea" id="task-memo-editor" placeholder="メモを入力..." oninput="autoSaveTaskMemo(' + task.id + ')" style="min-height:400px;resize:vertical">' + escapeHtml(task.memo || '') + '</textarea>';
       html += '</div>';
       el.innerHTML = html;
     }
