@@ -1870,7 +1870,7 @@
       // Section: Memo
       html += `<h2 id="sec-memo" class="doc-section-title" style="font-size:15px;font-weight:600;color:var(--fg-muted);margin:32px 0 8px">メモ・思考整理</h2>`;
       html += `<div class="project-memo-area" style="margin-top:0">
-        <div class="memo-toolbar">
+        <div class="memo-toolbar sticky">
           <button class="memo-toolbar-btn" onclick="memoExecCmd('h1')" title="見出し1">H1</button>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('h2')" title="見出し2">H2</button>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('h3')" title="見出し3">H3</button>
@@ -2388,7 +2388,7 @@
         case 'codeblock': {
           var sel = window.getSelection();
           var range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
-          var text = sel.toString() || 'ここにコピーしたいテキスト';
+          var text = sel.toString() || '';
           var wrapper = document.createElement('div');
           wrapper.className = 'code-textbox-wrapper';
           wrapper.setAttribute('contenteditable', 'false');
