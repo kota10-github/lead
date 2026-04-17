@@ -129,6 +129,11 @@
     .map-add-options{display:flex;gap:6px;margin-top:6px}
     .map-add-branch{padding:5px 12px;border-radius:14px;font-size:11px;font-weight:500;border:1px dashed var(--border);background:transparent;color:var(--fg-muted);cursor:pointer;transition:all .2s;white-space:nowrap}
     .map-add-branch:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)} .sub-tree-row{display:flex;align-items:flex-start;gap:12px;position:relative;flex-shrink:0} .sub-tree-card-wrap{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:120px} .sub-tree-children{display:flex;flex-direction:column;gap:8px} .sub-add-btn{font-size:10px;padding:2px 8px;border:1px dashed var(--border);border-radius:4px;background:transparent;cursor:pointer;white-space:nowrap;color:var(--fg-muted)} .sub-add-btn:hover{border-color:var(--primary);color:var(--primary)}
+    /* Hover-reveal add buttons on the map */
+    .map-add-options, .sub-tree-children > .sub-add-btn, .root-wrap > .map-add-btn { opacity: 0; transition: opacity .15s ease }
+    .project-branch:hover > .sub-tree-children > .map-add-options,
+    .sub-tree-row:hover > .sub-tree-children > .sub-add-btn,
+    .root-wrap:hover > .map-add-btn { opacity: 1 }
     /* Project detail */
     .project-memo-area{margin-top:24px}
     .project-memo-area h3{font-size:15px;font-weight:600;margin-bottom:8px}
@@ -1313,7 +1318,7 @@
         html += `<div class="breadcrumb"><span class="breadcrumb-item" onclick="navigate('home')">マップ</span></div>`;
         html += `<div class="mindmap-viewport" id="mindmap-viewport"><svg class="mindmap-svg" id="mindmap-svg"></svg>`;
         html += `<div class="mindmap-inner" id="mindmap-inner" style="transform:scale(${mapZoom})">`;
-        html += `<div style="display:flex;flex-direction:column;justify-content:center;padding-top:32px"><div class="node-root" data-node="root" ondragover="event.preventDefault();this.classList.add('drop-target')" ondragleave="this.classList.remove('drop-target','drop-before','drop-after')" ondrop="handleProjectDrop(event,null)">BOチーム</div><button class="map-add-btn" onclick="showProjectDialog()">+ プロジェクト追加</button></div>`;
+        html += `<div class="root-wrap" style="display:flex;flex-direction:column;justify-content:center;padding-top:32px"><div class="node-root" data-node="root" ondragover="event.preventDefault();this.classList.add('drop-target')" ondragleave="this.classList.remove('drop-target','drop-before','drop-after')" ondrop="handleProjectDrop(event,null)">BOチーム</div><button class="map-add-btn" onclick="showProjectDialog()">+ プロジェクト追加</button></div>`;
         html += `<div class="project-col">`;
         projects.forEach((proj, pi) => {
           const c = getProjectColor(proj.projectId);
