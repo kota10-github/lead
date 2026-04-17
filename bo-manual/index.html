@@ -129,11 +129,13 @@
     .map-add-options{display:flex;gap:6px;margin-top:6px}
     .map-add-branch{padding:5px 12px;border-radius:14px;font-size:11px;font-weight:500;border:1px dashed var(--border);background:transparent;color:var(--fg-muted);cursor:pointer;transition:all .2s;white-space:nowrap}
     .map-add-branch:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)} .sub-tree-row{display:flex;align-items:flex-start;gap:12px;position:relative;flex-shrink:0} .sub-tree-card-wrap{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:120px} .sub-tree-children{display:flex;flex-direction:column;gap:8px} .sub-add-btn{font-size:10px;padding:2px 8px;border:1px dashed var(--border);border-radius:4px;background:transparent;cursor:pointer;white-space:nowrap;color:var(--fg-muted)} .sub-add-btn:hover{border-color:var(--primary);color:var(--primary)}
-    /* Hover-reveal add buttons on the map */
-    .map-add-options, .sub-tree-children > .sub-add-btn, .root-wrap > .map-add-btn { opacity: 0; transition: opacity .15s ease }
-    .project-branch:hover > .sub-tree-children > .map-add-options,
-    .sub-tree-row:hover > .sub-tree-children > .sub-add-btn,
-    .root-wrap:hover > .map-add-btn { opacity: 1 }
+    /* Hover-reveal add buttons on the map — collapse space when hidden */
+    .map-add-options { max-height: 0; margin-top: 0; opacity: 0; overflow: hidden; transition: max-height .2s ease, margin-top .2s ease, opacity .15s ease }
+    .sub-tree-children > .sub-add-btn { max-height: 0; padding-top: 0; padding-bottom: 0; border-color: transparent; opacity: 0; overflow: hidden; transition: max-height .2s ease, padding .2s ease, opacity .15s ease, border-color .2s ease }
+    .root-wrap > .map-add-btn { max-height: 0; margin-top: 0; opacity: 0; overflow: hidden; padding-top: 0; padding-bottom: 0; transition: max-height .2s ease, margin-top .2s ease, opacity .15s ease, padding .2s ease }
+    .project-branch:hover > .sub-tree-children > .map-add-options { max-height: 48px; margin-top: 6px; opacity: 1 }
+    .sub-tree-row:hover > .sub-tree-children > .sub-add-btn { max-height: 24px; padding: 2px 8px; opacity: 1; border-color: var(--border) }
+    .root-wrap:hover > .map-add-btn { max-height: 48px; margin-top: 8px; opacity: 1; padding: 10px 14px }
     /* Project detail */
     .project-memo-area{margin-top:24px}
     .project-memo-area h3{font-size:15px;font-weight:600;margin-bottom:8px}
