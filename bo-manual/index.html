@@ -586,8 +586,16 @@
 .nav-item.active:hover{background:#1d4ed8;color:#fff}
 /* Rich editor for manual form */
 .manual-rich-editor{width:100%;min-height:calc(100vh - 240px);padding:16px;border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius);font-family:var(--font);font-size:14px;line-height:1.8;background:var(--bg);outline:none;overflow-y:auto;white-space:pre-wrap;word-wrap:break-word;resize:vertical}
-.manual-form-layout{display:grid;grid-template-columns:320px 1fr;gap:24px;align-items:start}
-@media(max-width:900px){.manual-form-layout{grid-template-columns:1fr}}
+.manual-form-layout{display:grid;grid-template-columns:280px 1fr 220px;gap:24px;align-items:start}
+.manual-form-layout > aside{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow-y:auto}
+.manual-toc{font-size:12px}
+.manual-toc-title{font-size:11px;font-weight:600;color:var(--fg-muted2);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px}
+.manual-toc a{display:block;padding:4px 8px;color:var(--fg-muted);border-radius:4px;line-height:1.4;cursor:pointer;transition:all .15s}
+.manual-toc a:hover{color:var(--primary);background:var(--primary-light)}
+.manual-toc a[data-level="3"]{padding-left:20px;font-size:11px}
+.manual-toc-empty{font-size:11px;color:var(--fg-muted2);font-style:italic}
+@media(max-width:1100px){.manual-form-layout{grid-template-columns:260px 1fr}.manual-form-layout > aside:last-child{display:none}}
+@media(max-width:900px){.manual-form-layout{grid-template-columns:1fr}.manual-form-layout > aside{position:static;max-height:none}}
 .manual-rich-editor:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
 .manual-rich-editor:empty::before{content:attr(data-placeholder);color:var(--fg-muted);pointer-events:none}
 .manual-rich-editor h1{font-size:22px;font-weight:700;margin:12px 0 6px;padding-bottom:6px;border-bottom:2px solid var(--border)}
@@ -1573,44 +1581,43 @@
         </select>
         ${currentTag ? '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:'+currentTag.color+'"></span>' : ''}
       </div>`;
-      // Manuals section
+      // 3-column layout: [metadata aside] [memo main] [TOC aside]
+      html += `<div class="manual-form-layout">`;
+      html += `<aside>`;
+      // Manuals & sub-projects
       if (manuals.length > 0 || subProjects.length > 0) {
-        html += `<div style="margin-top:8px;margin-bottom:16px"><h3 style="font-size:15px;font-weight:600;margin-bottom:12px">マニュアル・サブプロジェクト</h3>`;
-        html += `<div class="grid grid-2">`;
+        html += `<div style="margin-bottom:16px"><h3 style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--fg-muted)">マニュアル・サブプロジェクト</h3>`;
         subProjects.forEach(sp => {
-          html += `<div class="card" onclick="navigate('project-detail',{id:${sp.id}})" style="cursor:pointer;border-left:3px solid var(--primary)">
-            <div class="card-header"><div class="flex items-center gap-2">${icons.folder}<span class="card-title">${escapeHtml(sp.name)}</span></div></div>
-            <div class="card-body">${sp.description ? `<p class="text-sm" style="color:var(--fg-muted)">${escapeHtml(sp.description)}</p>` : ''}</div>
+          html += `<div class="card mb-2" onclick="navigate('project-detail',{id:${sp.id}})" style="cursor:pointer;border-left:3px solid var(--primary);padding:8px 12px">
+            <div class="flex items-center gap-2">${icons.folder}<span style="font-size:13px;font-weight:500">${escapeHtml(sp.name)}</span></div>
           </div>`;
         });
         manuals.forEach(m => {
-          const assignees = getAssigneesForManual(m.id);
-          html += `<div class="card" onclick="navigate('manual-detail',{id:${m.id}})" style="cursor:pointer">
-            <div class="card-header"><div class="flex items-center gap-2">${icons.book}<span class="card-title">${escapeHtml(m.title)}</span></div></div>
-            <div class="card-body"><div class="purpose-box"><div class="purpose-label">${icons.target} 果たすべき責任（目的）</div><p class="text-sm line-clamp-2">${escapeHtml(m.purpose)}</p></div></div>
+          html += `<div class="card mb-2" onclick="navigate('manual-detail',{id:${m.id}})" style="cursor:pointer;padding:8px 12px">
+            <div class="flex items-center gap-2">${icons.book}<span style="font-size:13px;font-weight:500">${escapeHtml(m.title)}</span></div>
           </div>`;
         });
-        html += `</div></div>`;
+        html += `</div>`;
       }
-      // Project tasks section
+      // Project tasks
       var pTasks = getTasksByProject(project.id);
-      html += `<div class="card mb-4"><div class="card-header"><span class="text-xs" style="font-weight:600;color:var(--fg-muted)">タスク <span class="badge badge-secondary">${pTasks.length}</span></span><button class="btn btn-primary btn-sm" onclick="showAddProjectTask(${project.id})" style="margin-left:auto">${icons.plus} タスク追加</button></div><div class="card-body">`;
+      html += `<div class="card mb-4"><div class="card-header" style="padding:10px 12px"><span style="font-size:12px;font-weight:600;color:var(--fg-muted)">タスク <span class="badge badge-secondary">${pTasks.length}</span></span><button class="btn btn-primary btn-sm" onclick="showAddProjectTask(${project.id})" style="margin-left:auto;font-size:11px;padding:3px 8px">${icons.plus}</button></div><div class="card-body" style="padding:4px 12px 8px">`;
       if (pTasks.length === 0) {
-        html += `<div style="text-align:center;padding:12px;color:var(--fg-muted);font-size:13px">タスクがありません</div>`;
+        html += `<div style="text-align:center;padding:8px;color:var(--fg-muted);font-size:12px">タスクなし</div>`;
       } else {
         pTasks.forEach(function(t) {
-          html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="navigate('task-detail',{id:${t.id}})">`;
-          html += `<div class="todo-checkbox ${t.done ? 'checked' : ''}" style="width:28px;height:28px" onclick="event.stopPropagation();expandProjectTaskActions(this,${t.id},${t.done})">${t.done ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>'}</div>`;
-          html += `<span style="flex:1;font-size:14px;${t.done ? 'text-decoration:line-through;opacity:.5' : ''}">${escapeHtml(t.title)}${dueBadgeHtml(t)}</span>`;
+          html += `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-light);cursor:pointer" onclick="navigate('task-detail',{id:${t.id}})">`;
+          html += `<div class="todo-checkbox ${t.done ? 'checked' : ''}" style="width:22px;height:22px" onclick="event.stopPropagation();expandProjectTaskActions(this,${t.id},${t.done})">${t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>'}</div>`;
+          html += `<span style="flex:1;font-size:12px;${t.done ? 'text-decoration:line-through;opacity:.5' : ''}">${escapeHtml(t.title)}${dueBadgeHtml(t)}</span>`;
           html += `</div>`;
         });
       }
       html += `</div></div>`;
-      // File upload section
-      html += `<div class="project-files-area">
-        <h3>📎 資料・ファイル</h3>
-        <div class="file-upload-zone" id="file-upload-zone" onclick="document.getElementById('file-input').click()">
-          クリックまたはドラッグ＆ドロップでファイルをアップロード
+      // File upload
+      html += `<div class="project-files-area" style="margin-top:0">
+        <h3 style="font-size:13px">📎 資料・ファイル</h3>
+        <div class="file-upload-zone" id="file-upload-zone" onclick="document.getElementById('file-input').click()" style="font-size:11px;padding:12px">
+          クリックまたはD&Dでアップロード
           <input type="file" id="file-input" multiple style="display:none" onchange="handleFileUpload(${project.id}, this.files)">
         </div>
         <div class="file-list" id="file-list">`;
@@ -1625,9 +1632,11 @@
         </div>`;
       });
       html += `</div></div>`;
-      html += `<div style="margin-top:8px;margin-bottom:16px"><button class="btn btn-ghost btn-sm" onclick="showProjectDialog(${project.id})" style="color:var(--primary)">+ サブプロジェクト追加</button></div>`;
-      // Memo section (moved to bottom with bigger area)
-      html += `<div class="project-memo-area">
+      html += `<div style="margin-top:12px"><button class="btn btn-ghost btn-sm" onclick="showProjectDialog(${project.id})" style="color:var(--primary);font-size:12px">+ サブプロジェクト追加</button></div>`;
+      html += `</aside>`;
+      // Main: memo rich editor
+      html += `<main>`;
+      html += `<div class="project-memo-area" style="margin-top:0">
         <h3>📝 メモ・思考整理</h3>
         <div class="memo-toolbar">
           <button class="memo-toolbar-btn" onclick="memoExecCmd('h1')" title="見出し1">H1</button>
@@ -1647,11 +1656,15 @@
           <button class="memo-toolbar-btn" onclick="memoExecCmd('link')" title="リンク">🔗 リンク</button>
           <button class="memo-toolbar-btn" onclick="memoExecCmd('hr')" title="水平線">─ 線</button>
         </div>
-        <div class="memo-rich-editor" id="memo-rich-editor" contenteditable="true" data-placeholder="見出しや太字を使って自由に記入できます" oninput="autoSaveProjectMemo(${project.id})"></div>
+        <div class="memo-rich-editor" id="memo-rich-editor" contenteditable="true" data-placeholder="見出しや太字を使って自由に記入できます" oninput="autoSaveProjectMemo(${project.id});updateMemoToc()"></div>
         <div id="memo-save-status" style="font-size:11px;color:var(--fg-muted);margin-top:4px;min-height:16px"></div>
       </div>`;
+      html += `</main>`;
+      // Right aside: TOC
+      html += `<aside><div class="manual-toc"><div class="manual-toc-title">📑 目次</div><div id="memo-toc"><div class="manual-toc-empty">見出しを追加すると目次が表示されます</div></div></div></aside>`;
+      html += `</div>`; // close manual-form-layout
       // Load memo into rich editor after render
-      setTimeout(function() { loadMemoToEditor(project.id); }, 0);
+      setTimeout(function() { loadMemoToEditor(project.id); updateMemoToc(); }, 0);
       el.innerHTML = html;
       // Setup drag & drop
       const zone = document.getElementById('file-upload-zone');
@@ -1839,9 +1852,11 @@
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('quote')" title="引用">❮ 引用</button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('hr')" title="水平線">─ 線</button>
       </div>
-      <div class="manual-rich-editor" id="f-roadmap-editor" contenteditable="true" data-placeholder="マニュアルの内容を記述できます（見出し・太字・リストなどが使えます）"></div>
+      <div class="manual-rich-editor" id="f-roadmap-editor" contenteditable="true" data-placeholder="マニュアルの内容を記述できます（見出し・太字・リストなどが使えます）" oninput="updateManualFormToc()"></div>
       </div>`;
       html += `</main>`;
+      // Right aside: table of contents
+      html += `<aside><div class="manual-toc"><div class="manual-toc-title">📑 目次</div><div id="manual-form-toc"><div class="manual-toc-empty">見出しを追加すると目次が表示されます</div></div></div></aside>`;
       html += `</div>`;
       // Load existing content into rich editor after render
       if (isEdit && existing && existing.taskRoadmap) {
@@ -1854,8 +1869,33 @@
         if (editor && window._pendingManualContent) {
           editor.innerHTML = window._pendingManualContent;
         }
+        updateManualFormToc();
       }, 50);
       el.innerHTML = html;
+    }
+    function updateManualFormToc() {
+      buildToc('f-roadmap-editor', 'manual-form-toc', 'fh');
+    }
+    function updateMemoToc() {
+      buildToc('memo-rich-editor', 'memo-toc', 'mh');
+    }
+    function buildToc(editorId, tocId, prefix) {
+      var editor = document.getElementById(editorId);
+      var tocEl = document.getElementById(tocId);
+      if (!editor || !tocEl) return;
+      var headings = editor.querySelectorAll('h1,h2,h3');
+      if (headings.length === 0) {
+        tocEl.innerHTML = '<div class="manual-toc-empty">見出しを追加すると目次が表示されます</div>';
+        return;
+      }
+      var html = '';
+      headings.forEach(function(h, i) {
+        var id = prefix + '-' + i;
+        h.id = id;
+        var level = h.tagName === 'H1' ? 1 : (h.tagName === 'H2' ? 2 : 3);
+        html += '<a data-level="' + level + '" onclick="document.getElementById(\'' + id + '\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">' + escapeHtml(h.textContent || '') + '</a>';
+      });
+      tocEl.innerHTML = html;
     }
 
     
@@ -2793,13 +2833,15 @@
       html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'link\')" title="リンク">🔗 リンク</button>';
       html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'hr\')" title="水平線">─ 線</button>';
       html += '</div>';
-      html += '<div class="memo-rich-editor" id="memo-rich-editor" contenteditable="true" data-placeholder="見出しや太字を使って自由に記入できます" oninput="autoSaveTaskMemo(' + task.id + ')"></div>';
+      html += '<div class="memo-rich-editor" id="memo-rich-editor" contenteditable="true" data-placeholder="見出しや太字を使って自由に記入できます" oninput="autoSaveTaskMemo(' + task.id + ');updateMemoToc()"></div>';
       html += '<div id="memo-save-status" style="font-size:11px;color:var(--fg-muted);margin-top:4px;min-height:16px"></div>';
       html += '</div>';
       html += '</main>';
+      // Right aside: TOC
+      html += '<aside><div class="manual-toc"><div class="manual-toc-title">📑 目次</div><div id="memo-toc"><div class="manual-toc-empty">見出しを追加すると目次が表示されます</div></div></div></aside>';
       html += '</div>'; // close manual-form-layout
       el.innerHTML = html;
-      setTimeout(function() { loadTaskMemoToEditor(task.id); }, 0);
+      setTimeout(function() { loadTaskMemoToEditor(task.id); updateMemoToc(); }, 0);
     }
 
     // USERS
