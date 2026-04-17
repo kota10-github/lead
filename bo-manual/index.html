@@ -615,6 +615,15 @@
       }
       /* Block copy buttons */
     .copyable-block{position:relative}
+    /* Copy message block (rich-text with copy button) */
+    .copy-block{position:relative;border:1px solid var(--border);border-radius:6px;padding:14px 16px;margin:12px 0;background:var(--bg);line-height:1.7}
+    .copy-block-body{outline:none;white-space:pre-wrap;word-wrap:break-word;min-height:1em}
+    .copy-block-body:empty::before{content:'メッセージを入力…';color:var(--fg-muted2)}
+    .copy-block-btn{position:absolute;top:8px;right:8px;display:flex;align-items:center;gap:4px;padding:4px 10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--fg-muted);cursor:pointer;opacity:0;transition:opacity .15s;z-index:2;white-space:nowrap;line-height:1.2}
+    .copy-block:hover .copy-block-btn{opacity:1}
+    .copy-block-btn:hover{background:var(--bg-muted);color:var(--fg)}
+    .copy-block-btn.copied{background:#16a34a;border-color:#16a34a;color:#fff;opacity:1}
+    .copy-block-btn svg{width:12px;height:12px;fill:currentColor}
     .copyable-block .block-copy-btn{position:absolute;top:4px;right:4px;display:flex;align-items:center;gap:3px;padding:3px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--fg-muted);cursor:pointer;opacity:0;transition:opacity .15s;z-index:10;white-space:nowrap}
     .copyable-block:hover .block-copy-btn{opacity:1}
     .block-copy-btn:hover{background:var(--primary-light);border-color:var(--primary);color:var(--primary)}
@@ -2012,7 +2021,10 @@
       setTimeout(() => {
         const content = document.getElementById('manual-content');
         const tocLinks = document.getElementById('toc-links');
-        if (!content || !tocLinks) return;
+        if (!content) return;
+        // Decorate copy blocks with Copy button on the viewer side too
+        if (typeof decorateCopyBlocks === 'function') decorateCopyBlocks(content);
+        if (!tocLinks) return;
         const headings = content.querySelectorAll('h1,h2,h3');
         headings.forEach((h, i) => {
           h.id = `heading-${i}`;
@@ -2180,11 +2192,12 @@
         updateManualFormToc();
         // Initialize pace schedule builder visibility/state
         if (typeof onPaceTagChange === 'function') onPaceTagChange();
-        // Decorate existing blockquotes with delete buttons
+        // Decorate existing blockquotes with delete buttons & copy blocks with copy buttons
         if (editor) {
           decorateBlockquotes(editor);
+          decorateCopyBlocks(editor);
           // Re-decorate on any edit
-          editor.addEventListener('input', function() { decorateBlockquotes(editor); });
+          editor.addEventListener('input', function() { decorateBlockquotes(editor); decorateCopyBlocks(editor); });
           // Tab / Shift+Tab for list nesting
           editor.addEventListener('keydown', function(e) {
             if (e.key === 'Tab') {
@@ -2424,34 +2437,26 @@
         case 'codeblock': {
           var sel = window.getSelection();
           var range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
-          var text = sel.toString() || '';
-          var wrapper = document.createElement('div');
-          wrapper.className = 'code-textbox-wrapper';
-          wrapper.setAttribute('contenteditable', 'false');
-          wrapper.style.cssText = 'position:relative;margin:8px 0';
-          var ta = document.createElement('textarea');
-          ta.className = 'code-textbox';
-          ta.value = text;
-          ta.style.cssText = 'width:100%;min-height:80px;padding:12px 60px 12px 12px;background:var(--bg-muted);border:1px solid var(--border);border-radius:6px;font-family:var(--font);font-size:13px;line-height:1.6;resize:vertical;white-space:pre-wrap;outline:none';
-          wrapper.appendChild(ta);
-          var copyBtn = document.createElement('button');
-          copyBtn.type = 'button';
-          copyBtn.className = 'code-textbox-copy-btn';
-          copyBtn.setAttribute('contenteditable', 'false');
-          copyBtn.innerHTML = '<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg>Copy';
-          copyBtn.onclick = function(e) {
-            e.preventDefault(); e.stopPropagation();
-            navigator.clipboard.writeText(ta.value).then(function() {
-              copyBtn.classList.add('copied');
-              copyBtn.innerHTML = '<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg>Copied!';
-              setTimeout(function() {
-                copyBtn.classList.remove('copied');
-                copyBtn.innerHTML = '<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg>Copy';
-              }, 1500);
-            });
-          };
-          wrapper.appendChild(copyBtn);
-          if (range) { range.deleteContents(); range.insertNode(wrapper); range.collapse(false); }
+          var block = document.createElement('div');
+          block.className = 'copy-block';
+          block.setAttribute('contenteditable', 'false');
+          var body = document.createElement('div');
+          body.className = 'copy-block-body';
+          body.setAttribute('contenteditable', 'true');
+          var selText = sel.toString();
+          if (selText) { body.innerHTML = escapeHtml(selText).replace(/\n/g, '<br>'); } else { body.innerHTML = '<br>'; }
+          block.appendChild(body);
+          // (Copy button is injected dynamically by decorateCopyBlocks for consistency)
+          if (range) {
+            range.deleteContents();
+            range.insertNode(block);
+            var r2 = document.createRange();
+            r2.selectNodeContents(body);
+            r2.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(r2);
+          }
+          decorateCopyBlocks(document.getElementById('f-roadmap-editor'));
           break;
         }
         case 'hr': {
@@ -2467,10 +2472,10 @@
           var details = document.createElement('details');
           details.open = true;
           var summary = document.createElement('summary');
-          summary.textContent = sel.toString() || 'クリックで開閉するタイトル';
+          summary.textContent = sel.toString() || 'タイトル';
           var body = document.createElement('div');
           body.className = 'details-body';
-          body.innerHTML = '<p>ここに内容を書いてください</p>';
+          body.innerHTML = '<p><br></p>';
           details.appendChild(summary);
           details.appendChild(body);
           if (range) { range.deleteContents(); range.insertNode(details); range.collapse(false); }
@@ -2543,6 +2548,32 @@
         }
       });
     }
+    // Add copy button to copy blocks (both in editor and prose views)
+    function decorateCopyBlocks(root) {
+      if (!root) return;
+      root.querySelectorAll('.copy-block').forEach(function(block) {
+        if (block.querySelector('.copy-block-btn')) return;
+        var btn = document.createElement('button');
+        btn.className = 'copy-block-btn';
+        btn.type = 'button';
+        btn.setAttribute('contenteditable', 'false');
+        btn.innerHTML = '<svg viewBox="0 0 16 16"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg>Copy';
+        btn.onclick = function(e) {
+          e.preventDefault(); e.stopPropagation();
+          var body = block.querySelector('.copy-block-body');
+          var text = body ? body.innerText : '';
+          navigator.clipboard.writeText(text).then(function() {
+            btn.classList.add('copied');
+            btn.innerHTML = '<svg viewBox="0 0 16 16"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg>Copied!';
+            setTimeout(function() {
+              btn.classList.remove('copied');
+              btn.innerHTML = '<svg viewBox="0 0 16 16"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25zM5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25z"/></svg>Copy';
+            }, 1500);
+          });
+        };
+        block.appendChild(btn);
+      });
+    }
 
     function submitManualForm(editId, projectId) {
       const title = document.getElementById('f-title').value.trim();
@@ -2559,6 +2590,7 @@
       if (roadmapEditor) {
         const clone = roadmapEditor.cloneNode(true);
         clone.querySelectorAll('.bq-delete').forEach(function(b) { b.remove(); });
+        clone.querySelectorAll('.copy-block-btn').forEach(function(b) { b.remove(); });
         // Fix invalid nested lists: <ul>...<ul>Y</ul> should be <ul>...<li>...<ul>Y</ul></li></ul>
         function fixNestedLists(root) {
           var fixed = true;
@@ -4083,10 +4115,10 @@
           const details = document.createElement('details');
           details.open = true;
           const summary = document.createElement('summary');
-          summary.textContent = sel.toString() || 'クリックで開閉するタイトル';
+          summary.textContent = sel.toString() || 'タイトル';
           const body = document.createElement('div');
           body.className = 'details-body';
-          body.innerHTML = '<p>ここに内容を書いてください</p>';
+          body.innerHTML = '<p><br></p>';
           details.appendChild(summary);
           details.appendChild(body);
           if (range) { range.deleteContents(); range.insertNode(details); range.collapse(false); }
