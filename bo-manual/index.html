@@ -1920,29 +1920,29 @@
       html += `<h2 id="sec-memo" class="doc-section-title" style="font-size:15px;font-weight:600;color:var(--fg-muted);margin:32px 0 8px">メモ・思考整理</h2>`;
       html += `<div class="project-memo-area" style="margin-top:0">
         <div class="memo-toolbar sticky">
-          <button class="memo-toolbar-btn" onclick="memoExecCmd('undo')" title="戻す (Cmd+Z)">↶</button>
-          <button class="memo-toolbar-btn" onclick="memoExecCmd('redo')" title="進む (Cmd+Shift+Z)">↷</button>
+          <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('undo')" title="戻す (Cmd+Z)">↶</button>
+          <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('redo')" title="進む (Cmd+Shift+Z)">↷</button>
           <div class="memo-toolbar-sep"></div>
-          <button class="memo-toolbar-btn" onclick="memoExecCmd('h1')" title="見出し1">H1</button>
-          <button class="memo-toolbar-btn" onclick="memoExecCmd('h2')" title="見出し2">H2</button>
-          <button class="memo-toolbar-btn" onclick="memoExecCmd('h3')" title="見出し3">H3</button>
-          <button class="memo-toolbar-btn" onclick="memoExecCmd('p')" title="本文に戻す">本文</button>
+          <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('h1')" title="見出し1">H1</button>
+          <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('h2')" title="見出し2">H2</button>
+          <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('h3')" title="見出し3">H3</button>
+          <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('p')" title="本文に戻す">本文</button>
           <div class="memo-toolbar-sep"></div>
-          <button class="memo-toolbar-btn" onclick="memoExecCmd('bold')" title="太字"><b>B</b></button>
-          <button class="memo-toolbar-btn" onclick="memoExecCmd('italic')" title="イタリック"><i>I</i></button>
-          <button class="memo-toolbar-btn" onclick="memoExecCmd('strike')" title="取り消し線"><s>S</s></button>
+          <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('bold')" title="太字"><b>B</b></button>
+          <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('italic')" title="イタリック"><i>I</i></button>
+          <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('strike')" title="取り消し線"><s>S</s></button>
+          <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('color', this)" title="文字色"><span style="border-bottom:3px solid #ef4444;padding-bottom:1px">A</span></button>
+          <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('highlight', this)" title="ハイライト"><span style="background:#FEF08A;padding:0 3px;border-radius:2px">H</span></button>
           <div class="memo-toolbar-sep"></div>
-          <button class="memo-toolbar-btn" onclick="memoExecCmd('ul')" title="箇条書き">• リスト</button>
-          <button class="memo-toolbar-btn" onclick="memoExecCmd('ol')" title="番号リスト">1. リスト</button>
-          <button class="memo-toolbar-btn" onclick="memoExecCmd('check')" title="チェックリスト">☑ TODO</button>
-          <div class="memo-toolbar-sep"></div>
-          <button class="memo-toolbar-btn" onclick="memoExecCmd('codeblock')" title="コード">&lt;/&gt;</button>
-          <button class="memo-toolbar-btn" onclick="memoExecCmd('quote')" title="引用">❮ 引用</button>
-          <button class="memo-toolbar-btn" onclick="memoExecCmd('callout')" title="コールアウト">💡 コールアウト</button>
-          <button class="memo-toolbar-btn" onclick="memoExecCmd('code')" title="コード">&lt;/&gt; コード</button>
-          <button class="memo-toolbar-btn" onclick="memoExecCmd('link')" title="リンク">🔗 リンク</button>
-          <button class="memo-toolbar-btn" onclick="memoExecCmd('collapse')" title="折りたたみ">▸ 折りたたみ</button>
-          <button class="memo-toolbar-btn" onclick="memoExecCmd('hr')" title="水平線">─ 線</button>
+          <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('ul')" title="箇条書き">• リスト</button>
+          <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('ol')" title="番号リスト">1. リスト</button>
+          <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('indent')" title="インデント">→</button>
+          <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('outdent')" title="アウトデント">←</button>
+          <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('quote')" title="引用">❮ 引用</button>
+          <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('callout', this)" title="コールアウト">💡 コールアウト</button>
+          <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('code')" title="コード">&lt;/&gt; コード</button>
+          <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('collapse')" title="折りたたみ">▸ 折りたたみ</button>
+          <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('hr')" title="水平線">─ 線</button>
         </div>
         <div class="memo-rich-editor" id="memo-rich-editor" contenteditable="true" data-placeholder="見出しや太字を使って自由に記入できます" oninput="autoSaveProjectMemo(${project.id});updateMemoToc()"></div>
         <div id="memo-save-status" style="font-size:11px;color:var(--fg-muted);margin-top:4px;min-height:16px"></div>
@@ -3991,23 +3991,30 @@
       html += '<main>';
       html += '<div class="project-memo-area" style="margin-top:0">';
       html += '<h3>📝 メモ・思考整理</h3>';
-      html += '<div class="memo-toolbar">';
-      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'h1\')" title="見出し1">H1</button>';
-      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'h2\')" title="見出し2">H2</button>';
-      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'h3\')" title="見出し3">H3</button>';
+      html += '<div class="memo-toolbar sticky">';
+      html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'undo\')" title="戻す (Cmd+Z)">↶</button>';
+      html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'redo\')" title="進む (Cmd+Shift+Z)">↷</button>';
       html += '<div class="memo-toolbar-sep"></div>';
-      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'bold\')" title="太字"><b>B</b></button>';
-      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'italic\')" title="イタリック"><i>I</i></button>';
-      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'strike\')" title="取り消し線"><s>S</s></button>';
+      html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'h1\')" title="見出し1">H1</button>';
+      html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'h2\')" title="見出し2">H2</button>';
+      html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'h3\')" title="見出し3">H3</button>';
+      html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'p\')" title="本文に戻す">本文</button>';
       html += '<div class="memo-toolbar-sep"></div>';
-      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'ul\')" title="箇条書き">• リスト</button>';
-      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'ol\')" title="番号リスト">1. リスト</button>';
-      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'check\')" title="チェックリスト">☑ TODO</button>';
+      html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'bold\')" title="太字"><b>B</b></button>';
+      html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'italic\')" title="イタリック"><i>I</i></button>';
+      html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'strike\')" title="取り消し線"><s>S</s></button>';
+      html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'color\', this)" title="文字色"><span style="border-bottom:3px solid #ef4444;padding-bottom:1px">A</span></button>';
+      html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'highlight\', this)" title="ハイライト"><span style="background:#FEF08A;padding:0 3px;border-radius:2px">H</span></button>';
       html += '<div class="memo-toolbar-sep"></div>';
-      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'codeblock\')" title="コード">&lt;/&gt;</button>';
-      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'quote\')" title="引用">❮ 引用</button>';
-      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'link\')" title="リンク">🔗 リンク</button>';
-      html += '<button class="memo-toolbar-btn" onclick="memoExecCmd(\'hr\')" title="水平線">─ 線</button>';
+      html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'ul\')" title="箇条書き">• リスト</button>';
+      html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'ol\')" title="番号リスト">1. リスト</button>';
+      html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'indent\')" title="インデント">→</button>';
+      html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'outdent\')" title="アウトデント">←</button>';
+      html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'quote\')" title="引用">❮ 引用</button>';
+      html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'callout\', this)" title="コールアウト">💡 コールアウト</button>';
+      html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'code\')" title="コード">&lt;/&gt; コード</button>';
+      html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'collapse\')" title="折りたたみ">▸ 折りたたみ</button>';
+      html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'hr\')" title="水平線">─ 線</button>';
       html += '</div>';
       html += '<div class="memo-rich-editor" id="memo-rich-editor" contenteditable="true" data-placeholder="見出しや太字を使って自由に記入できます" oninput="autoSaveTaskMemo(' + task.id + ');updateMemoToc()"></div>';
       html += '<div id="memo-save-status" style="font-size:11px;color:var(--fg-muted);margin-top:4px;min-height:16px"></div>';
@@ -4404,10 +4411,17 @@
     }
 
     
-    function memoExecCmd(type) {
+    function memoExecCmd(type, anchor) {
       const editor = document.getElementById('memo-rich-editor');
       if (!editor) return;
-      editor.focus();
+      // Save selection for color/highlight popups
+      var savedRange = null;
+      if (type === 'color' || type === 'highlight') {
+        var ss = window.getSelection();
+        if (ss.rangeCount) savedRange = ss.getRangeAt(0).cloneRange();
+      } else {
+        editor.focus();
+      }
       const sel = window.getSelection();
       const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
       switch(type) {
@@ -4422,6 +4436,28 @@
         case 'strike': document.execCommand('strikeThrough'); break;
         case 'ul': document.execCommand('insertUnorderedList'); break;
         case 'ol': document.execCommand('insertOrderedList'); break;
+        case 'indent': document.execCommand('indent'); break;
+        case 'outdent': document.execCommand('outdent'); break;
+        case 'color':
+          if (typeof showColorPopup === 'function') {
+            showColorPopup(anchor, COLOR_PALETTE, function(color) {
+              editor.focus();
+              if (savedRange) { var s2 = window.getSelection(); s2.removeAllRanges(); s2.addRange(savedRange); }
+              document.execCommand('styleWithCSS', false, true);
+              document.execCommand('foreColor', false, color);
+            });
+          }
+          break;
+        case 'highlight':
+          if (typeof showColorPopup === 'function') {
+            showColorPopup(anchor, HIGHLIGHT_PALETTE, function(color) {
+              editor.focus();
+              if (savedRange) { var s3 = window.getSelection(); s3.removeAllRanges(); s3.addRange(savedRange); }
+              document.execCommand('styleWithCSS', false, true);
+              document.execCommand('hiliteColor', false, color);
+            });
+          }
+          break;
         case 'check': {
           const text = sel.toString() || '\u30BF\u30B9\u30AF';
           const li = document.createElement('li');
