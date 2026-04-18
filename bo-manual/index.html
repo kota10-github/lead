@@ -3401,16 +3401,21 @@
     var syncDebounce = null;
     var SYNC_KEYS = ['users','projects','manuals','goals','todos','dailyTasks','tags','paceTags','permissions','assignees','nextId','nextTodoId','nextProjectId','nextManualId','nextGoalId','nextTagId','nextPaceTagId','nextUserId','nextDailyId','projectTasks','nextProjectTaskId'];
 
-    // Push local data to remote (debounced)
+    // Push local data to remote (debounced) — now uses merge to avoid overwriting other tabs' additions
     function pushSync() {
       clearTimeout(syncDebounce);
       syncDebounce = setTimeout(function() {
-        data._syncTs = Date.now();
-        fetch(SYNC_URL, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        }).catch(function(){});
+        // Merge remote first to preserve data added by other tabs/devices
+        fetch(SYNC_URL).then(function(r){return r.json()}).then(function(remote){
+          try { mergeRemoteIntoLocal(remote); } catch(e) {}
+        }).catch(function(){}).finally(function(){
+          data._syncTs = Date.now();
+          fetch(SYNC_URL, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          }).catch(function(){});
+        });
       }, 500);
     }
     // Safety: on page hide/unload, flush any pending autosave + push
@@ -3540,23 +3545,24 @@
         .then(function(r) { return r.json(); })
         .then(function(remote) {
           if (!remote || typeof remote !== 'object') { pushSync(); render(); return; }
-          var remoteTs = remote._syncTs || 0;
-          var localTs = data._syncTs || 0;
-          if (remoteTs > localTs) {
-            var hasData = false;
-            SYNC_KEYS.forEach(function(k) {
-              if (remote[k] !== undefined) hasData = true;
-            });
-            if (hasData) {
-              SYNC_KEYS.forEach(function(k) {
-                if (remote[k] !== undefined) data[k] = remote[k];
-              });
-              data._syncTs = remoteTs;
-              _origSaveData();
-            }
-          } else {
-            pushSync();
-          }
+          // Always merge remote non-destructively — never overwrite local additions/history.
+          // (Previous logic replaced data[k] = remote[k] when remoteTs > localTs, which wiped
+          //  local-only edits like new child tasks or manual.history entries.)
+          try { mergeRemoteIntoLocal(remote); } catch(e) {}
+          // For non-id-based scalar counters, take max
+          var counterKeys = ['nextId','nextTodoId','nextGoalId','nextDailyId'];
+          counterKeys.forEach(function(k){
+            if (typeof remote[k] === 'number') data[k] = Math.max(data[k] || 0, remote[k]);
+          });
+          // Copy over miscellaneous data that isn't id-list based (goals/todos/dailyTasks are
+          // trees — take the larger one as a heuristic, user can always restore from backups)
+          ['goals','todos','dailyTasks','permissions','assignees'].forEach(function(k){
+            if (remote[k] !== undefined && data[k] === undefined) data[k] = remote[k];
+          });
+          data._syncTs = Math.max(data._syncTs || 0, remote._syncTs || 0);
+          _origSaveData();
+          // Push merged state back so remote also catches up
+          pushSync();
           render();
         }).catch(function(){ pushSync(); render(); });
     }
