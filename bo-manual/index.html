@@ -2852,7 +2852,7 @@
               if (!m.history) m.history = [];
               m.history.push(Object.assign({ ts: Date.now() }, prev));
             }
-            Object.assign(m, { title: title, purpose: purpose, authority: authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap });
+            Object.assign(m, { title: title, purpose: purpose, authority: authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap, _modTs: Date.now() });
             if (paceTagId) m.operationPace = '';
             saveData();
             if (typeof pushSyncNow === 'function') pushSyncNow();
@@ -2920,7 +2920,7 @@
             // Keep last 50 versions only
             // History is NEVER purged
           }
-          Object.assign(m, { title, purpose, authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap });
+          Object.assign(m, { title, purpose, authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap, _modTs: Date.now() });
           // Clear legacy operationPace when using new tag system
           if (paceTagId) m.operationPace = '';
           saveData();
@@ -3506,16 +3506,29 @@
       });
     }
     // Merge remote data into local without destroying local-only additions.
-    // Tasks/manuals/projects are merged by id (append missing, keep local if both have same id).
-    // manual.history is merged by ts (append missing, sort).
+    // Items with same id are resolved by _modTs (newer wins). Items only on remote are added.
+    // Items only on local are preserved. manual.history is merged by ts (append missing).
     function mergeRemoteIntoLocal(remote) {
       if (!remote || typeof remote !== 'object') return;
       function mergeById(localList, remoteList) {
         if (!Array.isArray(localList) || !Array.isArray(remoteList)) return;
-        var localIds = {};
-        localList.forEach(function(x){ if (x && x.id != null) localIds[x.id] = true; });
+        var localById = {};
+        localList.forEach(function(x){ if (x && x.id != null) localById[x.id] = x; });
         remoteList.forEach(function(r){
-          if (r && r.id != null && !localIds[r.id]) localList.push(r);
+          if (!r || r.id == null) return;
+          var l = localById[r.id];
+          if (!l) {
+            localList.push(r); // remote-only: add
+            return;
+          }
+          // Both sides have it. Use _modTs to decide (newer wins).
+          var lt = l._modTs || 0;
+          var rt = r._modTs || 0;
+          if (rt > lt) {
+            // Replace local fields with remote (keep same object reference for callers' references)
+            Object.keys(l).forEach(function(k){ delete l[k]; });
+            Object.assign(l, r);
+          }
         });
       }
       mergeById(data.projectTasks = data.projectTasks || [], remote.projectTasks || []);
@@ -3721,6 +3734,37 @@
     if (!new URLSearchParams(location.search).get('manual')) {
       setTimeout(initSync, 300);
     }
+    // Cross-device sync: periodically pull remote + merge (non-destructive).
+    // Only re-render if remote had newer-_modTs items that replaced something local.
+    function pullMergeQuiet() {
+      if (new URLSearchParams(location.search).get('manual')) return;
+      // Skip while user is actively typing
+      var ae = document.activeElement;
+      if (ae && (ae.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))) return;
+      fetch(SYNC_URL).then(function(r){return r.json()}).then(function(remote){
+        if (!remote || typeof remote !== 'object') return;
+        var beforeSnapshot = JSON.stringify({
+          tasks: (data.projectTasks||[]).length,
+          taskStates: (data.projectTasks||[]).map(function(t){return t.id+':'+t.done}).sort(),
+          manualCount: (data.manuals||[]).length
+        });
+        mergeRemoteIntoLocal(remote);
+        var afterSnapshot = JSON.stringify({
+          tasks: (data.projectTasks||[]).length,
+          taskStates: (data.projectTasks||[]).map(function(t){return t.id+':'+t.done}).sort(),
+          manualCount: (data.manuals||[]).length
+        });
+        if (beforeSnapshot !== afterSnapshot) {
+          _origSaveData();
+          // Only re-render if not currently in a form the user is editing
+          if (currentPage !== 'manual-form') render();
+        }
+      }).catch(function(){});
+    }
+    setInterval(pullMergeQuiet, 15000);
+    document.addEventListener('visibilitychange', function(){
+      if (!document.hidden) pullMergeQuiet();
+    });
 
     // visibilitychange → pullSync was removed. It was destroying user input:
     //   - Adding a task or editing a manual, then tab-switching back, triggered a pull
@@ -4001,7 +4045,7 @@
           if (!title) { toast('タスク名を入力してください'); return; }
           if (!data.projectTasks) data.projectTasks = [];
           if (!data.nextProjectTaskId) data.nextProjectTaskId = 1;
-          var task = { id: data.nextProjectTaskId++, projectId: projectId, title: title, done: false };
+          var task = { id: data.nextProjectTaskId++, projectId: projectId, title: title, done: false, _modTs: Date.now() };
           var due = document.getElementById('d-pt-due').value;
           if (due) task.dueDate = due;
           data.projectTasks.push(task);
@@ -4022,7 +4066,7 @@
           if (!title) { toast('タスク名を入力してください'); return; }
           if (!data.projectTasks) data.projectTasks = [];
           if (!data.nextProjectTaskId) data.nextProjectTaskId = 1;
-          var task = { id: data.nextProjectTaskId++, projectId: parent.projectId, title: title, done: false, parentTaskId: parentTaskId };
+          var task = { id: data.nextProjectTaskId++, projectId: parent.projectId, title: title, done: false, parentTaskId: parentTaskId, _modTs: Date.now() };
           var due = document.getElementById('d-ct-due').value;
           if (due) task.dueDate = due;
           data.projectTasks.push(task);
@@ -4048,7 +4092,7 @@
           var pid = Number(document.getElementById('d-pt-project').value);
           if (!data.projectTasks) data.projectTasks = [];
           if (!data.nextProjectTaskId) data.nextProjectTaskId = 1;
-          var task = { id: data.nextProjectTaskId++, projectId: pid, title: title, done: false };
+          var task = { id: data.nextProjectTaskId++, projectId: pid, title: title, done: false, _modTs: Date.now() };
           var due = document.getElementById('d-pt-due').value;
           if (due) task.dueDate = due;
           data.projectTasks.push(task);
@@ -4058,7 +4102,7 @@
     }
     function toggleProjectTask(taskId) {
       var task = (data.projectTasks || []).find(function(t) { return t.id === taskId; });
-      if (task) { task.done = !task.done; saveData(); render(); }
+      if (task) { task.done = !task.done; task._modTs = Date.now(); saveData(); render(); }
     }
     function deleteProjectTask(taskId) {
       // Cascade: delete descendants too
