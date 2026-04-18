@@ -3397,17 +3397,11 @@
       setTimeout(initSync, 300);
     }
 
-    // On tab focus: pull latest from remote (skip while editing or in public manual view)
-    document.addEventListener('visibilitychange', function() {
-      if (document.hidden) return;
-      if (new URLSearchParams(location.search).get('manual')) return;
-      // Do NOT pull while the user is in the manual/project edit forms or inside any
-      // contenteditable — pulling overwrites local state and re-renders, wiping the editor.
-      if (currentPage === 'manual-form') return;
-      var ae = document.activeElement;
-      if (ae && (ae.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))) return;
-      pullSync();
-    });
+    // visibilitychange → pullSync was removed. It was destroying user input:
+    //   - Adding a task or editing a manual, then tab-switching back, triggered a pull
+    //     before the local push completed, wiping tasks / edits with stale remote data.
+    //   Initial sync on page load is the only place we pull now. If cross-tab sync is
+    //   needed in the future, implement per-key merge before clobbering local data.
 
 
     function countTasks(node) {
