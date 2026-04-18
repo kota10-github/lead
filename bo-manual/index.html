@@ -300,6 +300,26 @@
       .info-grid{grid-template-columns:1fr}
       .info-grid > div + div{border-left:none;border-top:1px solid var(--border)}
       .doc-toc{display:none}
+      /* Document pages (manual/project detail) — clean single-column layout on mobile */
+      .doc-page{margin:-16px -12px}
+      .doc-layout{padding:0;gap:0;display:block}
+      .doc-main{max-width:100%;padding:16px 16px 48px}
+      .doc-meta{display:none}
+      .doc-title{font-size:22px!important;margin-bottom:12px!important}
+      .breadcrumb{margin-bottom:12px}
+      /* Show copy / delete buttons permanently on touch devices (no hover) */
+      .copy-block-btn,.code-block-btn{opacity:1!important;pointer-events:auto!important;font-size:11px;padding:4px 8px}
+      .bq-delete,.block-delete{opacity:1!important;pointer-events:auto!important}
+      /* Tighter block padding on mobile */
+      .copy-block,.callout,pre.code-block{padding:12px 14px}
+      .copy-block-body{padding-right:80px}
+      /* Manual form: collapse 3-column into single */
+      .manual-form-layout{grid-template-columns:1fr!important;gap:12px}
+      .manual-form-layout > aside{position:static!important;max-height:none!important}
+      .memo-toolbar{gap:2px;padding:4px 6px;flex-wrap:wrap}
+      .memo-toolbar-btn{padding:3px 6px;font-size:11px}
+      .memo-toolbar-sep{display:none}
+      .memo-rich-editor,.manual-rich-editor{height:60vh!important;max-height:60vh!important;font-size:15px;padding:12px}
       .page-header{flex-direction:column;align-items:flex-start;gap:8px;margin-bottom:12px}
       .breadcrumb{font-size:11px;padding:6px 10px;margin-bottom:8px;flex-wrap:wrap}
       .card{border-radius:8px}
