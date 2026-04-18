@@ -2040,6 +2040,7 @@
       html += `<div class="doc-meta-actions no-print">
         <button class="btn btn-outline btn-sm" onclick="shareManualLink(${manual.id})">🔗 共有リンク</button>
         <button class="btn btn-outline btn-sm" onclick="showManualHistory(${manual.id})">🕐 変更履歴</button>
+        <button class="btn btn-outline btn-sm" onclick="showLocalBackupsDialog()" title="自動バックアップ（最大200件）">💾 バックアップ</button>
         <button class="btn btn-outline btn-sm" onclick="navigate('manual-form',{editId:${manual.id}})">${icons.pencil} 編集</button>
         <button class="btn btn-outline btn-sm" style="color:var(--destructive)" onclick="confirmDeleteManual(${manual.id})">${icons.trash} 削除</button>
       </div>`;
@@ -3385,12 +3386,110 @@
         }).catch(function(){ pushSync(); render(); });
     }
 
-    // Override saveData to also push to cloud
+    // ===== Append-only local backup (never overwrites, ring buffer of 200) =====
+    var BACKUPS_KEY = 'bo-manual-backups';
+    var BACKUP_MAX = 200;
+    var _lastBackupTs = 0;
+    function appendLocalBackup(reason) {
+      try {
+        var now = Date.now();
+        if (now - _lastBackupTs < 3000) return; // throttle: at most one backup per 3s
+        _lastBackupTs = now;
+        var raw = localStorage.getItem(BACKUPS_KEY);
+        var arr = raw ? JSON.parse(raw) : [];
+        // Clone essential state: manuals + projects + projectTasks + tags
+        var snap = {
+          ts: now,
+          reason: reason || 'save',
+          manuals: JSON.parse(JSON.stringify(data.manuals || [])),
+          projects: JSON.parse(JSON.stringify(data.projects || [])),
+          projectTasks: JSON.parse(JSON.stringify(data.projectTasks || [])),
+          tags: JSON.parse(JSON.stringify(data.tags || [])),
+          paceTags: JSON.parse(JSON.stringify(data.paceTags || []))
+        };
+        // Skip if identical to last snapshot
+        var prev = arr[arr.length - 1];
+        if (prev && JSON.stringify(prev.manuals) === JSON.stringify(snap.manuals)
+            && JSON.stringify(prev.projectTasks) === JSON.stringify(snap.projectTasks)) {
+          return;
+        }
+        arr.push(snap);
+        if (arr.length > BACKUP_MAX) arr = arr.slice(-BACKUP_MAX);
+        try {
+          localStorage.setItem(BACKUPS_KEY, JSON.stringify(arr));
+        } catch (e) {
+          // Storage full — trim harder and retry
+          arr = arr.slice(-Math.floor(BACKUP_MAX / 2));
+          try { localStorage.setItem(BACKUPS_KEY, JSON.stringify(arr)); } catch(e2) {}
+        }
+      } catch (e) { /* never throw from backup path */ }
+    }
+    function listLocalBackups() {
+      try {
+        var raw = localStorage.getItem(BACKUPS_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch(e) { return []; }
+    }
+    function downloadBackupJson() {
+      var payload = { exportedAt: new Date().toISOString(), backups: listLocalBackups(), currentData: data };
+      var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'bo-manual-backup-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 100);
+    }
+    function restoreFromLocalBackup(ts) {
+      var arr = listLocalBackups();
+      var b = arr.find(function(x){ return x.ts === ts; });
+      if (!b) { toast('バックアップが見つかりません'); return; }
+      // Safety: snapshot current before overwrite
+      appendLocalBackup('pre-restore');
+      data.manuals = JSON.parse(JSON.stringify(b.manuals || []));
+      if (b.projects) data.projects = JSON.parse(JSON.stringify(b.projects));
+      if (b.projectTasks) data.projectTasks = JSON.parse(JSON.stringify(b.projectTasks));
+      if (b.tags) data.tags = JSON.parse(JSON.stringify(b.tags));
+      if (b.paceTags) data.paceTags = JSON.parse(JSON.stringify(b.paceTags));
+      saveData();
+      toast('バックアップから復元しました');
+      render();
+    }
+    function showLocalBackupsDialog() {
+      var arr = listLocalBackups().slice().reverse(); // newest first
+      var body = '<div style="max-height:60vh;overflow-y:auto">';
+      body += '<div style="display:flex;gap:8px;margin-bottom:12px"><button class="btn btn-primary btn-sm" onclick="downloadBackupJson()">.json でダウンロード</button><span style="font-size:11px;color:var(--fg-muted);align-self:center">' + arr.length + ' 件保持中(最大 ' + BACKUP_MAX + ')</span></div>';
+      if (arr.length === 0) {
+        body += '<p style="color:var(--fg-muted2);font-size:13px">バックアップがありません</p>';
+      } else {
+        arr.forEach(function(b) {
+          var d = new Date(b.ts);
+          var manualsSummary = (b.manuals || []).map(function(m){ return escapeHtml(m.title||'') + ' (' + (m.taskRoadmap||'').length + ')'; }).join(' / ');
+          body += '<div style="padding:10px 12px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;display:flex;align-items:center;gap:10px">';
+          body += '<div style="flex:1;min-width:0"><div style="font-size:12px;color:var(--fg-muted)">' + d.toLocaleString() + ' / ' + escapeHtml(b.reason || '') + '</div>';
+          body += '<div style="font-size:12px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + manualsSummary + '</div></div>';
+          body += '<button class="btn btn-outline btn-sm" onclick="if(confirm(\'この時点に復元しますか?\')){restoreFromLocalBackup(' + b.ts + ');document.querySelectorAll(\'.modal-overlay\').forEach(function(x){x.remove()})}">復元</button>';
+          body += '</div>';
+        });
+      }
+      body += '</div>';
+      showModal('バックアップ履歴', body, [
+        { label: '閉じる', onClick: function(o){ o.remove(); } }
+      ]);
+    }
+    window.showLocalBackupsDialog = showLocalBackupsDialog;
+    window.restoreFromLocalBackup = restoreFromLocalBackup;
+    window.downloadBackupJson = downloadBackupJson;
+
+    // Override saveData to also push to cloud AND append to local backup log
     var _origSaveData = saveData;
     saveData = function() {
       _origSaveData();
+      appendLocalBackup('save');
       pushSync();
     };
+    // Initial backup on page load so we always have at least one snapshot
+    setTimeout(function(){ appendLocalBackup('load'); }, 500);
 
     // On load: smart sync with timestamp comparison (skip in public manual view)
     if (!new URLSearchParams(location.search).get('manual')) {
