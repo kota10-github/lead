@@ -1861,7 +1861,6 @@
         <a href="#sec-overview">概要</a>
         <a href="#sec-children">マニュアル・サブプロジェクト</a>
         <a href="#sec-tasks">タスク</a>
-        <a href="#sec-files">資料・ファイル</a>
         <a href="#sec-memo">メモ・思考整理</a>
         <div id="memo-toc" style="margin-top:12px"></div>
       </aside>`;
@@ -1917,25 +1916,6 @@
         });
         html += `</div>`;
       }
-      // Section: Files
-      html += `<h2 id="sec-files" class="doc-section-title" style="font-size:15px;font-weight:600;color:var(--fg-muted);margin:32px 0 8px">資料・ファイル</h2>`;
-      html += `<div class="project-files-area" style="margin-top:0">
-        <div class="file-upload-zone" id="file-upload-zone" onclick="document.getElementById('file-input').click()">
-          クリックまたはドラッグ&ドロップでファイルをアップロード
-          <input type="file" id="file-input" multiple style="display:none" onchange="handleFileUpload(${project.id}, this.files)">
-        </div>
-        <div class="file-list" id="file-list">`;
-      project.files.forEach((f, fi) => {
-        const isImage = f.type && f.type.startsWith('image/');
-        html += `<div class="file-item">
-          ${isImage ? `<img src="${f.dataUrl}" class="file-item-preview">` : ''}
-          <span class="file-item-name">${escapeHtml(f.name)}</span>
-          <span class="file-item-size">${formatFileSize(f.size)}</span>
-          ${isImage ? `<span class="file-item-delete" onclick="window.open('${f.dataUrl}','_blank')" title="開く">${icons.external}</span>` : ''}
-          <span class="file-item-delete" onclick="deleteProjectFile(${project.id},${fi})" title="削除">${icons.x}</span>
-        </div>`;
-      });
-      html += `</div></div>`;
       // Section: Memo
       html += `<h2 id="sec-memo" class="doc-section-title" style="font-size:15px;font-weight:600;color:var(--fg-muted);margin:32px 0 8px">メモ・思考整理</h2>`;
       html += `<div class="project-memo-area" style="margin-top:0">
@@ -1973,13 +1953,6 @@
       // Load memo into rich editor after render
       setTimeout(function() { loadMemoToEditor(project.id); updateMemoToc(); }, 0);
       el.innerHTML = html;
-      // Setup drag & drop
-      const zone = document.getElementById('file-upload-zone');
-      if (zone) {
-        zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
-        zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
-        zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('dragover'); handleFileUpload(project.id, e.dataTransfer.files); });
-      }
     }
     function renderManualList(el) {
       let html = `<div class="page-header"><h1 class="page-title">マニュアル</h1></div>`;
