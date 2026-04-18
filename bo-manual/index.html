@@ -1090,6 +1090,8 @@
     function getManualCountForProject(pid) { return data.manuals.filter(m => m.projectId === pid).length; }
     function getManualsByProject(pid) { return data.manuals.filter(m => m.projectId === pid); }
     function getTasksByProject(pid) { return (data.projectTasks || []).filter(function(t) { return t.projectId === pid; }); }
+    function getTopLevelTasksByProject(pid) { return (data.projectTasks || []).filter(function(t) { return t.projectId === pid && !t.parentTaskId; }); }
+    function getChildTasks(parentId) { return (data.projectTasks || []).filter(function(t) { return t.parentTaskId === parentId; }); }
     // Pace tag + schedule helpers
     function getPaceTag(id) { return (data.paceTags || []).find(function(t) { return t.id === id; }); }
     function formatSchedule(s) {
@@ -1902,18 +1904,23 @@
         <button onclick="navigate('manual-form',{projectId:${project.id}})" style="background:none;border:none;padding:0;color:var(--primary);font-size:13px;cursor:pointer">+ マニュアル</button>
         <button onclick="showProjectDialog(${project.id})" style="background:none;border:none;padding:0;color:var(--primary);font-size:13px;cursor:pointer">+ サブプロジェクト</button>
       </div>`;
-      // Section: Tasks
+      // Section: Tasks (with nested children)
+      const topLevelTasks = getTopLevelTasksByProject(project.id);
       html += `<h2 id="sec-tasks" class="doc-section-title" style="font-size:15px;font-weight:600;color:var(--fg-muted);margin:32px 0 8px;display:flex;align-items:center;gap:12px">タスク${pTasks.length > 0 ? ' <span style="color:var(--fg-muted2);font-weight:400">' + pTasks.length + '</span>' : ''}<button onclick="showAddProjectTask(${project.id})" style="background:none;border:none;padding:0;color:var(--primary);font-size:13px;cursor:pointer;font-weight:400">+ 追加</button></h2>`;
-      if (pTasks.length === 0) {
+      if (topLevelTasks.length === 0) {
         html += `<p style="color:var(--fg-muted2);font-size:13px">—</p>`;
       } else {
         html += `<div style="display:flex;flex-direction:column">`;
-        pTasks.forEach(function(t) {
-          html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;cursor:pointer" onclick="navigate('task-detail',{id:${t.id}})">`;
+        function renderTaskRow(t, depth) {
+          const children = getChildTasks(t.id);
+          html += `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;padding-left:${depth*20}px;cursor:pointer" onclick="navigate('task-detail',{id:${t.id}})" onmouseover="this.querySelector('.task-row-actions').style.opacity='1'" onmouseout="this.querySelector('.task-row-actions').style.opacity='0'">`;
           html += `<div class="todo-checkbox ${t.done ? 'checked' : ''}" style="width:20px;height:20px" onclick="event.stopPropagation();expandProjectTaskActions(this,${t.id},${t.done})">${t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>'}</div>`;
           html += `<span style="flex:1;font-size:14px;${t.done ? 'text-decoration:line-through;opacity:.5' : ''}">${escapeHtml(t.title)}${dueBadgeHtml(t)}</span>`;
+          html += `<span class="task-row-actions" style="opacity:0;transition:opacity .15s"><button onclick="event.stopPropagation();showAddChildTask(${t.id})" style="background:none;border:none;padding:2px 8px;color:var(--primary);font-size:12px;cursor:pointer">+ 子タスク</button></span>`;
           html += `</div>`;
-        });
+          children.forEach(function(c) { renderTaskRow(c, depth + 1); });
+        }
+        topLevelTasks.forEach(function(t) { renderTaskRow(t, 0); });
         html += `</div>`;
       }
       // Section: Memo
@@ -3826,6 +3833,28 @@
         }}
       ]);
     }
+    function showAddChildTask(parentTaskId) {
+      var parent = (data.projectTasks || []).find(function(t) { return t.id === parentTaskId; });
+      if (!parent) return;
+      var bodyHtml = '<div class="form-group"><label class="label">子タスク名</label><input class="input" id="d-ct-title" placeholder="子タスク名を入力"></div>';
+      bodyHtml += '<div class="form-group"><label class="label">親タスク</label><div style="font-size:13px;color:var(--fg-muted);padding:4px 0">' + escapeHtml(parent.title) + '</div></div>';
+      bodyHtml += '<div class="form-group"><label class="label">期日（任意）</label><input type="date" class="input" id="d-ct-due"></div>';
+      showModal('子タスクを追加', bodyHtml, [
+        { label: 'キャンセル', onClick: function(o) { o.remove(); } },
+        { label: '追加', class: 'btn btn-primary', onClick: function(o) {
+          var title = document.getElementById('d-ct-title').value.trim();
+          if (!title) { toast('タスク名を入力してください'); return; }
+          if (!data.projectTasks) data.projectTasks = [];
+          if (!data.nextProjectTaskId) data.nextProjectTaskId = 1;
+          var task = { id: data.nextProjectTaskId++, projectId: parent.projectId, title: title, done: false, parentTaskId: parentTaskId };
+          var due = document.getElementById('d-ct-due').value;
+          if (due) task.dueDate = due;
+          data.projectTasks.push(task);
+          saveData(); toast('子タスクを追加しました'); o.remove(); render();
+        }}
+      ]);
+    }
+    window.showAddChildTask = showAddChildTask;
     function showAddTaskFromProjectPicker() {
       var projects = data.projects || [];
       var bodyHtml = '<div class="form-group"><label class="label">タスク名</label><input class="input" id="d-pt-title" placeholder="タスク名を入力"></div>';
@@ -3856,7 +3885,19 @@
       if (task) { task.done = !task.done; saveData(); render(); }
     }
     function deleteProjectTask(taskId) {
-      data.projectTasks = (data.projectTasks || []).filter(function(t) { return t.id !== taskId; });
+      // Cascade: delete descendants too
+      var toDelete = new Set([taskId]);
+      var changed = true;
+      while (changed) {
+        changed = false;
+        (data.projectTasks || []).forEach(function(t) {
+          if (t.parentTaskId && toDelete.has(t.parentTaskId) && !toDelete.has(t.id)) {
+            toDelete.add(t.id);
+            changed = true;
+          }
+        });
+      }
+      data.projectTasks = (data.projectTasks || []).filter(function(t) { return !toDelete.has(t.id); });
       saveData(); render();
     }
     function expandProjectTaskActions(el, taskId, isDone) {
