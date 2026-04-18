@@ -1410,6 +1410,22 @@
           html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="' + c.bg + '" stroke="' + c.bg + '" stroke-width="2" stroke-linejoin="round" style="flex-shrink:0"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>';
           html += escapeHtml(m.title) + '</div>';
         });
+        // Build visible task tree: hide done tasks, but promote non-done orphans
+        // (children whose parent is done/hidden) to top level so they still appear
+        function buildVisibleTaskTree(allTasks) {
+          var visible = allTasks.filter(function(t){ return !t.done; });
+          var visibleIds = {};
+          visible.forEach(function(t){ visibleIds[t.id] = true; });
+          // Effective parentTaskId: if parent not visible, treat as top-level
+          visible.forEach(function(t){
+            t._effectiveParent = (t.parentTaskId && visibleIds[t.parentTaskId]) ? t.parentTaskId : null;
+          });
+          return visible;
+        }
+        var visibleMProjTasks = buildVisibleTaskTree(mProjTasks);
+        function getVisibleChildren(parentId, pool) {
+          return pool.filter(function(c){ return c._effectiveParent === parentId; });
+        }
         // Tasks inside (top-level + indented children with L-connector)
         function renderMobileTaskRow(t, depth) {
           var INDENT = 20, CBOX = 20;
@@ -1427,10 +1443,10 @@
           html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:' + CBOX + 'px;height:' + CBOX + 'px;font-size:8px;position:relative;z-index:1" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
           html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>' + dueBadgeHtml(t);
           html += '</div>';
-          var kids = mProjTasks.filter(function(c){ return c.parentTaskId === t.id && !c.done; });
+          var kids = getVisibleChildren(t.id, visibleMProjTasks);
           kids.forEach(function(c){ renderMobileTaskRow(c, depth + 1); });
         }
-        mProjTasks.filter(function(t){ return !t.parentTaskId && !t.done; }).forEach(function(t){ renderMobileTaskRow(t, 0); });
+        visibleMProjTasks.filter(function(t){ return !t._effectiveParent; }).forEach(function(t){ renderMobileTaskRow(t, 0); });
         // Sub-projects
         if (proj.subProjects.length > 0) {
           proj.subProjects.forEach(function renderSub(sp) {
@@ -1460,9 +1476,10 @@
               html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:' + CBOX + 'px;height:' + CBOX + 'px;font-size:8px;position:relative;z-index:1" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
               html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>' + dueBadgeHtml(t);
               html += '</div>';
-              spTasks.filter(function(c){ return c.parentTaskId === t.id && !c.done; }).forEach(function(c){ renderSpTaskRow(c, depth + 1); });
+              getVisibleChildren(t.id, visibleSpTasks).forEach(function(c){ renderSpTaskRow(c, depth + 1); });
             }
-            spTasks.filter(function(t){ return !t.parentTaskId && !t.done; }).forEach(function(t){ renderSpTaskRow(t, 0); });
+            var visibleSpTasks = buildVisibleTaskTree(spTasks);
+            visibleSpTasks.filter(function(t){ return !t._effectiveParent; }).forEach(function(t){ renderSpTaskRow(t, 0); });
             sp.subProjects.forEach(renderSub);
             html += '</div>';
           });
@@ -1518,7 +1535,23 @@
         html += '<h3 style="font-size:14px;font-weight:600;margin-bottom:10px;color:var(--fg);display:flex;align-items:center;gap:6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>リマインダー</h3>';
         // Continuous connected list: one border box, rows separated by 1px inner dividers only
         html += '<div class="card" style="padding:0;overflow:hidden">';
-        urgentTasks.forEach(function(t, idx) {
+        var rowIdx = 0;
+        function renderReminderRow(t, depth, urgencyColor, urgencyLabel, projName, c) {
+          var leftPad = depth * 20;
+          var borderTop = rowIdx > 0 ? 'border-top:1px solid var(--border-light);' : '';
+          rowIdx++;
+          html += '<div style="padding:10px 14px;padding-left:' + (14 + leftPad) + 'px;cursor:pointer;display:flex;align-items:center;gap:10px;position:relative;' + borderTop + '" onclick="navigate(\'task-detail\',{id:' + t.id + '})">';
+          html += '<span style="position:absolute;left:0;top:0;bottom:0;width:3px;background:' + urgencyColor + '"></span>';
+          html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:24px;height:24px;font-size:10px;margin-left:4px" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
+          html += '<div style="flex:1;min-width:0">';
+          html += '<div style="font-size:13px;font-weight:500;' + (t.done ? 'text-decoration:line-through;opacity:.5' : '') + '">' + escapeHtml(t.title) + '</div>';
+          html += '<div style="font-size:11px;color:var(--fg-muted);display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:' + c.bg + '"></span>' + escapeHtml(projName) + (urgencyLabel ? ' <span style="color:' + urgencyColor + ';font-weight:600">' + urgencyLabel + '</span>' : '') + '</div>';
+          html += '</div></div>';
+          // Render non-done children below the parent
+          var kids = (data.projectTasks || []).filter(function(ch){ return ch.parentTaskId === t.id && !ch.done; });
+          kids.forEach(function(ch){ renderReminderRow(ch, depth + 1, urgencyColor, '', projName, c); });
+        }
+        urgentTasks.forEach(function(t) {
           var due = new Date(t.dueDate); due.setHours(0,0,0,0);
           var diff = Math.round((due - now) / 86400000);
           var proj = getProject(t.projectId);
@@ -1526,14 +1559,7 @@
           var c = getProjectColor(t.projectId);
           var urgencyColor = diff < 0 ? '#ef4444' : '#f59e0b';
           var urgencyLabel = diff < 0 ? '期限切れ' : (diff === 0 ? '今日' : 'あと' + diff + '日');
-          var borderTop = idx > 0 ? 'border-top:1px solid var(--border-light);' : '';
-          html += '<div style="padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;position:relative;' + borderTop + '" onclick="navigate(\'task-detail\',{id:' + t.id + '})">';
-          html += '<span style="position:absolute;left:0;top:0;bottom:0;width:3px;background:' + urgencyColor + '"></span>';
-          html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:24px;height:24px;font-size:10px;margin-left:4px" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
-          html += '<div style="flex:1;min-width:0">';
-          html += '<div style="font-size:13px;font-weight:500;' + (t.done ? 'text-decoration:line-through;opacity:.5' : '') + '">' + escapeHtml(t.title) + '</div>';
-          html += '<div style="font-size:11px;color:var(--fg-muted);display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:' + c.bg + '"></span>' + escapeHtml(projName) + ' <span style="color:' + urgencyColor + ';font-weight:600">' + urgencyLabel + '</span></div>';
-          html += '</div></div>';
+          renderReminderRow(t, 0, urgencyColor, urgencyLabel, projName, c);
         });
         html += '</div>'; // card
         html += '</div>'; // wrapper
@@ -1627,8 +1653,11 @@
             if (m.purpose) html += `<div class="node-manual-purpose">${escapeHtml(m.purpose)}</div>`;
             html += `</div>`;
           });
-          // Map hides completed tasks: only show top-level unfinished tasks
-          projTasks.filter(function(t){ return !t.parentTaskId && !t.done; }).forEach(function(t) {
+          // Map hides completed tasks; children whose parent is hidden get promoted to top-level
+          var vProjTasks = projTasks.filter(function(t){ return !t.done; });
+          var vProjIds = {}; vProjTasks.forEach(function(t){ vProjIds[t.id] = true; });
+          vProjTasks.forEach(function(t){ t._effectiveParent = (t.parentTaskId && vProjIds[t.parentTaskId]) ? t.parentTaskId : null; });
+          vProjTasks.filter(function(t){ return !t._effectiveParent; }).forEach(function(t) {
             renderTaskBranch(t, c);
           });
           proj.subProjects.forEach(function(sp) { renderSubBranch(sp); });
@@ -1657,8 +1686,11 @@
             if (m.purpose) html += '<div class="node-manual-purpose">' + escapeHtml(m.purpose) + '</div>';
             html += '</div>';
           });
-          // Map hides completed tasks
-          spTasks.filter(function(t){ return !t.parentTaskId && !t.done; }).forEach(function(t) { renderTaskBranch(t, sc); });
+          // Map hides completed tasks; promote orphaned visible children
+          var vSpTasks = spTasks.filter(function(t){ return !t.done; });
+          var vSpIds = {}; vSpTasks.forEach(function(t){ vSpIds[t.id] = true; });
+          vSpTasks.forEach(function(t){ t._effectiveParent = (t.parentTaskId && vSpIds[t.parentTaskId]) ? t.parentTaskId : null; });
+          vSpTasks.filter(function(t){ return !t._effectiveParent; }).forEach(function(t) { renderTaskBranch(t, sc); });
           if (sp.subProjects.length > 0) {
             sp.subProjects.forEach(function(child) { renderSubBranch(child); });
           }
