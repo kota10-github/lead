@@ -914,6 +914,11 @@
     function navigate(page, params = {}) {
       // Close sidebar on mobile navigation
       var sb = document.querySelector('.sidebar'); if (sb && sb.classList.contains('open')) { sb.classList.remove('open'); var ov = document.getElementById('sidebar-overlay'); if (ov) ov.remove(); document.body.style.overflow = ''; }
+      // If leaving the manual edit form, force a final autosave + history snapshot
+      if (currentPage === 'manual-form' && page !== 'manual-form') {
+        try { if (typeof flushManualFormOnHide === 'function') flushManualFormOnHide(); } catch(e) {}
+        try { if (typeof snapshotManualFormHistory === 'function') snapshotManualFormHistory(); } catch(e) {}
+      }
       currentPage = page;
       pageParams = params;
       try { localStorage.setItem('bo_nav', JSON.stringify({page: page, params: params})); } catch(e) {}
@@ -922,7 +927,7 @@
       });
       const navTitle = document.querySelector(`.nav-item[data-page="${page}"]`)?.textContent.trim() || '';
       document.getElementById('mobile-title').textContent = (page === 'home' && window.innerWidth <= 768) ? 'BOタスク' : (page === 'dashboard' ? 'BOタスク' : navTitle);
-      const isFullscreen = page === 'manual-detail' || page === 'project-detail' || page === 'member-page' || page === 'member-manual';
+      const isFullscreen = page === 'manual-detail' || page === 'project-detail' || page === 'manual-form' || page === 'member-page' || page === 'member-manual';
       document.querySelector('.sidebar').classList.toggle('hidden', isFullscreen);
       document.getElementById('main-area').style.marginLeft = isFullscreen ? '0' : '';
       render();
@@ -938,7 +943,7 @@
       var mt = document.getElementById('mobile-title');
       if (mt) mt.textContent = (currentPage === 'home' || currentPage === 'dashboard') ? 'BOタスク' : titleText;
       // Apply fullscreen state on initial load so sidebar doesn't flash on reload
-      var isFullscreen = currentPage === 'manual-detail' || currentPage === 'project-detail' || currentPage === 'member-page' || currentPage === 'member-manual';
+      var isFullscreen = currentPage === 'manual-detail' || currentPage === 'project-detail' || currentPage === 'manual-form' || currentPage === 'member-page' || currentPage === 'member-manual';
       document.querySelector('.sidebar').classList.toggle('hidden', isFullscreen);
       document.getElementById('main-area').style.marginLeft = isFullscreen ? '0' : '';
     })();
@@ -2695,6 +2700,27 @@
       });
     }
 
+    // Force a history snapshot of the currently-edited manual (called on close)
+    function snapshotManualFormHistory() {
+      if (!pageParams || !pageParams.editId) return;
+      var m = getManual(pageParams.editId);
+      if (!m) return;
+      if (!m.history) m.history = [];
+      var last = m.history[m.history.length - 1];
+      var isSameAsLast = last && last.title === m.title && last.purpose === m.purpose && last.taskRoadmap === m.taskRoadmap;
+      if (isSameAsLast) return;
+      m.history.push({
+        ts: Date.now(),
+        title: m.title, purpose: m.purpose, authority: m.authority,
+        paceTagId: m.paceTagId, paceSchedule: m.paceSchedule,
+        operationPace: m.operationPace, responseSpeed: m.responseSpeed,
+        taskRoadmap: m.taskRoadmap,
+        _source: 'close'
+      });
+      if (m.history.length > 100) m.history = m.history.slice(-100);
+      saveData();
+      if (typeof pushSyncNow === 'function') pushSyncNow();
+    }
     // Autosave the manual form (debounced, pushes to remote immediately so reload/close won't lose edits)
     var _manualFormAutoSaveTimer = null;
     var _manualFormAutoSaveStatusEl = null;
@@ -3369,9 +3395,16 @@
       setTimeout(initSync, 300);
     }
 
-    // On tab focus: pull latest from remote (skip in public manual view)
+    // On tab focus: pull latest from remote (skip while editing or in public manual view)
     document.addEventListener('visibilitychange', function() {
-      if (!document.hidden && !new URLSearchParams(location.search).get('manual')) pullSync();
+      if (document.hidden) return;
+      if (new URLSearchParams(location.search).get('manual')) return;
+      // Do NOT pull while the user is in the manual/project edit forms or inside any
+      // contenteditable — pulling overwrites local state and re-renders, wiping the editor.
+      if (currentPage === 'manual-form') return;
+      var ae = document.activeElement;
+      if (ae && (ae.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))) return;
+      pullSync();
     });
 
 
