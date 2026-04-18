@@ -1489,7 +1489,9 @@
       if (urgentTasks.length > 0) {
         html += '<div style="margin-bottom:16px">';
         html += '<h3 style="font-size:14px;font-weight:600;margin-bottom:10px;color:var(--fg);display:flex;align-items:center;gap:6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>リマインダー</h3>';
-        urgentTasks.forEach(function(t) {
+        // Continuous connected list: one border box, rows separated by 1px inner dividers only
+        html += '<div class="card" style="padding:0;overflow:hidden">';
+        urgentTasks.forEach(function(t, idx) {
           var due = new Date(t.dueDate); due.setHours(0,0,0,0);
           var diff = Math.round((due - now) / 86400000);
           var proj = getProject(t.projectId);
@@ -1497,15 +1499,17 @@
           var c = getProjectColor(t.projectId);
           var urgencyColor = diff < 0 ? '#ef4444' : '#f59e0b';
           var urgencyLabel = diff < 0 ? '期限切れ' : (diff === 0 ? '今日' : 'あと' + diff + '日');
-          html += '<div class="card" style="padding:10px 14px;margin-bottom:6px;border-left:3px solid ' + urgencyColor + ';cursor:pointer" onclick="navigate(\'task-detail\',{id:' + t.id + '})">';
-          html += '<div style="display:flex;align-items:center;gap:10px">';
-          html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:24px;height:24px;font-size:10px" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
+          var borderTop = idx > 0 ? 'border-top:1px solid var(--border-light);' : '';
+          html += '<div style="padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;position:relative;' + borderTop + '" onclick="navigate(\'task-detail\',{id:' + t.id + '})">';
+          html += '<span style="position:absolute;left:0;top:0;bottom:0;width:3px;background:' + urgencyColor + '"></span>';
+          html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:24px;height:24px;font-size:10px;margin-left:4px" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
           html += '<div style="flex:1;min-width:0">';
           html += '<div style="font-size:13px;font-weight:500;' + (t.done ? 'text-decoration:line-through;opacity:.5' : '') + '">' + escapeHtml(t.title) + '</div>';
           html += '<div style="font-size:11px;color:var(--fg-muted);display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:' + c.bg + '"></span>' + escapeHtml(projName) + ' <span style="color:' + urgencyColor + ';font-weight:600">' + urgencyLabel + '</span></div>';
-          html += '</div></div></div>';
+          html += '</div></div>';
         });
-        html += '</div>';
+        html += '</div>'; // card
+        html += '</div>'; // wrapper
       }
 
       // Quick navigation
