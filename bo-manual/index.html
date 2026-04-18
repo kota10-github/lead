@@ -2149,7 +2149,7 @@
         </div>
       </div>`;
       html += `<div class="form-group"><label class="label label-icon">${icons.zap} 対応スピード</label><textarea class="textarea" id="f-speed" rows="2" placeholder="例：問い合わせから24時間以内に対応">${escapeHtml(existing?.responseSpeed || '')}</textarea></div>`;
-      html += `<div class="flex gap-2" style="margin-top:16px"><button class="btn btn-primary" onclick="submitManualForm(${isEdit ? pageParams.editId : 'null'},${pageParams.projectId || 'null'})">${isEdit ? '更新' : '作成'}</button><button class="btn btn-outline" onclick="${isEdit ? `navigate('manual-detail',{id:${pageParams.editId}})` : `navigate('project-detail',{id:${pageParams.projectId}})`}">キャンセル</button></div>`;
+      html += `<div class="flex gap-2" style="margin-top:16px;align-items:center"><button class="btn btn-primary" onclick="submitManualForm(${isEdit ? pageParams.editId : 'null'},${pageParams.projectId || 'null'})">${isEdit ? '更新して閉じる' : '作成'}</button><button class="btn btn-outline" onclick="${isEdit ? `navigate('manual-detail',{id:${pageParams.editId}})` : `navigate('project-detail',{id:${pageParams.projectId}})`}">${isEdit ? '閉じる' : 'キャンセル'}</button><span id="f-save-status" style="font-size:11px;color:var(--fg-muted2);margin-left:auto"></span></div>`;
       html += `</aside>`;
       // Right main: manual content editor (big)
       html += `<main>`;
@@ -2204,8 +2204,21 @@
           decorateBlockquotes(editor);
           decorateCopyBlocks(editor);
           decorateBlockDelete(editor);
-          // Re-decorate on any edit
-          editor.addEventListener('input', function() { decorateBlockquotes(editor); decorateCopyBlocks(editor); decorateBlockDelete(editor); });
+          // Re-decorate + autosave on any edit
+          editor.addEventListener('input', function() { decorateBlockquotes(editor); decorateCopyBlocks(editor); decorateBlockDelete(editor); autoSaveManualForm(); });
+          // Hook autosave to all other form fields
+          ['f-title','f-purpose','f-authority','f-speed'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener('input', autoSaveManualForm);
+          });
+          var paceSelEl = document.getElementById('f-pace-tag');
+          if (paceSelEl) paceSelEl.addEventListener('change', autoSaveManualForm);
+          // Also autosave when any schedule field changes (captured via bubbling from the builder)
+          var scheduleBox = document.getElementById('f-pace-schedule');
+          if (scheduleBox) {
+            scheduleBox.addEventListener('input', autoSaveManualForm);
+            scheduleBox.addEventListener('change', autoSaveManualForm);
+          }
           // Tab / Shift+Tab for list nesting
           editor.addEventListener('keydown', function(e) {
             if (e.key === 'Tab') {
@@ -2651,6 +2664,61 @@
       });
     }
 
+    // Autosave the manual form (debounced, pushes to remote immediately so reload/close won't lose edits)
+    var _manualFormAutoSaveTimer = null;
+    var _manualFormAutoSaveStatusEl = null;
+    function setManualFormSaveStatus(text) {
+      if (!_manualFormAutoSaveStatusEl) _manualFormAutoSaveStatusEl = document.getElementById('f-save-status');
+      if (_manualFormAutoSaveStatusEl) _manualFormAutoSaveStatusEl.textContent = text;
+    }
+    function autoSaveManualForm() {
+      var titleEl = document.getElementById('f-title');
+      if (!titleEl) return; // form not mounted
+      setManualFormSaveStatus('編集中…');
+      clearTimeout(_manualFormAutoSaveTimer);
+      _manualFormAutoSaveTimer = setTimeout(function() {
+        var title = titleEl.value.trim();
+        var purpose = (document.getElementById('f-purpose')||{value:''}).value.trim();
+        var authority = (document.getElementById('f-authority')||{value:''}).value.trim();
+        var paceTagSel = document.getElementById('f-pace-tag');
+        var paceTagId = paceTagSel && paceTagSel.value ? Number(paceTagSel.value) : null;
+        var paceTag = paceTagId ? getPaceTag(paceTagId) : null;
+        var paceSchedule = (paceTag && paceTag.isManual) ? collectPaceSchedule() : null;
+        var speed = (document.getElementById('f-speed')||{value:''}).value.trim();
+        var roadmapEditor = document.getElementById('f-roadmap-editor');
+        var roadmap = '';
+        if (roadmapEditor) {
+          var clone = roadmapEditor.cloneNode(true);
+          clone.querySelectorAll('.bq-delete').forEach(function(b) { b.remove(); });
+          clone.querySelectorAll('.copy-block-btn').forEach(function(b) { b.remove(); });
+          clone.querySelectorAll('.code-block-btn').forEach(function(b) { b.remove(); });
+          clone.querySelectorAll('.block-delete').forEach(function(b) { b.remove(); });
+          // Fix invalid nested lists
+          var fixed = true;
+          while (fixed) {
+            fixed = false;
+            clone.querySelectorAll('ul > ul, ul > ol, ol > ul, ol > ol').forEach(function(nested) {
+              var prev = nested.previousElementSibling;
+              if (prev && prev.tagName === 'LI') { prev.appendChild(nested); fixed = true; }
+            });
+          }
+          roadmap = clone.innerHTML;
+        }
+        if (!title) { setManualFormSaveStatus('タイトル未入力'); return; }
+        var editId = pageParams.editId;
+        if (editId) {
+          var m = getManual(editId);
+          if (m) {
+            Object.assign(m, { title: title, purpose: purpose, authority: authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap });
+            if (paceTagId) m.operationPace = '';
+            saveData();
+            if (typeof pushSyncNow === 'function') pushSyncNow();
+            setManualFormSaveStatus('保存しました');
+            setTimeout(function() { if (_manualFormAutoSaveStatusEl && _manualFormAutoSaveStatusEl.textContent === '保存しました') setManualFormSaveStatus(''); }, 2000);
+          }
+        }
+      }, 700);
+    }
     function submitManualForm(editId, projectId) {
       const title = document.getElementById('f-title').value.trim();
       const purpose = document.getElementById('f-purpose').value.trim();
@@ -3143,6 +3211,43 @@
         }).catch(function(){});
       }, 500);
     }
+    // Safety: on page hide/unload, flush any pending autosave + push
+    function flushManualFormOnHide() {
+      if (_manualFormAutoSaveTimer) {
+        clearTimeout(_manualFormAutoSaveTimer);
+        _manualFormAutoSaveTimer = null;
+        // Run the autosave body synchronously
+        var fn = autoSaveManualForm; // has 700ms inner delay, we need the save logic to run now
+        // Re-invoke with a small hack: temporarily set the inner timer to 0 — easier: just re-create logic inline.
+        var titleEl = document.getElementById('f-title');
+        if (titleEl && pageParams.editId) {
+          var m = getManual(pageParams.editId);
+          if (m) {
+            var roadmapEditor = document.getElementById('f-roadmap-editor');
+            var roadmap = '';
+            if (roadmapEditor) {
+              var clone = roadmapEditor.cloneNode(true);
+              clone.querySelectorAll('.bq-delete, .copy-block-btn, .code-block-btn, .block-delete').forEach(function(b) { b.remove(); });
+              roadmap = clone.innerHTML;
+            }
+            Object.assign(m, {
+              title: titleEl.value.trim() || m.title,
+              purpose: (document.getElementById('f-purpose')||{value:m.purpose}).value.trim(),
+              authority: (document.getElementById('f-authority')||{value:m.authority}).value.trim(),
+              responseSpeed: (document.getElementById('f-speed')||{value:m.responseSpeed}).value.trim(),
+              taskRoadmap: roadmap
+            });
+            saveData();
+          }
+        }
+      }
+      // Flush remote push
+      if (typeof pushSyncNow === 'function') pushSyncNow();
+    }
+    window.addEventListener('beforeunload', flushManualFormOnHide);
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'hidden') flushManualFormOnHide();
+    });
     // Force immediate push (used when the user explicitly saves)
     function pushSyncNow() {
       clearTimeout(syncDebounce);
