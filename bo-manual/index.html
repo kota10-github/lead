@@ -3513,14 +3513,15 @@
         }).catch(function(){ pushSync(); render(); });
     }
 
-    // ===== Append-only local backup (never overwrites, ring buffer of 200) =====
+    // ===== Append-only local backup (never overwrites, ring buffer of 500) =====
     var BACKUPS_KEY = 'bo-manual-backups';
-    var BACKUP_MAX = 200;
+    var BACKUP_MAX = 500;
     var _lastBackupTs = 0;
     function appendLocalBackup(reason) {
       try {
         var now = Date.now();
-        if (now - _lastBackupTs < 3000) return; // throttle: at most one backup per 3s
+        // Minimal throttle (500ms) — only to dedupe burst saves within half a second
+        if (now - _lastBackupTs < 500) return;
         _lastBackupTs = now;
         var raw = localStorage.getItem(BACKUPS_KEY);
         var arr = raw ? JSON.parse(raw) : [];
@@ -3534,10 +3535,13 @@
           tags: JSON.parse(JSON.stringify(data.tags || [])),
           paceTags: JSON.parse(JSON.stringify(data.paceTags || []))
         };
-        // Skip if identical to last snapshot
+        // Skip only if identical to last snapshot AND last snapshot is very recent (< 30s)
+        // This still lets us snapshot periodically even if nothing changed
         var prev = arr[arr.length - 1];
-        if (prev && JSON.stringify(prev.manuals) === JSON.stringify(snap.manuals)
-            && JSON.stringify(prev.projectTasks) === JSON.stringify(snap.projectTasks)) {
+        if (prev && (now - prev.ts) < 30000
+            && JSON.stringify(prev.manuals) === JSON.stringify(snap.manuals)
+            && JSON.stringify(prev.projectTasks) === JSON.stringify(snap.projectTasks)
+            && JSON.stringify(prev.projects) === JSON.stringify(snap.projects)) {
           return;
         }
         arr.push(snap);
@@ -3551,6 +3555,15 @@
         }
       } catch (e) { /* never throw from backup path */ }
     }
+    // Auto-snapshot every 30 seconds regardless of saveData events
+    setInterval(function() {
+      try { if (typeof data !== 'undefined' && data) appendLocalBackup('interval'); } catch(e) {}
+    }, 30000);
+    // Snapshot on tab close/hidden so we catch state right before leaving
+    window.addEventListener('beforeunload', function() { try { appendLocalBackup('beforeunload'); } catch(e) {} });
+    document.addEventListener('visibilitychange', function() {
+      if (document.hidden) { try { appendLocalBackup('hidden'); } catch(e) {} }
+    });
     function listLocalBackups() {
       try {
         var raw = localStorage.getItem(BACKUPS_KEY);
