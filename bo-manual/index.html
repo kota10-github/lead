@@ -3450,19 +3450,66 @@
     document.addEventListener('visibilitychange', function() {
       if (document.visibilityState === 'hidden') flushManualFormOnHide();
     });
-    // Force immediate push (used when the user explicitly saves)
+    // Force immediate push with merge-before-push (prevents stale-tab overwrite)
     function pushSyncNow() {
       clearTimeout(syncDebounce);
-      data._syncTs = Date.now();
-      // Use keepalive so the request completes even if the page navigates/unloads
-      try {
-        return fetch(SYNC_URL, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-          keepalive: true
-        }).catch(function(){});
-      } catch (e) { return Promise.resolve(); }
+      // Non-destructive merge: pull remote first, add anything we don't have, then push
+      return fetch(SYNC_URL).then(function(r){return r.json()}).then(function(remote){
+        try { mergeRemoteIntoLocal(remote); } catch(e) {}
+      }).catch(function(){}).finally(function(){
+        data._syncTs = Date.now();
+        try {
+          return fetch(SYNC_URL, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+            keepalive: true
+          }).catch(function(){});
+        } catch(e) { return Promise.resolve(); }
+      });
+    }
+    // Merge remote data into local without destroying local-only additions.
+    // Tasks/manuals/projects are merged by id (append missing, keep local if both have same id).
+    // manual.history is merged by ts (append missing, sort).
+    function mergeRemoteIntoLocal(remote) {
+      if (!remote || typeof remote !== 'object') return;
+      function mergeById(localList, remoteList) {
+        if (!Array.isArray(localList) || !Array.isArray(remoteList)) return;
+        var localIds = {};
+        localList.forEach(function(x){ if (x && x.id != null) localIds[x.id] = true; });
+        remoteList.forEach(function(r){
+          if (r && r.id != null && !localIds[r.id]) localList.push(r);
+        });
+      }
+      mergeById(data.projectTasks = data.projectTasks || [], remote.projectTasks || []);
+      mergeById(data.manuals = data.manuals || [], remote.manuals || []);
+      mergeById(data.projects = data.projects || [], remote.projects || []);
+      mergeById(data.tags = data.tags || [], remote.tags || []);
+      mergeById(data.paceTags = data.paceTags || [], remote.paceTags || []);
+      mergeById(data.users = data.users || [], remote.users || []);
+      // Merge manual.history (by ts)
+      (data.manuals || []).forEach(function(lm){
+        var rm = (remote.manuals || []).find(function(x){ return x.id === lm.id; });
+        if (!rm || !Array.isArray(rm.history)) return;
+        if (!Array.isArray(lm.history)) lm.history = [];
+        var seenTs = {};
+        lm.history.forEach(function(h){ if (h && h.ts) seenTs[h.ts] = true; });
+        rm.history.forEach(function(rh){
+          if (rh && rh.ts && !seenTs[rh.ts]) lm.history.push(rh);
+        });
+        lm.history.sort(function(a,b){ return (a.ts||0) - (b.ts||0); });
+      });
+      // Bump nextIds to be above any remote id to avoid collisions
+      var nextKeys = {
+        projectTasks: 'nextProjectTaskId', manuals: 'nextManualId',
+        projects: 'nextProjectId', tags: 'nextTagId', paceTags: 'nextPaceTagId',
+        users: 'nextUserId'
+      };
+      Object.keys(nextKeys).forEach(function(k){
+        var nk = nextKeys[k];
+        var maxId = Math.max.apply(null, (data[k]||[]).map(function(x){return x.id||0}).concat([0]));
+        data[nk] = Math.max(data[nk] || 0, maxId + 1);
+      });
     }
 
     // Pull remote data and overwrite local
