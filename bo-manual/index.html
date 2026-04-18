@@ -2040,7 +2040,6 @@
       html += `<div class="doc-meta-actions no-print">
         <button class="btn btn-outline btn-sm" onclick="shareManualLink(${manual.id})">🔗 共有リンク</button>
         <button class="btn btn-outline btn-sm" onclick="showManualHistory(${manual.id})">🕐 変更履歴</button>
-        <button class="btn btn-outline btn-sm" onclick="showLocalBackupsDialog()" title="自動バックアップ（最大200件）">💾 バックアップ</button>
         <button class="btn btn-outline btn-sm" onclick="navigate('manual-form',{editId:${manual.id}})">${icons.pencil} 編集</button>
         <button class="btn btn-outline btn-sm" style="color:var(--destructive)" onclick="confirmDeleteManual(${manual.id})">${icons.trash} 削除</button>
       </div>`;
@@ -2866,29 +2865,100 @@
     }
     function showManualHistory(manualId) {
       var m = getManual(manualId);
-      if (!m || !m.history || m.history.length === 0) {
-        toast('変更履歴はまだありません');
-        return;
-      }
-      var bodyHtml = '<div style="max-height:480px;overflow-y:auto;margin:-8px 0">';
-      // Show newest first
-      var history = m.history.slice().reverse();
-      history.forEach(function(v, i) {
+      if (!m) return;
+      // Gather entries from both sources: manual.history + local backup snapshots
+      var entries = [];
+      (m.history || []).forEach(function(v, idx) {
+        entries.push({ source: 'history', ts: v.ts, title: v.title, purpose: v.purpose, taskRoadmap: v.taskRoadmap || '', origIdx: idx });
+      });
+      try {
+        (listLocalBackups() || []).forEach(function(b) {
+          var bm = (b.manuals || []).find(function(x){ return x.id === manualId; });
+          if (bm) entries.push({ source: 'backup', ts: b.ts, title: bm.title, purpose: bm.purpose, taskRoadmap: bm.taskRoadmap || '', backupTs: b.ts });
+        });
+      } catch(e) {}
+      // Sort newest first, dedupe by same ts + same taskRoadmap length
+      entries.sort(function(a,b){ return b.ts - a.ts; });
+      var seen = {};
+      entries = entries.filter(function(e) {
+        var key = e.ts + '_' + (e.taskRoadmap || '').length;
+        if (seen[key]) return false;
+        seen[key] = true;
+        return true;
+      });
+      if (entries.length === 0) { toast('変更履歴はまだありません'); return; }
+      var bodyHtml = '<div style="max-height:60vh;overflow-y:auto;margin:-8px 0">';
+      bodyHtml += '<div style="font-size:11px;color:var(--fg-muted);margin-bottom:8px">' + entries.length + ' 件 (ローカルバックアップ含む)<button class="btn btn-ghost btn-sm" style="float:right;font-size:11px" onclick="downloadBackupJson()">.json でダウンロード</button></div>';
+      entries.forEach(function(v, i) {
         var d = new Date(v.ts);
-        var dateStr = d.getFullYear() + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+        var dateStr = d.getFullYear() + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
         var preview = (v.taskRoadmap || '').replace(/<[^>]*>/g,'').slice(0,80);
-        var origIdx = m.history.length - 1 - i;
+        var tag = v.source === 'history' ? '履歴' : 'バックアップ';
+        var actionArgs = v.source === 'history' ? (manualId + ',' + v.origIdx) : (manualId + ',null,' + v.backupTs);
         bodyHtml += '<div style="padding:10px 12px;border:1px solid var(--border);border-radius:6px;margin-bottom:8px">';
-        bodyHtml += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px"><span style="font-size:12px;font-weight:600">' + dateStr + '</span>';
-        bodyHtml += '<span style="display:flex;gap:6px"><button class="btn btn-outline btn-sm" onclick="previewManualVersion(' + manualId + ',' + origIdx + ')">プレビュー</button><button class="btn btn-primary btn-sm" onclick="restoreManualVersion(' + manualId + ',' + origIdx + ')">この版に戻す</button></span></div>';
+        bodyHtml += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px"><span style="font-size:12px;font-weight:600">' + dateStr + '<span style="font-size:10px;color:var(--fg-muted2);margin-left:8px;font-weight:400">' + tag + ' / ' + (v.taskRoadmap||'').length + '字</span></span>';
+        bodyHtml += '<span style="display:flex;gap:6px"><button class="btn btn-outline btn-sm" onclick="previewManualVersionUnified(' + actionArgs + ')">プレビュー</button><button class="btn btn-primary btn-sm" onclick="restoreManualVersionUnified(' + actionArgs + ')">この版に戻す</button></span></div>';
         bodyHtml += '<div style="font-size:11px;color:var(--fg-muted);word-break:break-all">' + escapeHtml(preview) + (preview.length >= 80 ? '…' : '') + '</div>';
         bodyHtml += '</div>';
       });
       bodyHtml += '</div>';
-      showModal('変更履歴 (' + m.history.length + '件)', bodyHtml, [
+      showModal('変更履歴', bodyHtml, [
         { label: '閉じる', onClick: function(o) { o.remove(); } }
       ]);
     }
+    function previewManualVersionUnified(manualId, historyIdx, backupTs) {
+      var v = null;
+      if (historyIdx !== null && historyIdx !== undefined) {
+        var m = getManual(manualId);
+        v = m && m.history && m.history[historyIdx];
+      } else if (backupTs) {
+        var b = listLocalBackups().find(function(x){ return x.ts === backupTs; });
+        if (b) v = (b.manuals || []).find(function(x){ return x.id === manualId; });
+      }
+      if (!v) return;
+      var d = new Date(v.ts || backupTs);
+      var dateStr = d.toLocaleString();
+      var bodyHtml = '<div style="max-height:60vh;overflow-y:auto;border:1px solid var(--border);padding:16px;border-radius:6px;background:var(--bg-muted)">';
+      bodyHtml += '<h3 style="margin-bottom:8px">' + escapeHtml(v.title || '') + '</h3>';
+      if (v.purpose) bodyHtml += '<p style="font-size:13px;color:var(--fg-muted);margin-bottom:12px"><strong>目的：</strong>' + escapeHtml(v.purpose) + '</p>';
+      bodyHtml += '<div class="prose">' + (v.taskRoadmap || '') + '</div>';
+      bodyHtml += '</div>';
+      showModal('プレビュー - ' + dateStr, bodyHtml, [
+        { label: '閉じる', onClick: function(o) { o.remove(); } },
+        { label: 'この版に戻す', class: 'btn btn-primary', onClick: function(o) { o.remove(); restoreManualVersionUnified(manualId, historyIdx, backupTs); } }
+      ]);
+    }
+    function restoreManualVersionUnified(manualId, historyIdx, backupTs) {
+      if (!confirm('この版に戻しますか？現在の内容は履歴とバックアップに保存されます。')) return;
+      var m = getManual(manualId);
+      if (!m) return;
+      // Snapshot current before overwrite
+      if (!m.history) m.history = [];
+      m.history.push({ ts: Date.now(), title: m.title, purpose: m.purpose, authority: m.authority, paceTagId: m.paceTagId, paceSchedule: m.paceSchedule, operationPace: m.operationPace, responseSpeed: m.responseSpeed, taskRoadmap: m.taskRoadmap });
+      if (m.history.length > 100) m.history = m.history.slice(-100);
+      var v = null;
+      if (historyIdx !== null && historyIdx !== undefined) {
+        v = m.history[historyIdx];
+      } else if (backupTs) {
+        var b = listLocalBackups().find(function(x){ return x.ts === backupTs; });
+        if (b) v = (b.manuals || []).find(function(x){ return x.id === manualId; });
+      }
+      if (!v) { toast('復元元が見つかりません'); return; }
+      m.title = v.title || m.title;
+      m.purpose = v.purpose || m.purpose;
+      m.authority = v.authority || m.authority;
+      if (v.paceTagId !== undefined) m.paceTagId = v.paceTagId;
+      if (v.paceSchedule !== undefined) m.paceSchedule = v.paceSchedule;
+      if (v.operationPace !== undefined) m.operationPace = v.operationPace;
+      if (v.responseSpeed !== undefined) m.responseSpeed = v.responseSpeed;
+      m.taskRoadmap = v.taskRoadmap || '';
+      saveData();
+      toast('復元しました');
+      document.querySelectorAll('.modal-overlay').forEach(function(x){ x.remove(); });
+      render();
+    }
+    window.previewManualVersionUnified = previewManualVersionUnified;
+    window.restoreManualVersionUnified = restoreManualVersionUnified;
     function previewManualVersion(manualId, index) {
       var m = getManual(manualId);
       if (!m || !m.history || !m.history[index]) return;
