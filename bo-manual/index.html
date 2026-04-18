@@ -119,7 +119,7 @@
     .user-col{display:flex;flex-direction:column;gap:12px}
     .project-row{display:flex;align-items:flex-start;gap:24px}
     .manuals-col{display:flex;flex-direction:column;gap:8px}
-    .node-project-standalone{padding:8px 16px;border-radius:8px;font-weight:500;font-size:13px;border:2px solid #334155;background:#f1f5f9;color:#1e293b;cursor:pointer;transition:all .15s;white-space:nowrap;user-select:none;word-break:break-word;overflow-wrap:break-word}
+    .node-project-standalone{padding:8px 16px;border-radius:8px;font-weight:500;font-size:13px;border:2px solid #334155;background:#f1f5f9;color:#1e293b;cursor:pointer;transition:all .15s;white-space:normal;user-select:none;word-break:break-word;overflow-wrap:anywhere;max-width:220px;line-height:1.35}
     .node-project-standalone:hover{transform:scale(1.05);box-shadow:0 2px 8px rgba(30,41,59,.15)}
     .node-project-standalone[draggable="true"],.node-manual[draggable="true"],.node-root[draggable]{cursor:grab}
     .node-project-standalone[draggable="true"]:active,.node-manual[draggable="true"]:active{cursor:grabbing}
@@ -2636,14 +2636,19 @@
     // Event delegation for block delete buttons + editor Tab handling
     document.addEventListener('click', function(e) {
       if (!e.target || !e.target.classList) return;
+      var removed = null;
       if (e.target.classList.contains('bq-delete')) {
         e.preventDefault();
-        var bq = e.target.closest('blockquote');
-        if (bq) bq.remove();
+        removed = e.target.closest('blockquote');
       } else if (e.target.classList.contains('block-delete')) {
         e.preventDefault();
-        var block = e.target.closest('.callout, pre.code-block, .copy-block, details');
-        if (block) block.remove();
+        removed = e.target.closest('.callout, pre.code-block, .copy-block, details');
+      }
+      if (removed) {
+        var editor = removed.closest('.manual-rich-editor, .memo-rich-editor');
+        removed.remove();
+        // Block removal must count as an edit → trigger input event so autosave + history capture
+        if (editor) editor.dispatchEvent(new Event('input', { bubbles: true }));
       }
     });
     // Run all block decorators at once (call after any programmatic block insertion)
@@ -2758,7 +2763,7 @@
         taskRoadmap: m.taskRoadmap,
         _source: 'close'
       });
-      if (m.history.length > 100) m.history = m.history.slice(-100);
+      // History is NEVER purged — user explicitly demanded full retention
       saveData();
       if (typeof pushSyncNow === 'function') pushSyncNow();
     }
@@ -2811,13 +2816,9 @@
             var prev = { title: m.title, purpose: m.purpose, authority: m.authority, paceTagId: m.paceTagId, paceSchedule: m.paceSchedule, operationPace: m.operationPace, responseSpeed: m.responseSpeed, taskRoadmap: m.taskRoadmap };
             var contentChanged = prev.title !== title || prev.purpose !== purpose || prev.authority !== authority || prev.responseSpeed !== speed || prev.taskRoadmap !== roadmap || prev.paceTagId !== paceTagId;
             if (contentChanged) {
+              // User requested: every change (even single character) = history entry, never purge
               if (!m.history) m.history = [];
-              var last = m.history[m.history.length - 1];
-              var now = Date.now();
-              if (!last || (now - (last.ts || 0)) > 60000) {
-                m.history.push(Object.assign({ ts: now }, prev));
-                if (m.history.length > 100) m.history = m.history.slice(-100);
-              }
+              m.history.push(Object.assign({ ts: Date.now() }, prev));
             }
             Object.assign(m, { title: title, purpose: purpose, authority: authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap });
             if (paceTagId) m.operationPace = '';
@@ -2885,7 +2886,7 @@
               taskRoadmap: m.taskRoadmap
             });
             // Keep last 50 versions only
-            if (m.history.length > 50) m.history = m.history.slice(-50);
+            // History is NEVER purged
           }
           Object.assign(m, { title, purpose, authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap });
           // Clear legacy operationPace when using new tag system
@@ -2974,7 +2975,7 @@
       // Snapshot current before overwrite
       if (!m.history) m.history = [];
       m.history.push({ ts: Date.now(), title: m.title, purpose: m.purpose, authority: m.authority, paceTagId: m.paceTagId, paceSchedule: m.paceSchedule, operationPace: m.operationPace, responseSpeed: m.responseSpeed, taskRoadmap: m.taskRoadmap });
-      if (m.history.length > 100) m.history = m.history.slice(-100);
+      // History is NEVER purged — user explicitly demanded full retention
       var v = null;
       if (historyIdx !== null && historyIdx !== undefined) {
         v = m.history[historyIdx];
