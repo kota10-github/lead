@@ -3738,9 +3738,17 @@
     // Only re-render if remote had newer-_modTs items that replaced something local.
     function pullMergeQuiet() {
       if (new URLSearchParams(location.search).get('manual')) return;
-      // Skip while user is actively typing
+      // Skip while user is interacting — any of these conditions:
+      //   - focused input/textarea/contenteditable
+      //   - modal overlay is open
+      //   - task checkbox is expanded (user is about to click 完了/削除)
+      //   - any button is in hover/focus state
       var ae = document.activeElement;
       if (ae && (ae.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))) return;
+      if (document.querySelector('.modal-overlay')) return;
+      if (document.querySelector('.todo-checkbox.expanded')) return;
+      // Skip if user is in any edit form
+      if (currentPage === 'manual-form') return;
       fetch(SYNC_URL).then(function(r){return r.json()}).then(function(remote){
         if (!remote || typeof remote !== 'object') return;
         var beforeSnapshot = JSON.stringify({
@@ -3756,8 +3764,10 @@
         });
         if (beforeSnapshot !== afterSnapshot) {
           _origSaveData();
-          // Only re-render if not currently in a form the user is editing
-          if (currentPage !== 'manual-form') render();
+          // Re-check before re-render (user may have started interacting while fetch pending)
+          if (document.querySelector('.todo-checkbox.expanded')) return;
+          if (document.querySelector('.modal-overlay')) return;
+          render();
         }
       }).catch(function(){});
     }
