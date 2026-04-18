@@ -1410,13 +1410,27 @@
           html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="' + c.bg + '" stroke="' + c.bg + '" stroke-width="2" stroke-linejoin="round" style="flex-shrink:0"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>';
           html += escapeHtml(m.title) + '</div>';
         });
-        // Tasks inside
-        mProjTasks.forEach(function(t) {
-          html += '<div style="padding:4px 0;font-size:12px;color:var(--fg-muted);display:flex;align-items:center;gap:6px;cursor:pointer;' + (t.done ? 'opacity:.5' : '') + '" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})">';
-          html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:20px;height:20px;font-size:8px" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
+        // Tasks inside (top-level + indented children with L-connector)
+        function renderMobileTaskRow(t, depth) {
+          var INDENT = 20, CBOX = 20;
+          var leftPad = depth * INDENT;
+          var conn = '';
+          if (depth > 0) {
+            var vx = (depth - 1) * INDENT + CBOX / 2;
+            var hxEnd = depth * INDENT;
+            conn = '<span aria-hidden="true" style="position:absolute;left:0;top:0;bottom:0;width:' + hxEnd + 'px;pointer-events:none">' +
+              '<span style="position:absolute;left:' + vx + 'px;top:0;height:50%;width:1px;background:var(--border)"></span>' +
+              '<span style="position:absolute;left:' + vx + 'px;top:50%;width:' + (hxEnd - vx) + 'px;height:1px;background:var(--border)"></span>' +
+              '</span>';
+          }
+          html += '<div style="position:relative;padding:4px 0;padding-left:' + leftPad + 'px;font-size:12px;color:var(--fg-muted);display:flex;align-items:center;gap:6px;cursor:pointer;' + (t.done ? 'opacity:.5' : '') + '" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})">' + conn;
+          html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:' + CBOX + 'px;height:' + CBOX + 'px;font-size:8px;position:relative;z-index:1" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
           html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>' + dueBadgeHtml(t);
           html += '</div>';
-        });
+          var kids = mProjTasks.filter(function(c){ return c.parentTaskId === t.id; });
+          kids.forEach(function(c){ renderMobileTaskRow(c, depth + 1); });
+        }
+        mProjTasks.filter(function(t){ return !t.parentTaskId; }).forEach(function(t){ renderMobileTaskRow(t, 0); });
         // Sub-projects
         if (proj.subProjects.length > 0) {
           proj.subProjects.forEach(function renderSub(sp) {
@@ -1430,12 +1444,25 @@
               html += '<span>' + escapeHtml(m.title) + '</span>';
               html += '</div>';
             });
-            spTasks.forEach(function(t) {
-              html += '<div style="padding:4px 0;font-size:12px;color:var(--fg-muted);display:flex;align-items:center;gap:6px;cursor:pointer;' + (t.done ? 'opacity:.5' : '') + '" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})">';
-              html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:20px;height:20px;font-size:8px" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
+            function renderSpTaskRow(t, depth) {
+              var INDENT = 20, CBOX = 20;
+              var leftPad = depth * INDENT;
+              var conn = '';
+              if (depth > 0) {
+                var vx = (depth - 1) * INDENT + CBOX / 2;
+                var hxEnd = depth * INDENT;
+                conn = '<span aria-hidden="true" style="position:absolute;left:0;top:0;bottom:0;width:' + hxEnd + 'px;pointer-events:none">' +
+                  '<span style="position:absolute;left:' + vx + 'px;top:0;height:50%;width:1px;background:var(--border)"></span>' +
+                  '<span style="position:absolute;left:' + vx + 'px;top:50%;width:' + (hxEnd - vx) + 'px;height:1px;background:var(--border)"></span>' +
+                  '</span>';
+              }
+              html += '<div style="position:relative;padding:4px 0;padding-left:' + leftPad + 'px;font-size:12px;color:var(--fg-muted);display:flex;align-items:center;gap:6px;cursor:pointer;' + (t.done ? 'opacity:.5' : '') + '" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})">' + conn;
+              html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:' + CBOX + 'px;height:' + CBOX + 'px;font-size:8px;position:relative;z-index:1" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
               html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>' + dueBadgeHtml(t);
               html += '</div>';
-            });
+              spTasks.filter(function(c){ return c.parentTaskId === t.id; }).forEach(function(c){ renderSpTaskRow(c, depth + 1); });
+            }
+            spTasks.filter(function(t){ return !t.parentTaskId; }).forEach(function(t){ renderSpTaskRow(t, 0); });
             sp.subProjects.forEach(renderSub);
             html += '</div>';
           });
@@ -1600,11 +1627,9 @@
             if (m.purpose) html += `<div class="node-manual-purpose">${escapeHtml(m.purpose)}</div>`;
             html += `</div>`;
           });
-          projTasks.forEach(function(t) {
-            html += `<div class="node-manual" style="border-left:3px solid ${t.done ? '#059669' : c.bg};background:${c.light};opacity:${t.done ? '.5' : '1'};cursor:pointer" onclick="event.stopPropagation();navigate('task-detail',{id:${t.id}})"><div class="node-manual-title" style="color:${c.bg};display:flex;align-items:center;gap:6px">`;
-            html += `<div class="todo-checkbox ${t.done ? 'checked' : ''}" style="width:24px;height:24px;font-size:10px" onclick="event.stopPropagation();expandProjectTaskActions(this,${t.id},${t.done})">${t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>'}</div>`;
-            html += `<span style="${t.done ? 'text-decoration:line-through' : ''}">${escapeHtml(t.title)}</span>${dueBadgeHtml(t)}`;
-            html += `</div></div>`;
+          // Only show top-level tasks here; children render recursively to the right
+          projTasks.filter(function(t){ return !t.parentTaskId; }).forEach(function(t) {
+            renderTaskBranch(t, c);
           });
           proj.subProjects.forEach(function(sp) { renderSubBranch(sp); });
           html += `<div class="map-add-options">
@@ -1632,18 +1657,33 @@
             if (m.purpose) html += '<div class="node-manual-purpose">' + escapeHtml(m.purpose) + '</div>';
             html += '</div>';
           });
-          spTasks.forEach(function(t) {
-            html += '<div class="node-manual" style="border-left:3px solid ' + (t.done ? '#059669' : sc.bg) + ';background:' + sc.light + ';opacity:' + (t.done ? '.5' : '1') + ';cursor:pointer" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})"><div class="node-manual-title" style="color:' + sc.bg + ';display:flex;align-items:center;gap:6px">';
-            html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:20px;height:20px;font-size:8px" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
-            html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>' + dueBadgeHtml(t);
-            html += '</div></div>';
-          });
+          // Only show top-level tasks here; children render recursively via renderTaskBranch
+          spTasks.filter(function(t){ return !t.parentTaskId; }).forEach(function(t) { renderTaskBranch(t, sc); });
           if (sp.subProjects.length > 0) {
             sp.subProjects.forEach(function(child) { renderSubBranch(child); });
           }
           html += '<button class="sub-add-btn" onclick="event.stopPropagation();navigate(\'manual-form\',{projectId:' + sp.projectId + '})">+ マニュアル</button>';
           html += '<button class="sub-add-btn" onclick="event.stopPropagation();showAddProjectTask(' + sp.projectId + ')">+ タスク</button>';
           html += '<button class="sub-add-btn" onclick="event.stopPropagation();showProjectDialog(' + sp.projectId + ')">+ サブ</button>';
+          html += '</div>'; // close sub-tree-children
+          html += '</div>'; // close sub-tree-row
+        }
+        // Task branch: task card on left, child tasks branching to the right (same shape as sub-tree-row)
+        function renderTaskBranch(t, parentColor) {
+          var color = parentColor || { bg: '#94a3b8', light: '#f1f5f9' };
+          var kids = getChildTasks(t.id);
+          html += '<div class="sub-tree-row" data-task="' + t.id + '">';
+          html += '<div class="sub-tree-card-wrap">';
+          html += '<div class="node-manual" data-node="task-' + t.id + '" style="border-left:3px solid ' + (t.done ? '#059669' : color.bg) + ';background:' + color.light + ';opacity:' + (t.done ? '.5' : '1') + ';cursor:pointer" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})">';
+          html += '<div class="node-manual-title" style="color:' + color.bg + ';display:flex;align-items:center;gap:6px">';
+          html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:24px;height:24px;font-size:10px" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
+          html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>' + dueBadgeHtml(t);
+          html += '</div></div>';
+          html += '</div>'; // close sub-tree-card-wrap
+          // Right side: child tasks + add button
+          html += '<div class="sub-tree-children">';
+          kids.forEach(function(c) { renderTaskBranch(c, color); });
+          html += '<button class="sub-add-btn" onclick="event.stopPropagation();showAddChildTask(' + t.id + ')">+ 子タスク</button>';
           html += '</div>'; // close sub-tree-children
           html += '</div>'; // close sub-tree-row
         }
@@ -1917,12 +1957,26 @@
         html += `<div style="display:flex;flex-direction:column">`;
         function renderTaskRow(t, depth) {
           const children = getChildTasks(t.id);
-          const connector = depth > 0 ? `<span aria-hidden="true" style="display:inline-block;position:relative;width:${depth*12}px;align-self:stretch;flex-shrink:0"><span style="position:absolute;left:${(depth-1)*12 + 5}px;top:0;bottom:50%;width:1px;background:var(--border)"></span><span style="position:absolute;left:${(depth-1)*12 + 5}px;top:50%;width:${12 - 2}px;height:1px;background:var(--border)"></span></span>` : '';
-          html += `<div style="display:flex;align-items:stretch;gap:0;padding:2px 0;cursor:pointer;min-height:32px" onclick="navigate('task-detail',{id:${t.id}})">${connector}<div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">`;
-          html += `<div class="todo-checkbox ${t.done ? 'checked' : ''}" style="width:20px;height:20px" onclick="event.stopPropagation();expandProjectTaskActions(this,${t.id},${t.done})">${t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>'}</div>`;
+          // Indent: 24px per depth so checkbox-to-checkbox L is visible (20px checkbox + 4px slack)
+          const INDENT = 24;
+          const CBOX = 20; // checkbox width
+          const leftPad = depth * INDENT;
+          // L-connector: vertical from (depth-1)*INDENT + CBOX/2 starting at top (parent's checkbox bottom aligns with row top),
+          // horizontal from that x to depth*INDENT (child checkbox left) at row vertical center
+          let connectorSvg = '';
+          if (depth > 0) {
+            const vx = (depth - 1) * INDENT + CBOX / 2; // parent checkbox center x
+            const hxEnd = depth * INDENT; // child checkbox left
+            connectorSvg = `<span aria-hidden="true" style="position:absolute;left:0;top:0;bottom:0;width:${hxEnd}px;pointer-events:none">` +
+              `<span style="position:absolute;left:${vx}px;top:0;height:50%;width:1px;background:var(--border)"></span>` +
+              `<span style="position:absolute;left:${vx}px;top:50%;width:${hxEnd - vx}px;height:1px;background:var(--border)"></span>` +
+              `</span>`;
+          }
+          html += `<div style="position:relative;display:flex;align-items:center;gap:10px;padding:6px 0;padding-left:${leftPad}px;cursor:pointer;min-height:32px" onclick="navigate('task-detail',{id:${t.id}})">${connectorSvg}`;
+          html += `<div class="todo-checkbox ${t.done ? 'checked' : ''}" style="width:${CBOX}px;height:${CBOX}px;position:relative;z-index:1" onclick="event.stopPropagation();expandProjectTaskActions(this,${t.id},${t.done})">${t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>'}</div>`;
           html += `<span style="flex:1;font-size:14px;${t.done ? 'text-decoration:line-through;opacity:.5' : ''}">${escapeHtml(t.title)}${dueBadgeHtml(t)}</span>`;
           html += `<button onclick="event.stopPropagation();showAddChildTask(${t.id})" style="background:none;border:none;padding:2px 8px;color:var(--primary);font-size:12px;cursor:pointer;flex-shrink:0">+ 子タスク</button>`;
-          html += `</div></div>`;
+          html += `</div>`;
           children.forEach(function(c) { renderTaskRow(c, depth + 1); });
         }
         topLevelTasks.forEach(function(t) { renderTaskRow(t, 0); });
@@ -3248,8 +3302,19 @@
           grouped[pid].forEach(function(t){ projectTaskIdSet[t.id] = true; });
           var topLevel = grouped[pid].filter(function(t){ return !t.parentTaskId || !projectTaskIdSet[t.parentTaskId]; });
           function renderMyTasksRow(t, depth) {
-            html += '<div class="todo-item' + (t.done ? ' done' : '') + '" style="margin:0;border:none;padding:3px 0;padding-left:' + (depth * 12) + 'px;cursor:pointer" onclick="navigate(\'task-detail\',{id:' + t.id + '})">';
-            html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? icons.check : '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
+            var INDENT = 24, CBOX = 24; // checkbox width in this view is ~24 via CSS .todo-checkbox
+            var leftPad = depth * INDENT;
+            var conn = '';
+            if (depth > 0) {
+              var vx = (depth - 1) * INDENT + CBOX / 2;
+              var hxEnd = depth * INDENT;
+              conn = '<span aria-hidden="true" style="position:absolute;left:0;top:0;bottom:0;width:' + hxEnd + 'px;pointer-events:none">' +
+                '<span style="position:absolute;left:' + vx + 'px;top:0;height:50%;width:1px;background:var(--border)"></span>' +
+                '<span style="position:absolute;left:' + vx + 'px;top:50%;width:' + (hxEnd - vx) + 'px;height:1px;background:var(--border)"></span>' +
+                '</span>';
+            }
+            html += '<div class="todo-item' + (t.done ? ' done' : '') + '" style="position:relative;margin:0;border:none;padding:3px 0;padding-left:' + leftPad + 'px;cursor:pointer" onclick="navigate(\'task-detail\',{id:' + t.id + '})">' + conn;
+            html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="position:relative;z-index:1" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? icons.check : '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
             html += '<div style="flex:1;min-width:0">';
             html += '<div class="todo-title">' + escapeHtml(t.title) + dueBadgeHtml(t) + '</div>';
             html += '</div></div>';
