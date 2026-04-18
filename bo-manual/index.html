@@ -320,6 +320,10 @@
       .memo-toolbar-btn{padding:3px 6px;font-size:11px}
       .memo-toolbar-sep{display:none}
       .memo-rich-editor,.manual-rich-editor{height:60vh!important;max-height:60vh!important;font-size:15px;padding:12px}
+      /* Wrap long URLs / text so mobile doesn't overflow */
+      .prose,.prose p,.prose li,.prose blockquote,.prose .callout-body,.prose .copy-block-body,.copy-block-body,.callout-body,.manual-rich-editor,.memo-rich-editor{overflow-wrap:anywhere;word-break:break-word}
+      .prose a,.manual-rich-editor a,.memo-rich-editor a{overflow-wrap:anywhere;word-break:break-all}
+      pre.code-block{white-space:pre-wrap;word-break:break-word}
       .page-header{flex-direction:column;align-items:flex-start;gap:8px;margin-bottom:12px}
       .breadcrumb{font-size:11px;padding:6px 10px;margin-bottom:8px;flex-wrap:wrap}
       .card{border-radius:8px}
@@ -2641,6 +2645,8 @@
       // Code blocks
       root.querySelectorAll('pre.code-block').forEach(function(pre) {
         if (pre.querySelector('.code-block-btn')) return;
+        // Skip if legacy embedded copy button is present (old saved content)
+        if (pre.querySelector('.block-copy-btn, .code-textbox-copy-btn')) return;
         var cbtn = document.createElement('button');
         cbtn.className = 'code-block-btn';
         cbtn.type = 'button';
@@ -2762,6 +2768,8 @@
         clone.querySelectorAll('.copy-block-btn').forEach(function(b) { b.remove(); });
         clone.querySelectorAll('.code-block-btn').forEach(function(b) { b.remove(); });
         clone.querySelectorAll('.block-delete').forEach(function(b) { b.remove(); });
+        // Strip legacy copy buttons that may have been embedded from older versions
+        clone.querySelectorAll('.block-copy-btn, .code-textbox-copy-btn').forEach(function(b) { b.remove(); });
         // Fix invalid nested lists: <ul>...<ul>Y</ul> should be <ul>...<li>...<ul>Y</ul></li></ul>
         function fixNestedLists(root) {
           var fixed = true;
