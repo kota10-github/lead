@@ -1913,7 +1913,7 @@
         html += `<div style="display:flex;flex-direction:column">`;
         function renderTaskRow(t, depth) {
           const children = getChildTasks(t.id);
-          html += `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;padding-left:${depth*16}px;cursor:pointer" onclick="navigate('task-detail',{id:${t.id}})">`;
+          html += `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;padding-left:${depth*12}px;cursor:pointer" onclick="navigate('task-detail',{id:${t.id}})">`;
           html += `<div class="todo-checkbox ${t.done ? 'checked' : ''}" style="width:20px;height:20px" onclick="event.stopPropagation();expandProjectTaskActions(this,${t.id},${t.done})">${t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>'}</div>`;
           html += `<span style="flex:1;font-size:14px;${t.done ? 'text-decoration:line-through;opacity:.5' : ''}">${escapeHtml(t.title)}${dueBadgeHtml(t)}</span>`;
           html += `<button onclick="event.stopPropagation();showAddChildTask(${t.id})" style="background:none;border:none;padding:2px 8px;color:var(--primary);font-size:12px;cursor:pointer;flex-shrink:0">+ 子タスク</button>`;
@@ -3243,7 +3243,7 @@
           grouped[pid].forEach(function(t){ projectTaskIdSet[t.id] = true; });
           var topLevel = grouped[pid].filter(function(t){ return !t.parentTaskId || !projectTaskIdSet[t.parentTaskId]; });
           function renderMyTasksRow(t, depth) {
-            html += '<div class="todo-item' + (t.done ? ' done' : '') + '" style="margin:0;border:none;padding:3px 0;padding-left:' + (depth * 16) + 'px;cursor:pointer" onclick="navigate(\'task-detail\',{id:' + t.id + '})">';
+            html += '<div class="todo-item' + (t.done ? ' done' : '') + '" style="margin:0;border:none;padding:3px 0;padding-left:' + (depth * 12) + 'px;cursor:pointer" onclick="navigate(\'task-detail\',{id:' + t.id + '})">';
             html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? icons.check : '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
             html += '<div style="flex:1;min-width:0">';
             html += '<div class="todo-title">' + escapeHtml(t.title) + dueBadgeHtml(t) + '</div>';
