@@ -2149,7 +2149,11 @@
         </div>
       </div>`;
       html += `<div class="form-group"><label class="label label-icon">${icons.zap} 対応スピード</label><textarea class="textarea" id="f-speed" rows="2" placeholder="例：問い合わせから24時間以内に対応">${escapeHtml(existing?.responseSpeed || '')}</textarea></div>`;
-      html += `<div class="flex gap-2" style="margin-top:16px;align-items:center"><button class="btn btn-primary" onclick="submitManualForm(${isEdit ? pageParams.editId : 'null'},${pageParams.projectId || 'null'})">${isEdit ? '更新して閉じる' : '作成'}</button><button class="btn btn-outline" onclick="${isEdit ? `navigate('manual-detail',{id:${pageParams.editId}})` : `navigate('project-detail',{id:${pageParams.projectId}})`}">${isEdit ? '閉じる' : 'キャンセル'}</button><span id="f-save-status" style="font-size:11px;color:var(--fg-muted2);margin-left:auto"></span></div>`;
+      if (isEdit) {
+        html += `<div class="flex gap-2" style="margin-top:16px;align-items:center"><button class="btn btn-outline" onclick="navigate('manual-detail',{id:${pageParams.editId}})">閉じる</button><span id="f-save-status" style="font-size:11px;color:var(--fg-muted2);margin-left:auto"></span></div>`;
+      } else {
+        html += `<div class="flex gap-2" style="margin-top:16px;align-items:center"><button class="btn btn-primary" onclick="submitManualForm(null,${pageParams.projectId || 'null'})">作成</button><button class="btn btn-outline" onclick="navigate('project-detail',{id:${pageParams.projectId}})">キャンセル</button></div>`;
+      }
       html += `</aside>`;
       // Right main: manual content editor (big)
       html += `<main>`;
