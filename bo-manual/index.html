@@ -1913,10 +1913,10 @@
         html += `<div style="display:flex;flex-direction:column">`;
         function renderTaskRow(t, depth) {
           const children = getChildTasks(t.id);
-          html += `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;padding-left:${depth*20}px;cursor:pointer" onclick="navigate('task-detail',{id:${t.id}})" onmouseover="this.querySelector('.task-row-actions').style.opacity='1'" onmouseout="this.querySelector('.task-row-actions').style.opacity='0'">`;
+          html += `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;padding-left:${depth*20}px;cursor:pointer" onclick="navigate('task-detail',{id:${t.id}})">`;
           html += `<div class="todo-checkbox ${t.done ? 'checked' : ''}" style="width:20px;height:20px" onclick="event.stopPropagation();expandProjectTaskActions(this,${t.id},${t.done})">${t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>'}</div>`;
           html += `<span style="flex:1;font-size:14px;${t.done ? 'text-decoration:line-through;opacity:.5' : ''}">${escapeHtml(t.title)}${dueBadgeHtml(t)}</span>`;
-          html += `<span class="task-row-actions" style="opacity:0;transition:opacity .15s"><button onclick="event.stopPropagation();showAddChildTask(${t.id})" style="background:none;border:none;padding:2px 8px;color:var(--primary);font-size:12px;cursor:pointer">+ 子タスク</button></span>`;
+          html += `<button onclick="event.stopPropagation();showAddChildTask(${t.id})" style="background:none;border:none;padding:2px 8px;color:var(--primary);font-size:12px;cursor:pointer;flex-shrink:0">+ 子タスク</button>`;
           html += `</div>`;
           children.forEach(function(c) { renderTaskRow(c, depth + 1); });
         }
@@ -4025,6 +4025,31 @@
       // Status
       html += '<div class="info-section"><div class="info-section-label"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>ステータス</div>';
       html += '<span class="badge ' + (task.done ? 'badge-primary' : 'badge-secondary') + '">' + (task.done ? '完了' : '未完了') + '</span>';
+      html += '</div>';
+      // Parent task (if child)
+      if (task.parentTaskId) {
+        var parent = (data.projectTasks || []).find(function(x){ return x.id === task.parentTaskId; });
+        if (parent) {
+          html += '<div class="info-section"><div class="info-section-label">↑ 親タスク</div>';
+          html += '<span style="font-size:13px;cursor:pointer;color:var(--primary)" onclick="navigate(\'task-detail\',{id:' + parent.id + '})">' + escapeHtml(parent.title) + '</span>';
+          html += '</div>';
+        }
+      }
+      // Child tasks
+      var childTasks = getChildTasks(task.id);
+      html += '<div class="info-section"><div class="info-section-label" style="display:flex;align-items:center;gap:8px">↓ 子タスク <span style="color:var(--fg-muted2);font-weight:400">' + childTasks.length + '</span><button onclick="showAddChildTask(' + task.id + ')" style="margin-left:auto;background:none;border:none;padding:0;color:var(--primary);font-size:12px;cursor:pointer;font-weight:400">+ 追加</button></div>';
+      if (childTasks.length === 0) {
+        html += '<p style="color:var(--fg-muted2);font-size:12px;margin:0">—</p>';
+      } else {
+        html += '<div style="display:flex;flex-direction:column;gap:4px">';
+        childTasks.forEach(function(ct) {
+          html += '<div style="display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0;cursor:pointer" onclick="navigate(\'task-detail\',{id:' + ct.id + '})">';
+          html += '<div class="todo-checkbox ' + (ct.done ? 'checked' : '') + '" style="width:18px;height:18px;font-size:8px" onclick="event.stopPropagation();expandProjectTaskActions(this,' + ct.id + ',' + ct.done + ')">' + (ct.done ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
+          html += '<span style="' + (ct.done ? 'text-decoration:line-through;opacity:.5' : '') + '">' + escapeHtml(ct.title) + '</span>';
+          html += '</div>';
+        });
+        html += '</div>';
+      }
       html += '</div>';
       html += '</div>';
       html += '</aside>';
