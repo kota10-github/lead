@@ -2740,6 +2740,18 @@
         if (editId) {
           var m = getManual(editId);
           if (m) {
+            // Snapshot previous state to history if content has meaningfully changed and >60s since last snapshot
+            var prev = { title: m.title, purpose: m.purpose, authority: m.authority, paceTagId: m.paceTagId, paceSchedule: m.paceSchedule, operationPace: m.operationPace, responseSpeed: m.responseSpeed, taskRoadmap: m.taskRoadmap };
+            var contentChanged = prev.title !== title || prev.purpose !== purpose || prev.authority !== authority || prev.responseSpeed !== speed || prev.taskRoadmap !== roadmap || prev.paceTagId !== paceTagId;
+            if (contentChanged) {
+              if (!m.history) m.history = [];
+              var last = m.history[m.history.length - 1];
+              var now = Date.now();
+              if (!last || (now - (last.ts || 0)) > 60000) {
+                m.history.push(Object.assign({ ts: now }, prev));
+                if (m.history.length > 100) m.history = m.history.slice(-100);
+              }
+            }
             Object.assign(m, { title: title, purpose: purpose, authority: authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap });
             if (paceTagId) m.operationPace = '';
             saveData();
