@@ -2914,7 +2914,10 @@
       if (paceTagId) m.operationPace = '';
       saveData();
       _manualFormLastSavedAt = Date.now();
-      if (typeof pushSyncNow === 'function') pushSyncNow();
+      // NOTE: saveData() already schedules a 500ms-debounced pushSync; do NOT
+      // call pushSyncNow() here — that would fire one GET+PUT per keystroke,
+      // which on mobile causes OOM / Safari crashes during typing. The
+      // debounced push and the blur/pagehide flushes are enough.
       setManualFormSaveStatus('保存しました');
       setTimeout(function() { if (_manualFormAutoSaveStatusEl && _manualFormAutoSaveStatusEl.textContent === '保存しました') setManualFormSaveStatus(''); }, 1500);
       return true;
