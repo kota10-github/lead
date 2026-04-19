@@ -4112,21 +4112,24 @@
     // Only re-render if remote had newer-_modTs items that replaced something local.
     function pullMergeQuiet() {
       if (new URLSearchParams(location.search).get('manual')) return;
-      // Skip while user is interacting — any of these conditions:
-      //   - focused input/textarea/contenteditable
-      //   - modal overlay is open
-      //   - task checkbox is expanded (user is about to click 完了/削除)
-      //   - any button is in hover/focus state
-      var ae = document.activeElement;
-      if (ae && (ae.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))) return;
+      // Skip pulls ONLY when the user is mid-interaction that would be
+      // visually disrupted by a re-render. We intentionally DO NOT skip on
+      // manual-form anymore — we filter out the edited manual instead, so
+      // other items (tasks, other manuals) still sync while editing.
       if (document.querySelector('.modal-overlay')) return;
       if (document.querySelector('.todo-checkbox.expanded')) return;
-      // Skip if user is in any edit form
-      if (currentPage === 'manual-form') return;
+      var onForm = (currentPage === 'manual-form');
+      var editId = onForm && pageParams ? pageParams.editId : null;
       fetch(SYNC_URL).then(function(r){return r.json()}).then(function(remote){
         if (!remote || typeof remote !== 'object') return;
-        // Signature includes per-item _modTs so ANY content change (not just
-        // list length or done-state) triggers persist + render.
+        // If on manual-form, strip the currently-edited manual from remote
+        // payload so we don't stomp the live editor state.
+        var effectiveRemote = remote;
+        if (onForm && editId != null && Array.isArray(remote.manuals)) {
+          effectiveRemote = Object.assign({}, remote, {
+            manuals: remote.manuals.filter(function(rm){ return rm && rm.id !== editId; })
+          });
+        }
         function sig() {
           return JSON.stringify({
             t: (data.projectTasks||[]).map(function(t){return t.id+':'+(t.done?1:0)+':'+(t._modTs||0);}).sort(),
@@ -4137,25 +4140,44 @@
           });
         }
         var before = sig();
-        mergeRemoteIntoLocal(remote);
+        mergeRemoteIntoLocal(effectiveRemote);
         var after = sig();
         if (before !== after) {
           _origSaveData();
           if (document.querySelector('.todo-checkbox.expanded')) return;
           if (document.querySelector('.modal-overlay')) return;
+          // Don't re-render while the user is editing — that would rebuild the
+          // form and lose their caret position. Data is already merged in-memory
+          // and persisted to LS; next navigation will reflect.
+          if (onForm) return;
+          // Don't steal focus from a focused input (text-typing continues).
+          var ae = document.activeElement;
+          if (ae && (ae.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))) return;
           render();
         }
       }).catch(function(){});
     }
     // Pull every 1.5s for near-realtime cross-device feel (Notion-style
     // polling cadence). Plus immediate pulls on tab focus / network-online
-    // so returning to a tab doesn't wait for the next interval tick.
+    // and on any user interaction (throttled) so mobile doesn't need to wait
+    // for the next interval tick after tapping/scrolling.
     setInterval(pullMergeQuiet, 1500);
     document.addEventListener('visibilitychange', function(){
       if (!document.hidden) pullMergeQuiet();
     });
     window.addEventListener('focus', pullMergeQuiet);
     window.addEventListener('online', pullMergeQuiet);
+    var _lastInteractPull = 0;
+    function _pullOnInteract() {
+      var now = Date.now();
+      if (now - _lastInteractPull < 800) return; // throttle: max 1 pull per 800ms
+      _lastInteractPull = now;
+      pullMergeQuiet();
+    }
+    // Passive listeners so scrolling is never delayed by these hooks.
+    document.addEventListener('touchstart', _pullOnInteract, {passive: true});
+    document.addEventListener('click', _pullOnInteract);
+    document.addEventListener('scroll', _pullOnInteract, {passive: true});
 
     // visibilitychange → pullSync was removed. It was destroying user input:
     //   - Adding a task or editing a manual, then tab-switching back, triggered a pull
