@@ -2889,7 +2889,12 @@
       var contentChanged = prev.title !== title || prev.purpose !== purpose || prev.authority !== authority || prev.responseSpeed !== speed || prev.taskRoadmap !== roadmap || prev.paceTagId !== paceTagId;
       if (!contentChanged) { setManualFormSaveStatus(''); return false; }
       if (!m.history) m.history = [];
-      m.history.push(Object.assign({ ts: bumpModTs(m._modTs) }, prev));
+      // Throttle history entries: one snapshot per 3 seconds of active editing.
+      // Keystrokes still write to localStorage immediately via the main Object.assign.
+      var lastHist = m.history.length ? (m.history[m.history.length-1].ts || 0) : 0;
+      if (Date.now() - lastHist >= 3000) {
+        m.history.push(Object.assign({ ts: bumpModTs(m._modTs) }, prev));
+      }
       Object.assign(m, { title: title, purpose: purpose, authority: authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap, _modTs: bumpModTs(m._modTs) });
       markDirty('manuals', m.id);
       if (paceTagId) m.operationPace = '';
@@ -2900,18 +2905,17 @@
       setTimeout(function() { if (_manualFormAutoSaveStatusEl && _manualFormAutoSaveStatusEl.textContent === '保存しました') setManualFormSaveStatus(''); }, 1500);
       return true;
     }
-    // Debounced autosave (300ms — shorter than before to reduce reload-loss window)
+    // Autosave: write to localStorage IMMEDIATELY on every input (zero delay).
+    // This guarantees a reload cannot lose the edit. Only the remote push is
+    // debounced (500ms) — that happens inside performManualFormSave → pushSync.
     function autoSaveManualForm() {
       if (!document.getElementById('f-title')) return;
-      setManualFormSaveStatus('編集中…');
+      // Save to localStorage synchronously right now — no debounce window.
+      var saved = performManualFormSave();
+      if (!saved) setManualFormSaveStatus('');
+      // Debounced no-op timer just so flushManualFormNow can detect "in flight"
       clearTimeout(_manualFormAutoSaveTimer);
-      _manualFormAutoSaveTimer = setTimeout(function() {
-        _manualFormAutoSaveTimer = null;
-        var saved = performManualFormSave();
-        // performManualFormSave returns false when nothing actually changed
-        // (e.g. status-only input). Clear the stuck "編集中…" label in that case.
-        if (!saved) setManualFormSaveStatus('');
-      }, 300);
+      _manualFormAutoSaveTimer = null;
     }
     // Force-flush any pending debounced save (blur / hide / unload)
     function flushManualFormNow() {
