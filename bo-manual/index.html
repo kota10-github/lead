@@ -92,6 +92,8 @@
     .info-grid > div + div{border-left:1px solid var(--border)}
     /* Dialog / Modal */
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+    /* Inline action bar on manual detail page (visible on mobile + desktop) */
+    .doc-actions-inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border-light)}
     /* Google Docs-style version history */
     .gdocs-history-overlay{position:fixed;inset:0;background:#f6f8fc;z-index:200;display:flex;animation:modalIn .15s}
     .gdocs-history-panel{display:flex;flex-direction:column;width:100%;height:100%}
@@ -2129,6 +2131,14 @@
       html += `<main class="doc-main">`;
       html += renderBreadcrumb();
       html += `<h1 class="doc-title">${escapeHtml(manual.title)}</h1>`;
+      // Inline action bar — visible on all viewports (the sidebar aside is
+      // hidden on mobile via .doc-meta{display:none}).
+      html += `<div class="doc-actions-inline no-print">
+        <button class="btn btn-primary btn-sm" onclick="navigate('manual-form',{editId:${manual.id}})">${icons.pencil} 編集</button>
+        <button class="btn btn-outline btn-sm" onclick="showManualHistory(${manual.id})">🕐 変更履歴</button>
+        <button class="btn btn-outline btn-sm" onclick="shareManualLink(${manual.id})">🔗 共有</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--destructive);margin-left:auto" onclick="confirmDeleteManual(${manual.id})">${icons.trash}</button>
+      </div>`;
       html += `<div class="doc-assignees">`;
       assignees.forEach(a => {
         html += `<span class="badge badge-secondary">${escapeHtml(a.user?.name || '不明')} <button onclick="removeAssignee(${manual.id},${a.userId})" style="margin-left:4px;opacity:.6">${icons.x}</button></span>`;
@@ -2140,14 +2150,8 @@
         html += `<p style="color:var(--fg-muted2);font-style:italic">マニュアル内容が未設定です</p>`;
       }
       html += `</main>`;
-      // Right aside: action buttons + manual meta info
+      // Right aside: manual meta info (desktop only — actions moved inline above)
       html += `<aside class="doc-meta">`;
-      html += `<div class="doc-meta-actions no-print">
-        <button class="btn btn-outline btn-sm" onclick="shareManualLink(${manual.id})">🔗 共有リンク</button>
-        <button class="btn btn-outline btn-sm" onclick="showManualHistory(${manual.id})">🕐 変更履歴</button>
-        <button class="btn btn-outline btn-sm" onclick="navigate('manual-form',{editId:${manual.id}})">${icons.pencil} 編集</button>
-        <button class="btn btn-outline btn-sm" style="color:var(--destructive)" onclick="confirmDeleteManual(${manual.id})">${icons.trash} 削除</button>
-      </div>`;
       html += `<div class="info-card">`;
       html += `<div class="info-section"><div class="info-section-label" style="color:var(--primary)">${icons.target} <span style="text-transform:uppercase;letter-spacing:.05em">果たすべき責任（目的）</span></div><p style="font-weight:500;white-space:pre-wrap;font-size:13px">${escapeHtml(manual.purpose)}</p></div>`;
       html += `<div class="info-section"><div class="info-section-label">${icons.shield} <span>権限</span></div><p class="text-sm" style="white-space:pre-wrap">${manual.authority ? escapeHtml(manual.authority) : '<em style="color:var(--fg-muted2)">未設定</em>'}</p></div>`;
