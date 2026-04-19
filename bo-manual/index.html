@@ -169,13 +169,30 @@
     .map-add-options{display:flex;gap:6px;margin-top:6px}
     .map-add-branch{padding:5px 12px;border-radius:14px;font-size:11px;font-weight:500;border:1px dashed var(--border);background:transparent;color:var(--fg-muted);cursor:pointer;transition:all .2s;white-space:nowrap}
     .map-add-branch:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)} .sub-tree-row{display:flex;align-items:flex-start;gap:12px;position:relative;flex-shrink:0} .sub-tree-card-wrap{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:120px} .sub-tree-children{display:flex;flex-direction:column;gap:8px} .sub-add-btn{font-size:10px;padding:2px 8px;border:1px dashed var(--border);border-radius:4px;background:transparent;cursor:pointer;white-space:nowrap;color:var(--fg-muted)} .sub-add-btn:hover{border-color:var(--primary);color:var(--primary)}
-    /* Hover-reveal add buttons on the map — collapse space when hidden */
-    .map-add-options { max-height: 0; margin-top: 0; opacity: 0; overflow: hidden; transition: max-height .2s ease, margin-top .2s ease, opacity .15s ease }
-    .sub-tree-children > .sub-add-btn { max-height: 0; padding-top: 0; padding-bottom: 0; border-color: transparent; opacity: 0; overflow: hidden; transition: max-height .2s ease, padding .2s ease, opacity .15s ease, border-color .2s ease }
-    .root-wrap > .map-add-btn { max-height: 0; margin-top: 0; opacity: 0; overflow: hidden; padding-top: 0; padding-bottom: 0; transition: max-height .2s ease, margin-top .2s ease, opacity .15s ease, padding .2s ease }
-    .project-branch:hover > .sub-tree-children > .map-add-options { max-height: 48px; margin-top: 6px; opacity: 1 }
-    .sub-tree-row:hover > .sub-tree-children > .sub-add-btn { max-height: 24px; padding: 2px 8px; opacity: 1; border-color: var(--border) }
-    .root-wrap:hover > .map-add-btn { max-height: 48px; margin-top: 8px; opacity: 1; padding: 10px 14px }
+    /* Hover-reveal add buttons on the map.
+       IMPORTANT: layout must NOT shift on hover — otherwise cards jump down
+       and the user can't read them comfortably. Keep the button slot at a
+       constant size and animate only opacity (and pointer-events). */
+    .map-add-plus, .sub-add-plus, .map-add-btn-plus {
+      width:20px;height:20px;min-height:20px;line-height:1;padding:0;font-size:14px;font-weight:600;
+      display:inline-flex;align-items:center;justify-content:center;
+      border:1px dashed var(--border);border-radius:50%;background:transparent;color:var(--fg-muted);
+      cursor:pointer;opacity:0;pointer-events:none;transition:opacity .15s ease, color .15s, border-color .15s;
+      flex-shrink:0;
+    }
+    .map-add-plus:hover, .sub-add-plus:hover, .map-add-btn-plus:hover { color: var(--primary); border-color: var(--primary); background: var(--primary-light) }
+    .project-branch:hover .map-add-plus,
+    .sub-tree-row:hover > .sub-tree-children > .sub-add-plus,
+    .root-wrap:hover > .map-add-btn-plus,
+    .map-add-plus.open, .sub-add-plus.open, .map-add-btn-plus.open { opacity: 1; pointer-events: auto }
+    /* Touch devices: no hover, always show the + (dim) so mobile users can tap */
+    @media (hover: none) {
+      .map-add-plus, .sub-add-plus, .map-add-btn-plus { opacity: .5; pointer-events: auto }
+    }
+    /* Add-options popup (tap + → 3 choices) */
+    .add-popup{position:absolute;z-index:60;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);padding:4px;display:flex;flex-direction:column;min-width:140px}
+    .add-popup button{background:transparent;border:none;text-align:left;padding:8px 12px;border-radius:4px;cursor:pointer;font-size:13px;color:var(--fg);display:flex;align-items:center;gap:8px}
+    .add-popup button:hover{background:var(--bg-muted)}
     /* Project detail */
     .project-memo-area{margin-top:24px}
     .project-memo-area h3{font-size:15px;font-weight:600;margin-bottom:8px}
@@ -1129,6 +1146,53 @@
     function getManualCountForProject(pid) { return data.manuals.filter(m => m.projectId === pid).length; }
     function getManualsByProject(pid) { return data.manuals.filter(m => m.projectId === pid); }
     function isLive(x) { return x && !x._deleted; }
+    // Map: "+ ボタン" → 3 択ポップアップ (マニュアル / タスク / サブプロジェクト)
+    function showAddOptionsPopup(anchorBtn, projectId, kind) {
+      // Close any existing popups
+      document.querySelectorAll('.add-popup').forEach(function(p){ p.remove(); });
+      var opts;
+      if (kind === 'project' || kind === 'subproject') {
+        opts = [
+          { label: '📖 マニュアル', click: function(){ navigate('manual-form',{projectId:projectId}); } },
+          { label: '✓ タスク', click: function(){ showAddProjectTask(projectId); } },
+          { label: '📁 サブプロジェクト', click: function(){ showProjectDialog(projectId); } }
+        ];
+      } else {
+        return;
+      }
+      var pop = document.createElement('div');
+      pop.className = 'add-popup';
+      opts.forEach(function(o){
+        var b = document.createElement('button');
+        b.textContent = o.label;
+        b.addEventListener('click', function(ev){ ev.stopPropagation(); pop.remove(); o.click(); });
+        pop.appendChild(b);
+      });
+      // Position near the anchor button (above the + if there's no space below, else below)
+      document.body.appendChild(pop);
+      anchorBtn.classList.add('open');
+      var r = anchorBtn.getBoundingClientRect();
+      var pw = pop.offsetWidth, ph = pop.offsetHeight;
+      var top = r.bottom + 6;
+      if (top + ph > window.innerHeight - 10) top = r.top - ph - 6;
+      var left = r.left + (r.width / 2) - (pw / 2);
+      if (left < 8) left = 8;
+      if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+      pop.style.top = (top + window.scrollY) + 'px';
+      pop.style.left = (left + window.scrollX) + 'px';
+      // Close on outside click (next tick so the opening click doesn't close immediately)
+      setTimeout(function(){
+        var onDoc = function(ev){
+          if (!pop.contains(ev.target) && ev.target !== anchorBtn) {
+            pop.remove();
+            anchorBtn.classList.remove('open');
+            document.removeEventListener('click', onDoc);
+          }
+        };
+        document.addEventListener('click', onDoc);
+      }, 0);
+    }
+    window.showAddOptionsPopup = showAddOptionsPopup;
     function getTasksByProject(pid) { return (data.projectTasks || []).filter(function(t) { return isLive(t) && t.projectId === pid; }); }
     function getTopLevelTasksByProject(pid) { return (data.projectTasks || []).filter(function(t) { return isLive(t) && t.projectId === pid && !t.parentTaskId; }); }
     function getChildTasks(parentId) { return (data.projectTasks || []).filter(function(t) { return isLive(t) && t.parentTaskId === parentId; }); }
@@ -1672,7 +1736,7 @@
         html += `<div class="breadcrumb"><span class="breadcrumb-item" onclick="navigate('home')">マップ</span></div>`;
         html += `<div class="mindmap-viewport" id="mindmap-viewport"><svg class="mindmap-svg" id="mindmap-svg"></svg>`;
         html += `<div class="mindmap-inner" id="mindmap-inner" style="transform:scale(${mapZoom})">`;
-        html += `<div class="root-wrap" style="display:flex;flex-direction:column;justify-content:center;padding-top:32px"><div class="node-root" data-node="root" ondragover="event.preventDefault();this.classList.add('drop-target')" ondragleave="this.classList.remove('drop-target','drop-before','drop-after')" ondrop="handleProjectDrop(event,null)">BOチーム</div><button class="map-add-btn" onclick="showProjectDialog()">+ プロジェクト追加</button></div>`;
+        html += `<div class="root-wrap" style="display:flex;flex-direction:column;justify-content:center;padding-top:32px;position:relative"><div class="node-root" data-node="root" ondragover="event.preventDefault();this.classList.add('drop-target')" ondragleave="this.classList.remove('drop-target','drop-before','drop-after')" ondrop="handleProjectDrop(event,null)">BOチーム</div><button class="map-add-btn-plus" title="プロジェクトを追加" onclick="showProjectDialog()" style="align-self:center;margin-top:8px">+</button></div>`;
         html += `<div class="project-col">`;
         projects.forEach((proj, pi) => {
           const c = getProjectColor(proj.projectId);
@@ -1701,11 +1765,7 @@
             renderTaskBranch(t, c);
           });
           proj.subProjects.forEach(function(sp) { renderSubBranch(sp); });
-          html += `<div class="map-add-options">
-            <button class="map-add-branch" onclick="navigate('manual-form',{projectId:${proj.projectId}})">+ マニュアル</button>
-            <button class="map-add-branch" onclick="showAddProjectTask(${proj.projectId})">+ タスク</button>
-            <button class="map-add-branch" onclick="showProjectDialog(${proj.projectId})">+ プロジェクト</button>
-          </div>`;
+          html += `<button class="map-add-plus" title="追加" onclick="event.stopPropagation();showAddOptionsPopup(this,${proj.projectId},'project')">+</button>`;
           html += `</div>`; // close sub-tree-children
           html += `</div>`; // close project-branch
         });
@@ -1734,9 +1794,7 @@
           if (sp.subProjects.length > 0) {
             sp.subProjects.forEach(function(child) { renderSubBranch(child); });
           }
-          html += '<button class="sub-add-btn" onclick="event.stopPropagation();navigate(\'manual-form\',{projectId:' + sp.projectId + '})">+ マニュアル</button>';
-          html += '<button class="sub-add-btn" onclick="event.stopPropagation();showAddProjectTask(' + sp.projectId + ')">+ タスク</button>';
-          html += '<button class="sub-add-btn" onclick="event.stopPropagation();showProjectDialog(' + sp.projectId + ')">+ サブ</button>';
+          html += '<button class="sub-add-plus" title="追加" onclick="event.stopPropagation();showAddOptionsPopup(this,' + sp.projectId + ',\'subproject\')">+</button>';
           html += '</div>'; // close sub-tree-children
           html += '</div>'; // close sub-tree-row
         }
@@ -1755,7 +1813,7 @@
           // Right side: child tasks + add button
           html += '<div class="sub-tree-children">';
           kids.forEach(function(c) { renderTaskBranch(c, color); });
-          html += '<button class="sub-add-btn" onclick="event.stopPropagation();showAddChildTask(' + t.id + ')">+ 子タスク</button>';
+          html += '<button class="sub-add-plus" title="子タスクを追加" onclick="event.stopPropagation();showAddChildTask(' + t.id + ')">+</button>';
           html += '</div>'; // close sub-tree-children
           html += '</div>'; // close sub-tree-row
         }
