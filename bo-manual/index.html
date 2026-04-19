@@ -2835,6 +2835,16 @@
       saveData();
       if (typeof pushSyncNow === 'function') pushSyncNow();
     }
+    // Monotonic modTs: strictly greater than any known _modTs on this item.
+    // Protects against cross-device clock skew (otherwise a device with a
+    // fast clock wins forever and edits from the "behind" device revert on
+    // reload when mergeRemoteIntoLocal compares _modTs).
+    function bumpModTs(prev) {
+      var now = Date.now();
+      var p = Number(prev) || 0;
+      return now > p ? now : (p + 1);
+    }
+    window.bumpModTs = bumpModTs;
     // Autosave the manual form (Google Docs style: short debounce + blur/hide flush)
     var _manualFormAutoSaveTimer = null;
     var _manualFormAutoSaveStatusEl = null;
@@ -2877,10 +2887,10 @@
       if (!m) return false;
       var prev = { title: m.title, purpose: m.purpose, authority: m.authority, paceTagId: m.paceTagId, paceSchedule: m.paceSchedule, operationPace: m.operationPace, responseSpeed: m.responseSpeed, taskRoadmap: m.taskRoadmap };
       var contentChanged = prev.title !== title || prev.purpose !== purpose || prev.authority !== authority || prev.responseSpeed !== speed || prev.taskRoadmap !== roadmap || prev.paceTagId !== paceTagId;
-      if (!contentChanged) return false;
+      if (!contentChanged) { setManualFormSaveStatus(''); return false; }
       if (!m.history) m.history = [];
-      m.history.push(Object.assign({ ts: Date.now() }, prev));
-      Object.assign(m, { title: title, purpose: purpose, authority: authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap, _modTs: Date.now() });
+      m.history.push(Object.assign({ ts: bumpModTs(m._modTs) }, prev));
+      Object.assign(m, { title: title, purpose: purpose, authority: authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap, _modTs: bumpModTs(m._modTs) });
       if (paceTagId) m.operationPace = '';
       saveData();
       _manualFormLastSavedAt = Date.now();
@@ -2896,7 +2906,10 @@
       clearTimeout(_manualFormAutoSaveTimer);
       _manualFormAutoSaveTimer = setTimeout(function() {
         _manualFormAutoSaveTimer = null;
-        performManualFormSave();
+        var saved = performManualFormSave();
+        // performManualFormSave returns false when nothing actually changed
+        // (e.g. status-only input). Clear the stuck "編集中…" label in that case.
+        if (!saved) setManualFormSaveStatus('');
       }, 300);
     }
     // Force-flush any pending debounced save (blur / hide / unload)
@@ -2963,7 +2976,7 @@
             // Keep last 50 versions only
             // History is NEVER purged
           }
-          Object.assign(m, { title, purpose, authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap, _modTs: Date.now() });
+          Object.assign(m, { title, purpose, authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap, _modTs: bumpModTs(m._modTs) });
           // Clear legacy operationPace when using new tag system
           if (paceTagId) m.operationPace = '';
           saveData();
@@ -2980,24 +2993,37 @@
     }
     // Google Docs-style version history: full-screen panel, version list on right, preview on left
     function showManualHistory(manualId) {
+      // Flush any pending edit so "現在のバージョン" reflects the latest state
+      try { if (typeof flushManualFormNow === 'function') flushManualFormNow(); } catch(e) {}
       var m = getManual(manualId);
       if (!m) return;
       // Build entries: current + history + local backups (dedupe by ts)
       var entries = [];
-      entries.push({ source: 'current', ts: m._modTs || Date.now(), title: m.title, purpose: m.purpose, authority: m.authority, paceTagId: m.paceTagId, paceSchedule: m.paceSchedule, operationPace: m.operationPace, responseSpeed: m.responseSpeed, taskRoadmap: m.taskRoadmap || '', isCurrent: true });
+      // "Current" always gets a ts that is >= all others so sort keeps it at the top
+      var currentTs = m._modTs || Date.now();
+      (m.history || []).forEach(function(v) { if (v && v.ts && v.ts > currentTs) currentTs = v.ts; });
+      try {
+        (listLocalBackups() || []).forEach(function(b) {
+          var bm = (b.manuals || []).find(function(x){ return x.id === manualId; });
+          if (bm && b.ts > currentTs) currentTs = b.ts;
+        });
+      } catch(e) {}
+      entries.push({ source: 'current', ts: currentTs, sortKey: Number.POSITIVE_INFINITY, title: m.title, purpose: m.purpose, authority: m.authority, paceTagId: m.paceTagId, paceSchedule: m.paceSchedule, operationPace: m.operationPace, responseSpeed: m.responseSpeed, taskRoadmap: m.taskRoadmap || '', isCurrent: true });
       (m.history || []).forEach(function(v, idx) {
-        entries.push({ source: 'history', ts: v.ts, title: v.title, purpose: v.purpose, authority: v.authority, paceTagId: v.paceTagId, paceSchedule: v.paceSchedule, operationPace: v.operationPace, responseSpeed: v.responseSpeed, taskRoadmap: v.taskRoadmap || '', origIdx: idx });
+        entries.push({ source: 'history', ts: v.ts, sortKey: v.ts || 0, title: v.title, purpose: v.purpose, authority: v.authority, paceTagId: v.paceTagId, paceSchedule: v.paceSchedule, operationPace: v.operationPace, responseSpeed: v.responseSpeed, taskRoadmap: v.taskRoadmap || '', origIdx: idx });
       });
       try {
         (listLocalBackups() || []).forEach(function(b) {
           var bm = (b.manuals || []).find(function(x){ return x.id === manualId; });
-          if (bm) entries.push({ source: 'backup', ts: b.ts, title: bm.title, purpose: bm.purpose, authority: bm.authority, paceTagId: bm.paceTagId, paceSchedule: bm.paceSchedule, operationPace: bm.operationPace, responseSpeed: bm.responseSpeed, taskRoadmap: bm.taskRoadmap || '', backupTs: b.ts });
+          if (bm) entries.push({ source: 'backup', ts: b.ts, sortKey: b.ts || 0, title: bm.title, purpose: bm.purpose, authority: bm.authority, paceTagId: bm.paceTagId, paceSchedule: bm.paceSchedule, operationPace: bm.operationPace, responseSpeed: bm.responseSpeed, taskRoadmap: bm.taskRoadmap || '', backupTs: b.ts });
         });
       } catch(e) {}
-      entries.sort(function(a,b){ return b.ts - a.ts; });
-      // Dedupe: same ts + same content length
+      // Current entry always on top (sortKey = +Infinity); rest newest→oldest
+      entries.sort(function(a,b){ return (b.sortKey||0) - (a.sortKey||0); });
+      // Dedupe, but NEVER drop the current entry
       var seen = {};
       entries = entries.filter(function(e) {
+        if (e.isCurrent) return true;
         var key = e.ts + '_' + (e.taskRoadmap||'').length + '_' + (e.title||'');
         if (seen[key]) return false;
         seen[key] = true;
@@ -3598,14 +3624,14 @@
           var memoEl = document.getElementById('memo-rich-editor');
           var mid = pageParams && pageParams.id;
           var mt = mid ? (data.projectTasks||[]).find(function(t){return isLive(t) && t.id===mid;}) : null;
-          if (mt && memoEl) { mt.memo = htmlToMarkdown(memoEl); mt._modTs = Date.now(); saveData(); }
+          if (mt && memoEl) { mt.memo = htmlToMarkdown(memoEl); mt._modTs = bumpModTs(mt._modTs); saveData(); }
         }
         if (typeof _taskTitleTimer !== 'undefined' && _taskTitleTimer) {
           clearTimeout(_taskTitleTimer); _taskTitleTimer = null;
           var tte = document.getElementById('task-title-input');
           var tid = pageParams && pageParams.id;
           var tt = tid ? (data.projectTasks||[]).find(function(t){return isLive(t) && t.id===tid;}) : null;
-          if (tt && tte && tte.value.trim()) { tt.title = tte.value.trim(); tt._modTs = Date.now(); saveData(); }
+          if (tt && tte && tte.value.trim()) { tt.title = tte.value.trim(); tt._modTs = bumpModTs(tt._modTs); saveData(); }
         }
       } catch(e) {}
       if (typeof pushSyncNow === 'function') pushSyncNow();
@@ -4205,7 +4231,7 @@
           if (!title) { toast('タスク名を入力してください'); return; }
           if (!data.projectTasks) data.projectTasks = [];
           if (!data.nextProjectTaskId) data.nextProjectTaskId = 1;
-          var task = { id: data.nextProjectTaskId++, projectId: projectId, title: title, done: false, _modTs: Date.now() };
+          var task = { id: data.nextProjectTaskId++, projectId: projectId, title: title, done: false, _modTs: bumpModTs(0) };
           var due = document.getElementById('d-pt-due').value;
           if (due) task.dueDate = due;
           data.projectTasks.push(task);
@@ -4226,7 +4252,7 @@
           if (!title) { toast('タスク名を入力してください'); return; }
           if (!data.projectTasks) data.projectTasks = [];
           if (!data.nextProjectTaskId) data.nextProjectTaskId = 1;
-          var task = { id: data.nextProjectTaskId++, projectId: parent.projectId, title: title, done: false, parentTaskId: parentTaskId, _modTs: Date.now() };
+          var task = { id: data.nextProjectTaskId++, projectId: parent.projectId, title: title, done: false, parentTaskId: parentTaskId, _modTs: bumpModTs(0) };
           var due = document.getElementById('d-ct-due').value;
           if (due) task.dueDate = due;
           data.projectTasks.push(task);
@@ -4252,7 +4278,7 @@
           var pid = Number(document.getElementById('d-pt-project').value);
           if (!data.projectTasks) data.projectTasks = [];
           if (!data.nextProjectTaskId) data.nextProjectTaskId = 1;
-          var task = { id: data.nextProjectTaskId++, projectId: pid, title: title, done: false, _modTs: Date.now() };
+          var task = { id: data.nextProjectTaskId++, projectId: pid, title: title, done: false, _modTs: bumpModTs(0) };
           var due = document.getElementById('d-pt-due').value;
           if (due) task.dueDate = due;
           data.projectTasks.push(task);
@@ -4262,7 +4288,7 @@
     }
     function toggleProjectTask(taskId) {
       var task = (data.projectTasks || []).find(function(t) { return isLive(t) && t.id === taskId; });
-      if (task) { task.done = !task.done; task._modTs = Date.now(); saveData(); render(); }
+      if (task) { task.done = !task.done; task._modTs = bumpModTs(task._modTs); saveData(); render(); }
     }
     function deleteProjectTask(taskId) {
       // Cascade: delete descendants too. Tombstone instead of physical removal
@@ -4326,7 +4352,7 @@
       _taskTitleTimer = setTimeout(function() {
         var task = (data.projectTasks || []).find(function(t) { return isLive(t) && t.id === taskId; });
         var el = document.getElementById('task-title-input');
-        if (task && el && el.value.trim()) { task.title = el.value.trim(); task._modTs = Date.now(); saveData(); }
+        if (task && el && el.value.trim()) { task.title = el.value.trim(); task._modTs = bumpModTs(task._modTs); saveData(); }
       }, 800);
     }
     var _taskMemoTimer = null;
@@ -4337,7 +4363,7 @@
       _taskMemoTimer = setTimeout(function() {
         var task = (data.projectTasks || []).find(function(t) { return isLive(t) && t.id === taskId; });
         var el = document.getElementById('memo-rich-editor');
-        if (task && el) { task.memo = htmlToMarkdown(el); task._modTs = Date.now(); saveData(); }
+        if (task && el) { task.memo = htmlToMarkdown(el); task._modTs = bumpModTs(task._modTs); saveData(); }
         if (status) { status.textContent = '保存済み'; setTimeout(function() { if (status) status.textContent = ''; }, 2000); }
       }, 800);
     }
@@ -4372,7 +4398,7 @@
       var el = document.getElementById('task-due-input');
       if (task && el) {
         task.dueDate = el.value || undefined;
-        task._modTs = Date.now();
+        task._modTs = bumpModTs(task._modTs);
         saveData();
         toast('期日を更新しました');
       }
