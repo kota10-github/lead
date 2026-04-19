@@ -92,6 +92,39 @@
     .info-grid > div + div{border-left:1px solid var(--border)}
     /* Dialog / Modal */
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+    /* Google Docs-style version history */
+    .gdocs-history-overlay{position:fixed;inset:0;background:#f6f8fc;z-index:200;display:flex;animation:modalIn .15s}
+    .gdocs-history-panel{display:flex;flex-direction:column;width:100%;height:100%}
+    .gdocs-history-header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #dadce0;background:#fff;height:56px;flex-shrink:0}
+    .gdocs-history-back{border:none;background:transparent;cursor:pointer;padding:8px;border-radius:50%;color:#5f6368;display:flex;align-items:center;justify-content:center}
+    .gdocs-history-back:hover{background:rgba(95,99,104,.1)}
+    .gdocs-history-title{font-size:18px;font-weight:500;color:#202124;flex:1}
+    .gdocs-history-actions{display:flex;gap:8px}
+    .gdocs-history-body{display:flex;flex:1;overflow:hidden;min-height:0}
+    .gdocs-history-preview{flex:1;overflow-y:auto;padding:40px;background:#fff;border-right:1px solid #dadce0;min-width:0}
+    .gdocs-preview-inner{max-width:820px;margin:0 auto}
+    .gdocs-preview-stamp{font-size:12px;color:#5f6368;margin-bottom:16px;font-weight:500}
+    .gdocs-preview-title{font-size:28px;font-weight:600;color:#202124;margin-bottom:24px;line-height:1.2}
+    .gdocs-preview-field{margin-bottom:24px}
+    .gdocs-preview-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#5f6368;margin-bottom:6px}
+    .gdocs-history-list{width:320px;flex-shrink:0;overflow-y:auto;background:#fff;padding:12px 0}
+    .gdocs-history-day{padding:0}
+    .gdocs-history-day-label{font-size:11px;font-weight:600;color:#5f6368;padding:12px 20px 6px;letter-spacing:.02em}
+    .gdocs-history-item{padding:10px 20px;cursor:pointer;border-left:3px solid transparent;transition:background .08s}
+    .gdocs-history-item:hover{background:#f1f3f4}
+    .gdocs-history-item.selected{background:#e8f0fe;border-left-color:#1a73e8}
+    .gdocs-history-item-time{font-size:13px;font-weight:500;color:#202124}
+    .gdocs-history-item-meta{font-size:11px;color:#5f6368;margin-top:4px;display:flex;align-items:center;gap:8px}
+    .gdocs-history-badge{background:#f1f3f4;color:#5f6368;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:500}
+    .gdocs-history-badge.current{background:#e8f0fe;color:#1a73e8}
+    .gdocs-history-badge.backup{background:#fef7e0;color:#b06000}
+    .gdocs-history-item-chars{color:#80868b}
+    @media(max-width:720px){
+      .gdocs-history-body{flex-direction:column-reverse}
+      .gdocs-history-list{width:100%;max-height:40vh;border-top:1px solid #dadce0}
+      .gdocs-history-preview{padding:20px}
+      .gdocs-preview-title{font-size:22px}
+    }
     .modal{background:var(--bg);border-radius:12px;padding:24px;max-width:480px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.15);animation:modalIn .2s}
     @keyframes modalIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
     .modal-title{font-size:16px;font-weight:600;margin-bottom:16px}
@@ -2314,18 +2347,20 @@
           decorateBlockDelete(editor);
           // Re-decorate + autosave on any edit
           editor.addEventListener('input', function() { decorateBlockquotes(editor); decorateCopyBlocks(editor); decorateBlockDelete(editor); autoSaveManualForm(); });
-          // Hook autosave to all other form fields
+          // Blur = force flush immediately (no 300ms window where reload loses data)
+          editor.addEventListener('blur', flushManualFormNow);
+          // Hook autosave to all other form fields + blur-flush
           ['f-title','f-purpose','f-authority','f-speed'].forEach(function(id) {
             var el = document.getElementById(id);
-            if (el) el.addEventListener('input', autoSaveManualForm);
+            if (el) { el.addEventListener('input', autoSaveManualForm); el.addEventListener('blur', flushManualFormNow); }
           });
           var paceSelEl = document.getElementById('f-pace-tag');
-          if (paceSelEl) paceSelEl.addEventListener('change', autoSaveManualForm);
+          if (paceSelEl) paceSelEl.addEventListener('change', function() { autoSaveManualForm(); flushManualFormNow(); });
           // Also autosave when any schedule field changes (captured via bubbling from the builder)
           var scheduleBox = document.getElementById('f-pace-schedule');
           if (scheduleBox) {
             scheduleBox.addEventListener('input', autoSaveManualForm);
-            scheduleBox.addEventListener('change', autoSaveManualForm);
+            scheduleBox.addEventListener('change', function() { autoSaveManualForm(); flushManualFormNow(); });
           }
           // Tab / Shift+Tab for list nesting
           editor.addEventListener('keydown', function(e) {
@@ -2800,69 +2835,76 @@
       saveData();
       if (typeof pushSyncNow === 'function') pushSyncNow();
     }
-    // Autosave the manual form (debounced, pushes to remote immediately so reload/close won't lose edits)
+    // Autosave the manual form (Google Docs style: short debounce + blur/hide flush)
     var _manualFormAutoSaveTimer = null;
     var _manualFormAutoSaveStatusEl = null;
+    var _manualFormLastSavedAt = 0;
     function setManualFormSaveStatus(text) {
       if (!_manualFormAutoSaveStatusEl) _manualFormAutoSaveStatusEl = document.getElementById('f-save-status');
       if (_manualFormAutoSaveStatusEl) _manualFormAutoSaveStatusEl.textContent = text;
     }
-    function autoSaveManualForm() {
+    // Core save (synchronous — writes to localStorage immediately; remote push is async)
+    function performManualFormSave() {
       var titleEl = document.getElementById('f-title');
-      if (!titleEl) return; // form not mounted
+      if (!titleEl) return false;
+      var title = titleEl.value.trim();
+      var purpose = (document.getElementById('f-purpose')||{value:''}).value.trim();
+      var authority = (document.getElementById('f-authority')||{value:''}).value.trim();
+      var paceTagSel = document.getElementById('f-pace-tag');
+      var paceTagId = paceTagSel && paceTagSel.value ? Number(paceTagSel.value) : null;
+      var paceTag = paceTagId ? getPaceTag(paceTagId) : null;
+      var paceSchedule = (paceTag && paceTag.isManual) ? collectPaceSchedule() : null;
+      var speed = (document.getElementById('f-speed')||{value:''}).value.trim();
+      var roadmapEditor = document.getElementById('f-roadmap-editor');
+      var roadmap = '';
+      if (roadmapEditor) {
+        var clone = roadmapEditor.cloneNode(true);
+        clone.querySelectorAll('.bq-delete, .copy-block-btn, .code-block-btn, .block-delete').forEach(function(b) { b.remove(); });
+        var fixed = true;
+        while (fixed) {
+          fixed = false;
+          clone.querySelectorAll('ul > ul, ul > ol, ol > ul, ol > ol').forEach(function(nested) {
+            var prev = nested.previousElementSibling;
+            if (prev && prev.tagName === 'LI') { prev.appendChild(nested); fixed = true; }
+          });
+        }
+        roadmap = clone.innerHTML;
+      }
+      if (!title) { setManualFormSaveStatus('タイトル未入力'); return false; }
+      var editId = pageParams.editId;
+      if (!editId) return false;
+      var m = getManual(editId);
+      if (!m) return false;
+      var prev = { title: m.title, purpose: m.purpose, authority: m.authority, paceTagId: m.paceTagId, paceSchedule: m.paceSchedule, operationPace: m.operationPace, responseSpeed: m.responseSpeed, taskRoadmap: m.taskRoadmap };
+      var contentChanged = prev.title !== title || prev.purpose !== purpose || prev.authority !== authority || prev.responseSpeed !== speed || prev.taskRoadmap !== roadmap || prev.paceTagId !== paceTagId;
+      if (!contentChanged) return false;
+      if (!m.history) m.history = [];
+      m.history.push(Object.assign({ ts: Date.now() }, prev));
+      Object.assign(m, { title: title, purpose: purpose, authority: authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap, _modTs: Date.now() });
+      if (paceTagId) m.operationPace = '';
+      saveData();
+      _manualFormLastSavedAt = Date.now();
+      if (typeof pushSyncNow === 'function') pushSyncNow();
+      setManualFormSaveStatus('保存しました');
+      setTimeout(function() { if (_manualFormAutoSaveStatusEl && _manualFormAutoSaveStatusEl.textContent === '保存しました') setManualFormSaveStatus(''); }, 1500);
+      return true;
+    }
+    // Debounced autosave (300ms — shorter than before to reduce reload-loss window)
+    function autoSaveManualForm() {
+      if (!document.getElementById('f-title')) return;
       setManualFormSaveStatus('編集中…');
       clearTimeout(_manualFormAutoSaveTimer);
       _manualFormAutoSaveTimer = setTimeout(function() {
-        var title = titleEl.value.trim();
-        var purpose = (document.getElementById('f-purpose')||{value:''}).value.trim();
-        var authority = (document.getElementById('f-authority')||{value:''}).value.trim();
-        var paceTagSel = document.getElementById('f-pace-tag');
-        var paceTagId = paceTagSel && paceTagSel.value ? Number(paceTagSel.value) : null;
-        var paceTag = paceTagId ? getPaceTag(paceTagId) : null;
-        var paceSchedule = (paceTag && paceTag.isManual) ? collectPaceSchedule() : null;
-        var speed = (document.getElementById('f-speed')||{value:''}).value.trim();
-        var roadmapEditor = document.getElementById('f-roadmap-editor');
-        var roadmap = '';
-        if (roadmapEditor) {
-          var clone = roadmapEditor.cloneNode(true);
-          clone.querySelectorAll('.bq-delete').forEach(function(b) { b.remove(); });
-          clone.querySelectorAll('.copy-block-btn').forEach(function(b) { b.remove(); });
-          clone.querySelectorAll('.code-block-btn').forEach(function(b) { b.remove(); });
-          clone.querySelectorAll('.block-delete').forEach(function(b) { b.remove(); });
-          // Fix invalid nested lists
-          var fixed = true;
-          while (fixed) {
-            fixed = false;
-            clone.querySelectorAll('ul > ul, ul > ol, ol > ul, ol > ol').forEach(function(nested) {
-              var prev = nested.previousElementSibling;
-              if (prev && prev.tagName === 'LI') { prev.appendChild(nested); fixed = true; }
-            });
-          }
-          roadmap = clone.innerHTML;
-        }
-        if (!title) { setManualFormSaveStatus('タイトル未入力'); return; }
-        var editId = pageParams.editId;
-        if (editId) {
-          var m = getManual(editId);
-          if (m) {
-            // Snapshot previous state to history if content has meaningfully changed and >60s since last snapshot
-            var prev = { title: m.title, purpose: m.purpose, authority: m.authority, paceTagId: m.paceTagId, paceSchedule: m.paceSchedule, operationPace: m.operationPace, responseSpeed: m.responseSpeed, taskRoadmap: m.taskRoadmap };
-            var contentChanged = prev.title !== title || prev.purpose !== purpose || prev.authority !== authority || prev.responseSpeed !== speed || prev.taskRoadmap !== roadmap || prev.paceTagId !== paceTagId;
-            if (contentChanged) {
-              // User requested: every change (even single character) = history entry, never purge
-              if (!m.history) m.history = [];
-              m.history.push(Object.assign({ ts: Date.now() }, prev));
-            }
-            Object.assign(m, { title: title, purpose: purpose, authority: authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap, _modTs: Date.now() });
-            if (paceTagId) m.operationPace = '';
-            saveData();
-            if (typeof pushSyncNow === 'function') pushSyncNow();
-            setManualFormSaveStatus('保存しました');
-            setTimeout(function() { if (_manualFormAutoSaveStatusEl && _manualFormAutoSaveStatusEl.textContent === '保存しました') setManualFormSaveStatus(''); }, 2000);
-          }
-        }
-      }, 700);
+        _manualFormAutoSaveTimer = null;
+        performManualFormSave();
+      }, 300);
     }
+    // Force-flush any pending debounced save (blur / hide / unload)
+    function flushManualFormNow() {
+      if (_manualFormAutoSaveTimer) { clearTimeout(_manualFormAutoSaveTimer); _manualFormAutoSaveTimer = null; }
+      if (document.getElementById('f-title')) performManualFormSave();
+    }
+    window.flushManualFormNow = flushManualFormNow;
     function submitManualForm(editId, projectId) {
       const title = document.getElementById('f-title').value.trim();
       const purpose = document.getElementById('f-purpose').value.trim();
@@ -2936,48 +2978,141 @@
         toast('マニュアルを作成しました'); navigate('manual-detail', { id });
       }
     }
+    // Google Docs-style version history: full-screen panel, version list on right, preview on left
     function showManualHistory(manualId) {
       var m = getManual(manualId);
       if (!m) return;
-      // Gather entries from both sources: manual.history + local backup snapshots
+      // Build entries: current + history + local backups (dedupe by ts)
       var entries = [];
+      entries.push({ source: 'current', ts: m._modTs || Date.now(), title: m.title, purpose: m.purpose, authority: m.authority, paceTagId: m.paceTagId, paceSchedule: m.paceSchedule, operationPace: m.operationPace, responseSpeed: m.responseSpeed, taskRoadmap: m.taskRoadmap || '', isCurrent: true });
       (m.history || []).forEach(function(v, idx) {
-        entries.push({ source: 'history', ts: v.ts, title: v.title, purpose: v.purpose, taskRoadmap: v.taskRoadmap || '', origIdx: idx });
+        entries.push({ source: 'history', ts: v.ts, title: v.title, purpose: v.purpose, authority: v.authority, paceTagId: v.paceTagId, paceSchedule: v.paceSchedule, operationPace: v.operationPace, responseSpeed: v.responseSpeed, taskRoadmap: v.taskRoadmap || '', origIdx: idx });
       });
       try {
         (listLocalBackups() || []).forEach(function(b) {
           var bm = (b.manuals || []).find(function(x){ return x.id === manualId; });
-          if (bm) entries.push({ source: 'backup', ts: b.ts, title: bm.title, purpose: bm.purpose, taskRoadmap: bm.taskRoadmap || '', backupTs: b.ts });
+          if (bm) entries.push({ source: 'backup', ts: b.ts, title: bm.title, purpose: bm.purpose, authority: bm.authority, paceTagId: bm.paceTagId, paceSchedule: bm.paceSchedule, operationPace: bm.operationPace, responseSpeed: bm.responseSpeed, taskRoadmap: bm.taskRoadmap || '', backupTs: b.ts });
         });
       } catch(e) {}
-      // Sort newest first, dedupe by same ts + same taskRoadmap length
       entries.sort(function(a,b){ return b.ts - a.ts; });
+      // Dedupe: same ts + same content length
       var seen = {};
       entries = entries.filter(function(e) {
-        var key = e.ts + '_' + (e.taskRoadmap || '').length;
+        var key = e.ts + '_' + (e.taskRoadmap||'').length + '_' + (e.title||'');
         if (seen[key]) return false;
         seen[key] = true;
         return true;
       });
-      if (entries.length === 0) { toast('変更履歴はまだありません'); return; }
-      var bodyHtml = '<div style="max-height:60vh;overflow-y:auto;margin:-8px 0">';
-      bodyHtml += '<div style="font-size:11px;color:var(--fg-muted);margin-bottom:8px">' + entries.length + ' 件 (ローカルバックアップ含む)<button class="btn btn-ghost btn-sm" style="float:right;font-size:11px" onclick="downloadBackupJson()">.json でダウンロード</button></div>';
-      entries.forEach(function(v, i) {
-        var d = new Date(v.ts);
-        var dateStr = d.getFullYear() + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + String(d.getDate()).padStart(2,'0') + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
-        var preview = (v.taskRoadmap || '').replace(/<[^>]*>/g,'').slice(0,80);
-        var tag = v.source === 'history' ? '履歴' : 'バックアップ';
-        var actionArgs = v.source === 'history' ? (manualId + ',' + v.origIdx) : (manualId + ',null,' + v.backupTs);
-        bodyHtml += '<div style="padding:10px 12px;border:1px solid var(--border);border-radius:6px;margin-bottom:8px">';
-        bodyHtml += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px"><span style="font-size:12px;font-weight:600">' + dateStr + '<span style="font-size:10px;color:var(--fg-muted2);margin-left:8px;font-weight:400">' + tag + ' / ' + (v.taskRoadmap||'').length + '字</span></span>';
-        bodyHtml += '<span style="display:flex;gap:6px"><button class="btn btn-outline btn-sm" onclick="previewManualVersionUnified(' + actionArgs + ')">プレビュー</button><button class="btn btn-primary btn-sm" onclick="restoreManualVersionUnified(' + actionArgs + ')">この版に戻す</button></span></div>';
-        bodyHtml += '<div style="font-size:11px;color:var(--fg-muted);word-break:break-all">' + escapeHtml(preview) + (preview.length >= 80 ? '…' : '') + '</div>';
-        bodyHtml += '</div>';
+
+      // Group entries by day
+      function dayLabel(ts) {
+        var d = new Date(ts), today = new Date(); today.setHours(0,0,0,0);
+        var d0 = new Date(d); d0.setHours(0,0,0,0);
+        var diff = Math.round((today - d0) / 86400000);
+        if (diff === 0) return '今日';
+        if (diff === 1) return '昨日';
+        return d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日';
+      }
+      function timeLabel(ts) {
+        var d = new Date(ts);
+        return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+      }
+
+      // Build overlay
+      var overlay = document.createElement('div');
+      overlay.className = 'gdocs-history-overlay';
+      overlay.innerHTML = ''
+        + '<div class="gdocs-history-panel">'
+        + '  <header class="gdocs-history-header">'
+        + '    <button class="gdocs-history-back" aria-label="閉じる">'
+        + '      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>'
+        + '    </button>'
+        + '    <div class="gdocs-history-title">変更履歴</div>'
+        + '    <div class="gdocs-history-actions">'
+        + '      <button class="gdocs-history-restore btn btn-primary btn-sm" disabled>この版を復元</button>'
+        + '    </div>'
+        + '  </header>'
+        + '  <div class="gdocs-history-body">'
+        + '    <main class="gdocs-history-preview" id="gdocs-preview"></main>'
+        + '    <aside class="gdocs-history-list" id="gdocs-list"></aside>'
+        + '  </div>'
+        + '</div>';
+      document.body.appendChild(overlay);
+
+      var listEl = overlay.querySelector('#gdocs-list');
+      var previewEl = overlay.querySelector('#gdocs-preview');
+      var restoreBtn = overlay.querySelector('.gdocs-history-restore');
+      var selectedIdx = 0;
+
+      // Render version list grouped by day
+      function renderList() {
+        var html = '';
+        var currentDay = null;
+        entries.forEach(function(e, i) {
+          var day = dayLabel(e.ts);
+          if (day !== currentDay) {
+            if (currentDay !== null) html += '</div>';
+            html += '<div class="gdocs-history-day"><div class="gdocs-history-day-label">' + day + '</div>';
+            currentDay = day;
+          }
+          var sel = i === selectedIdx ? ' selected' : '';
+          var badge = e.isCurrent ? '<span class="gdocs-history-badge current">現在のバージョン</span>'
+                    : e.source === 'history' ? '<span class="gdocs-history-badge">自動</span>'
+                    : '<span class="gdocs-history-badge backup">バックアップ</span>';
+          html += '<div class="gdocs-history-item' + sel + '" data-idx="' + i + '">'
+               + '  <div class="gdocs-history-item-time">' + timeLabel(e.ts) + '</div>'
+               + '  <div class="gdocs-history-item-meta">' + badge + '<span class="gdocs-history-item-chars">' + (e.taskRoadmap||'').length + '字</span></div>'
+               + '</div>';
+        });
+        if (currentDay !== null) html += '</div>';
+        listEl.innerHTML = html;
+        listEl.querySelectorAll('.gdocs-history-item').forEach(function(el) {
+          el.addEventListener('click', function() {
+            selectedIdx = Number(el.getAttribute('data-idx'));
+            renderList();
+            renderPreview();
+          });
+        });
+      }
+      function renderPreview() {
+        var e = entries[selectedIdx];
+        if (!e) { previewEl.innerHTML = ''; return; }
+        var d = new Date(e.ts);
+        var dateStr = d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日 ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+        var html = ''
+          + '<div class="gdocs-preview-inner">'
+          + '  <div class="gdocs-preview-stamp">' + dateStr + ' ' + (e.isCurrent ? '（現在のバージョン）' : '') + '</div>'
+          + '  <h1 class="gdocs-preview-title">' + escapeHtml(e.title || '(無題)') + '</h1>';
+        if (e.purpose) html += '<div class="gdocs-preview-field"><div class="gdocs-preview-label">目的</div><div>' + escapeHtml(e.purpose) + '</div></div>';
+        if (e.authority) html += '<div class="gdocs-preview-field"><div class="gdocs-preview-label">権限</div><div>' + escapeHtml(e.authority) + '</div></div>';
+        if (e.responseSpeed) html += '<div class="gdocs-preview-field"><div class="gdocs-preview-label">対応速度</div><div>' + escapeHtml(e.responseSpeed) + '</div></div>';
+        html += '  <div class="gdocs-preview-field"><div class="gdocs-preview-label">本文</div><div class="prose">' + (e.taskRoadmap || '<em style="color:var(--fg-muted2)">（本文なし）</em>') + '</div></div>';
+        html += '</div>';
+        previewEl.innerHTML = html;
+        // Disable restore button for current version
+        restoreBtn.disabled = !!e.isCurrent;
+      }
+
+      renderList();
+      renderPreview();
+
+      // Close handlers
+      overlay.querySelector('.gdocs-history-back').addEventListener('click', function() { overlay.remove(); });
+      overlay.addEventListener('click', function(ev) {
+        if (ev.target === overlay) overlay.remove();
       });
-      bodyHtml += '</div>';
-      showModal('変更履歴', bodyHtml, [
-        { label: '閉じる', onClick: function(o) { o.remove(); } }
-      ]);
+      // ESC key to close
+      var escHandler = function(ev) { if (ev.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); } };
+      document.addEventListener('keydown', escHandler);
+      // Restore button
+      restoreBtn.addEventListener('click', function() {
+        var e = entries[selectedIdx];
+        if (!e || e.isCurrent) return;
+        if (!confirm('この版に戻しますか？現在の内容は履歴に保存されます。')) return;
+        if (e.source === 'history') restoreManualVersionUnified(manualId, e.origIdx, null);
+        else if (e.source === 'backup') restoreManualVersionUnified(manualId, null, e.backupTs);
+        overlay.remove();
+      });
     }
     function previewManualVersionUnified(manualId, historyIdx, backupTs) {
       var v = null;
@@ -3453,40 +3588,30 @@
         });
       }, 500);
     }
-    // Safety: on page hide/unload, flush any pending autosave + push
+    // Safety: on page hide/unload/blur, flush any pending autosave + push
     function flushManualFormOnHide() {
-      if (_manualFormAutoSaveTimer) {
-        clearTimeout(_manualFormAutoSaveTimer);
-        _manualFormAutoSaveTimer = null;
-        // Run the autosave body synchronously
-        var fn = autoSaveManualForm; // has 700ms inner delay, we need the save logic to run now
-        // Re-invoke with a small hack: temporarily set the inner timer to 0 — easier: just re-create logic inline.
-        var titleEl = document.getElementById('f-title');
-        if (titleEl && pageParams.editId) {
-          var m = getManual(pageParams.editId);
-          if (m) {
-            var roadmapEditor = document.getElementById('f-roadmap-editor');
-            var roadmap = '';
-            if (roadmapEditor) {
-              var clone = roadmapEditor.cloneNode(true);
-              clone.querySelectorAll('.bq-delete, .copy-block-btn, .code-block-btn, .block-delete').forEach(function(b) { b.remove(); });
-              roadmap = clone.innerHTML;
-            }
-            Object.assign(m, {
-              title: titleEl.value.trim() || m.title,
-              purpose: (document.getElementById('f-purpose')||{value:m.purpose}).value.trim(),
-              authority: (document.getElementById('f-authority')||{value:m.authority}).value.trim(),
-              responseSpeed: (document.getElementById('f-speed')||{value:m.responseSpeed}).value.trim(),
-              taskRoadmap: roadmap
-            });
-            saveData();
-          }
+      try { if (typeof flushManualFormNow === 'function') flushManualFormNow(); } catch(e) {}
+      // Also flush task memo/title autosaves if they're pending
+      try {
+        if (typeof _taskMemoTimer !== 'undefined' && _taskMemoTimer) {
+          clearTimeout(_taskMemoTimer); _taskMemoTimer = null;
+          var memoEl = document.getElementById('memo-rich-editor');
+          var mid = pageParams && pageParams.id;
+          var mt = mid ? (data.projectTasks||[]).find(function(t){return isLive(t) && t.id===mid;}) : null;
+          if (mt && memoEl) { mt.memo = htmlToMarkdown(memoEl); mt._modTs = Date.now(); saveData(); }
         }
-      }
-      // Flush remote push
+        if (typeof _taskTitleTimer !== 'undefined' && _taskTitleTimer) {
+          clearTimeout(_taskTitleTimer); _taskTitleTimer = null;
+          var tte = document.getElementById('task-title-input');
+          var tid = pageParams && pageParams.id;
+          var tt = tid ? (data.projectTasks||[]).find(function(t){return isLive(t) && t.id===tid;}) : null;
+          if (tt && tte && tte.value.trim()) { tt.title = tte.value.trim(); tt._modTs = Date.now(); saveData(); }
+        }
+      } catch(e) {}
       if (typeof pushSyncNow === 'function') pushSyncNow();
     }
     window.addEventListener('beforeunload', flushManualFormOnHide);
+    window.addEventListener('pagehide', flushManualFormOnHide);
     document.addEventListener('visibilitychange', function() {
       if (document.visibilityState === 'hidden') flushManualFormOnHide();
     });
