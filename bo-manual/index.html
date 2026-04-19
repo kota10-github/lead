@@ -3792,10 +3792,23 @@
         .then(function(r) { return r.json(); })
         .then(function(remote) {
           if (!remote || typeof remote !== 'object') { pushSync(); render(); return; }
-          // Always merge remote non-destructively — never overwrite local additions/history.
-          // (Previous logic replaced data[k] = remote[k] when remoteTs > localTs, which wiped
-          //  local-only edits like new child tasks or manual.history entries.)
-          try { mergeRemoteIntoLocal(remote); } catch(e) {}
+          // Skip manual merge if the user is in the editor — otherwise the merge
+          // can replace the manual in-memory with remote's stale state, then
+          // render() rebuilds the form from that stale state.
+          var onManualForm = (currentPage === 'manual-form');
+          try {
+            if (onManualForm) {
+              // Merge everything EXCEPT the manual being edited
+              var editId = pageParams && pageParams.editId;
+              var filteredRemote = Object.assign({}, remote);
+              if (Array.isArray(remote.manuals) && editId != null) {
+                filteredRemote.manuals = remote.manuals.filter(function(rm){ return rm && rm.id !== editId; });
+              }
+              mergeRemoteIntoLocal(filteredRemote);
+            } else {
+              mergeRemoteIntoLocal(remote);
+            }
+          } catch(e) {}
           // For non-id-based scalar counters, take max
           var counterKeys = ['nextId','nextTodoId','nextGoalId','nextDailyId'];
           counterKeys.forEach(function(k){
@@ -3810,8 +3823,11 @@
           _origSaveData();
           // Push merged state back so remote also catches up
           pushSync();
-          render();
-        }).catch(function(){ pushSync(); render(); });
+          // Skip render() while user is in the manual editor — re-rendering
+          // the form would reset the contenteditable (and potentially show
+          // stale merged content if anything slipped through).
+          if (!onManualForm) render();
+        }).catch(function(){ pushSync(); if (currentPage !== 'manual-form') render(); });
     }
 
     // ===== Append-only local backup (never overwrites, ring buffer of 500) =====
