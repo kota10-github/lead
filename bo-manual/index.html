@@ -3433,20 +3433,22 @@
     var syncDebounce = null;
     var SYNC_KEYS = ['users','projects','manuals','goals','todos','dailyTasks','tags','paceTags','permissions','assignees','nextId','nextTodoId','nextProjectId','nextManualId','nextGoalId','nextTagId','nextPaceTagId','nextUserId','nextDailyId','projectTasks','nextProjectTaskId'];
 
-    // Push local data to remote (debounced) — now uses merge to avoid overwriting other tabs' additions
+    // Push local data to remote (debounced) — merges first + uses slim payload under 1MB
     function pushSync() {
       clearTimeout(syncDebounce);
       syncDebounce = setTimeout(function() {
-        // Merge remote first to preserve data added by other tabs/devices
         fetch(SYNC_URL).then(function(r){return r.json()}).then(function(remote){
           try { mergeRemoteIntoLocal(remote); } catch(e) {}
         }).catch(function(){}).finally(function(){
           data._syncTs = Date.now();
+          var payload = (typeof buildRemotePayload === 'function') ? buildRemotePayload() : data;
           fetch(SYNC_URL, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-          }).catch(function(){});
+            body: JSON.stringify(payload)
+          }).then(function(r){
+            if (!r.ok) r.text().then(function(t){ console.warn('[sync] push failed', r.status, t); });
+          }).catch(function(e){ console.warn('[sync] push error', e); });
         });
       }, 500);
     }
@@ -3487,21 +3489,43 @@
     document.addEventListener('visibilitychange', function() {
       if (document.visibilityState === 'hidden') flushManualFormOnHide();
     });
+    // Prepare a slim payload for remote (jsonblob has 1MB limit).
+    // Full history is kept locally in bo-manual-data + bo-manual-backups.
+    // Remote only carries the most recent 20 history entries per manual.
+    var REMOTE_HISTORY_LIMIT = 10;
+    function buildRemotePayload() {
+      var slim = {};
+      Object.keys(data).forEach(function(k){ slim[k] = data[k]; });
+      if (Array.isArray(slim.manuals)) {
+        slim.manuals = slim.manuals.map(function(m){
+          if (!m || !Array.isArray(m.history) || m.history.length <= REMOTE_HISTORY_LIMIT) return m;
+          var copy = {};
+          Object.keys(m).forEach(function(k){ copy[k] = m[k]; });
+          copy.history = m.history.slice(-REMOTE_HISTORY_LIMIT);
+          return copy;
+        });
+      }
+      return slim;
+    }
     // Force immediate push with merge-before-push (prevents stale-tab overwrite)
     function pushSyncNow() {
       clearTimeout(syncDebounce);
-      // Non-destructive merge: pull remote first, add anything we don't have, then push
       return fetch(SYNC_URL).then(function(r){return r.json()}).then(function(remote){
         try { mergeRemoteIntoLocal(remote); } catch(e) {}
       }).catch(function(){}).finally(function(){
         data._syncTs = Date.now();
         try {
+          var payload = buildRemotePayload();
           return fetch(SYNC_URL, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
+            body: JSON.stringify(payload),
             keepalive: true
-          }).catch(function(){});
+          }).then(function(r){
+            if (!r.ok) {
+              r.text().then(function(t){ console.warn('[sync] PUT failed', r.status, t); });
+            }
+          }).catch(function(e){ console.warn('[sync] push error', e); });
         } catch(e) { return Promise.resolve(); }
       });
     }
