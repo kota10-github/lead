@@ -3707,7 +3707,33 @@
     // Items only on local are preserved. manual.history is merged by ts (append missing).
     function mergeRemoteIntoLocal(remote) {
       if (!remote || typeof remote !== 'object') return;
-      function mergeById(kind, localList, remoteList) {
+      // Safety: reject garbage _modTs values (> 24h in the future). Bugs,
+      // test pollution, or wild clock skew could push a remote row to year
+      // 2286; without this cap it would win every merge forever.
+      var FUTURE_GUARD = Date.now() + 24*60*60*1000;
+      function sane(ts) { return (!ts || ts > FUTURE_GUARD) ? 0 : ts; }
+
+      // Core principle: LOCAL IS AUTHORITATIVE.
+      // - For rich content (manuals, projects) remote NEVER overwrites an item
+      //   that already exists locally. Only remote-only items are added.
+      //   This makes reload-revert impossible: the user's edit in localStorage
+      //   can never be clobbered by a stale/future-dated remote blob.
+      // - For high-churn items (projectTasks) we allow _modTs merging so task
+      //   completion toggles propagate mobile↔PC quickly, but still reject
+      //   future-timestamped "garbage" values and protect dirty items.
+      function mergeAdditive(kind, localList, remoteList) {
+        if (!Array.isArray(localList) || !Array.isArray(remoteList)) return;
+        var localIds = {};
+        localList.forEach(function(x){ if (x && x.id != null) localIds[x.id] = true; });
+        remoteList.forEach(function(r){
+          if (!r || r.id == null) return;
+          if (localIds[r.id]) return; // same id exists locally → keep local
+          if (isDirty(kind, r.id)) return; // locally deleted but push pending
+          if (r._modTs && r._modTs > FUTURE_GUARD) return; // garbage timestamp
+          localList.push(r); // remote-only → add
+        });
+      }
+      function mergeByModTs(kind, localList, remoteList) {
         if (!Array.isArray(localList) || !Array.isArray(remoteList)) return;
         var localById = {};
         localList.forEach(function(x){ if (x && x.id != null) localById[x.id] = x; });
@@ -3715,30 +3741,26 @@
           if (!r || r.id == null) return;
           var l = localById[r.id];
           if (!l) {
-            // Remote-only: add UNLESS we've locally deleted it (dirty tombstone
-            // was already pushed but remote blob hasn't received our PUT yet,
-            // or remote was somehow re-populated from elsewhere).
             if (isDirty(kind, r.id)) return;
+            if (r._modTs && r._modTs > FUTURE_GUARD) return;
             localList.push(r);
             return;
           }
-          // NEVER replace a locally-dirty item — it carries the user's fresh edit
           if (isDirty(kind, l.id)) return;
-          // Both sides have it. Use _modTs to decide (newer wins).
-          var lt = l._modTs || 0;
-          var rt = r._modTs || 0;
+          var lt = sane(l._modTs);
+          var rt = sane(r._modTs);
           if (rt > lt) {
             Object.keys(l).forEach(function(k){ delete l[k]; });
             Object.assign(l, r);
           }
         });
       }
-      mergeById('projectTasks', data.projectTasks = data.projectTasks || [], remote.projectTasks || []);
-      mergeById('manuals', data.manuals = data.manuals || [], remote.manuals || []);
-      mergeById('projects', data.projects = data.projects || [], remote.projects || []);
-      mergeById('tags', data.tags = data.tags || [], remote.tags || []);
-      mergeById('paceTags', data.paceTags = data.paceTags || [], remote.paceTags || []);
-      mergeById('users', data.users = data.users || [], remote.users || []);
+      mergeByModTs('projectTasks', data.projectTasks = data.projectTasks || [], remote.projectTasks || []);
+      mergeAdditive('manuals', data.manuals = data.manuals || [], remote.manuals || []);
+      mergeAdditive('projects', data.projects = data.projects || [], remote.projects || []);
+      mergeAdditive('tags', data.tags = data.tags || [], remote.tags || []);
+      mergeAdditive('paceTags', data.paceTags = data.paceTags || [], remote.paceTags || []);
+      mergeAdditive('users', data.users = data.users || [], remote.users || []);
       // Merge manual.history (by ts)
       (data.manuals || []).forEach(function(lm){
         var rm = (remote.manuals || []).find(function(x){ return x.id === lm.id; });
