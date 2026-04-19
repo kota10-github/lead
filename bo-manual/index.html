@@ -92,9 +92,8 @@
     .info-grid > div + div{border-left:1px solid var(--border)}
     /* Dialog / Modal */
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
-    /* Inline action bar on manual detail page — right-aligned, sticky so it
-       stays visible while scrolling the content. */
-    .doc-actions-inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end;position:sticky;top:0;z-index:20;background:var(--bg);padding:10px 0;margin:-10px 0 12px;border-bottom:1px solid var(--border-light)}
+    /* Mobile-only sticky action bar (hidden on desktop where .doc-meta shows them) */
+    .doc-actions-mobile{display:none}
     /* Google Docs-style version history */
     .gdocs-history-overlay{position:fixed;inset:0;background:#f6f8fc;z-index:200;display:flex;animation:modalIn .15s}
     .gdocs-history-panel{display:flex;flex-direction:column;width:100%;height:100%}
@@ -341,6 +340,8 @@
       .doc-layout{padding:0;gap:0;display:block}
       .doc-main{max-width:100%;padding:16px 16px 48px}
       .doc-meta{display:none}
+      /* Mobile: show the sticky action bar at the top of the doc */
+      .doc-actions-mobile{display:flex;gap:6px;flex-wrap:wrap;align-items:center;position:sticky;top:0;z-index:20;background:var(--bg);padding:8px 0;margin-bottom:8px;border-bottom:1px solid var(--border-light)}
       .doc-title{font-size:22px!important;margin-bottom:12px!important}
       .breadcrumb{margin-bottom:12px}
       /* Show copy / delete buttons permanently on touch devices (no hover) */
@@ -2132,11 +2133,11 @@
       html += `<main class="doc-main">`;
       html += renderBreadcrumb();
       html += `<h1 class="doc-title">${escapeHtml(manual.title)}</h1>`;
-      // Inline action bar — visible on all viewports (the sidebar aside is
-      // hidden on mobile via .doc-meta{display:none}).
-      html += `<div class="doc-actions-inline no-print">
+      // Mobile-only sticky action bar (desktop shows the buttons in the right
+      // aside at original top-right position).
+      html += `<div class="doc-actions-mobile no-print">
         <button class="btn btn-primary btn-sm" onclick="navigate('manual-form',{editId:${manual.id}})">${icons.pencil} 編集</button>
-        <button class="btn btn-outline btn-sm" onclick="showManualHistory(${manual.id})">🕐 変更履歴</button>
+        <button class="btn btn-outline btn-sm" onclick="showManualHistory(${manual.id})">🕐 履歴</button>
         <button class="btn btn-outline btn-sm" onclick="shareManualLink(${manual.id})">🔗 共有</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--destructive);margin-left:auto" onclick="confirmDeleteManual(${manual.id})">${icons.trash}</button>
       </div>`;
@@ -2151,8 +2152,14 @@
         html += `<p style="color:var(--fg-muted2);font-style:italic">マニュアル内容が未設定です</p>`;
       }
       html += `</main>`;
-      // Right aside: manual meta info (desktop only — actions moved inline above)
+      // Right aside: action buttons (top-right, original position) + manual meta info
       html += `<aside class="doc-meta">`;
+      html += `<div class="doc-meta-actions no-print">
+        <button class="btn btn-outline btn-sm" onclick="shareManualLink(${manual.id})">🔗 共有リンク</button>
+        <button class="btn btn-outline btn-sm" onclick="showManualHistory(${manual.id})">🕐 変更履歴</button>
+        <button class="btn btn-outline btn-sm" onclick="navigate('manual-form',{editId:${manual.id}})">${icons.pencil} 編集</button>
+        <button class="btn btn-outline btn-sm" style="color:var(--destructive)" onclick="confirmDeleteManual(${manual.id})">${icons.trash} 削除</button>
+      </div>`;
       html += `<div class="info-card">`;
       html += `<div class="info-section"><div class="info-section-label" style="color:var(--primary)">${icons.target} <span style="text-transform:uppercase;letter-spacing:.05em">果たすべき責任（目的）</span></div><p style="font-weight:500;white-space:pre-wrap;font-size:13px">${escapeHtml(manual.purpose)}</p></div>`;
       html += `<div class="info-section"><div class="info-section-label">${icons.shield} <span>権限</span></div><p class="text-sm" style="white-space:pre-wrap">${manual.authority ? escapeHtml(manual.authority) : '<em style="color:var(--fg-muted2)">未設定</em>'}</p></div>`;
