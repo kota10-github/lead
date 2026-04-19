@@ -3878,6 +3878,7 @@
 
     // On load: compare timestamps - newer data wins
     function initSync() {
+      try {
       fetch(SYNC_URL)
         .then(function(r) { return r.json(); })
         .then(function(remote) {
@@ -3917,12 +3918,50 @@
           // the form would reset the contenteditable (and potentially show
           // stale merged content if anything slipped through).
           if (!onManualForm) render();
-        }).catch(function(){ pushSync(); if (currentPage !== 'manual-form') render(); });
+        }).catch(function(){ try { pushSync(); } catch(e){} if (currentPage !== 'manual-form') { try { render(); } catch(e){} } });
+      } catch(e) {
+        console.warn('[initSync] fatal:', e);
+        // Don't let init failures leave the app in a broken state.
+        try { if (currentPage !== 'manual-form') render(); } catch(e2) {}
+      }
     }
 
     // ===== Append-only local backup (never overwrites, ring buffer of 500) =====
     var BACKUPS_KEY = 'bo-manual-backups';
-    var BACKUP_MAX = 500;
+    // Reduced from 500 → 50 to prevent localStorage quota overruns on mobile.
+    // Each snapshot serializes all manuals (incl. taskRoadmap HTML), so 500 ×
+    // 14KB ≈ 7MB would exceed Safari mobile's ~5MB quota, causing setItem to
+    // throw and eventually crash the page on init.
+    var BACKUP_MAX = 50;
+    // Migrate existing oversized backup stores (from earlier versions) so
+    // mobile devices don't choke on 5-10MB localStorage blobs on page load.
+    (function migrateBackups(){
+      try {
+        var raw = localStorage.getItem(BACKUPS_KEY);
+        if (!raw) return;
+        if (raw.length < 1024 * 1024) return; // under 1MB — fine
+        var arr = JSON.parse(raw);
+        if (!Array.isArray(arr)) return;
+        // Drop history from any existing snapshots + trim to BACKUP_MAX
+        var slim = arr.slice(-BACKUP_MAX).map(function(b){
+          if (b && Array.isArray(b.manuals)) {
+            b.manuals = b.manuals.map(function(m){
+              if (!m) return m;
+              var c = {};
+              Object.keys(m).forEach(function(k){ if (k !== 'history') c[k] = m[k]; });
+              return c;
+            });
+          }
+          return b;
+        });
+        try { localStorage.setItem(BACKUPS_KEY, JSON.stringify(slim)); } catch(e) {
+          // Still too big — keep only the last 10
+          try { localStorage.setItem(BACKUPS_KEY, JSON.stringify(slim.slice(-10))); } catch(e2) {
+            try { localStorage.removeItem(BACKUPS_KEY); } catch(e3) {}
+          }
+        }
+      } catch(e) { /* corrupt — let the normal code recover */ }
+    })();
     var _lastBackupTs = 0;
     function appendLocalBackup(reason) {
       try {
@@ -3933,10 +3972,19 @@
         var raw = localStorage.getItem(BACKUPS_KEY);
         var arr = raw ? JSON.parse(raw) : [];
         // Clone essential state: manuals + projects + projectTasks + tags
+        // Strip `history` from the manuals snapshot — each manual.history
+        // already stores historical states, so including it in every backup
+        // snapshot bloats localStorage by O(history × snapshots). The manual
+        // object itself is enough to recover content.
+        var manualsSlim = (data.manuals || []).map(function(m) {
+          var copy = {};
+          Object.keys(m).forEach(function(k){ if (k !== 'history') copy[k] = m[k]; });
+          return copy;
+        });
         var snap = {
           ts: now,
           reason: reason || 'save',
-          manuals: JSON.parse(JSON.stringify(data.manuals || [])),
+          manuals: JSON.parse(JSON.stringify(manualsSlim)),
           projects: JSON.parse(JSON.stringify(data.projects || [])),
           projectTasks: JSON.parse(JSON.stringify(data.projectTasks || [])),
           tags: JSON.parse(JSON.stringify(data.tags || [])),
