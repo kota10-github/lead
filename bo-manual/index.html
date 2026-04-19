@@ -3672,10 +3672,26 @@
     window.markDirty = markDirty;
     window._dirtyMap = _dirtyMap;
 
-    // Push local data to remote (debounced) — merges first + uses slim payload under 1MB
+    // Push local data to remote (debounced). Skip entirely when nothing is
+    // dirty — avoids sending a full blob PUT on every unrelated saveData().
+    // Debounce shortened from 500ms → 250ms for faster cross-device feel
+    // (Notion-ish interactive latency while still coalescing keystroke bursts).
+    var _lastPushedSig = '';
+    function _pushSig() {
+      try {
+        return JSON.stringify({
+          m: (data.manuals || []).map(function(x){return x.id+':'+(x._modTs||0)+':'+((x.taskRoadmap||'').length);}),
+          t: (data.projectTasks || []).map(function(x){return x.id+':'+(x._modTs||0)+':'+(x.done?1:0)+':'+(x._deleted?1:0);}),
+          p: (data.projects || []).map(function(x){return x.id+':'+(x._modTs||0);})
+        });
+      } catch(e) { return String(Date.now()); }
+    }
     function pushSync() {
       clearTimeout(syncDebounce);
       syncDebounce = setTimeout(function() {
+        var sig = _pushSig();
+        // Skip unchanged pushes unless dirty items remain (push pending retry)
+        if (sig === _lastPushedSig && Object.keys(_dirtyMap).length === 0) return;
         var sending = new Set(Object.keys(_dirtyMap));
         fetch(SYNC_URL).then(function(r){return r.json()}).then(function(remote){
           try { mergeRemoteIntoLocal(remote); } catch(e) {}
@@ -3688,10 +3704,10 @@
             body: JSON.stringify(payload)
           }).then(function(r){
             if (!r.ok) r.text().then(function(t){ console.warn('[sync] push failed', r.status, t); });
-            else clearDirty(Array.from(sending));
+            else { clearDirty(Array.from(sending)); _lastPushedSig = sig; }
           }).catch(function(e){ console.warn('[sync] push error', e); });
         });
-      }, 500);
+      }, 250);
     }
     // Safety: on page hide/unload/blur, flush any pending autosave + push
     function flushManualFormOnHide() {
@@ -4131,10 +4147,15 @@
         }
       }).catch(function(){});
     }
-    setInterval(pullMergeQuiet, 5000);
+    // Pull every 1.5s for near-realtime cross-device feel (Notion-style
+    // polling cadence). Plus immediate pulls on tab focus / network-online
+    // so returning to a tab doesn't wait for the next interval tick.
+    setInterval(pullMergeQuiet, 1500);
     document.addEventListener('visibilitychange', function(){
       if (!document.hidden) pullMergeQuiet();
     });
+    window.addEventListener('focus', pullMergeQuiet);
+    window.addEventListener('online', pullMergeQuiet);
 
     // visibilitychange → pullSync was removed. It was destroying user input:
     //   - Adding a task or editing a manual, then tab-switching back, triggered a pull
