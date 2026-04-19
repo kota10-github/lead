@@ -92,8 +92,9 @@
     .info-grid > div + div{border-left:1px solid var(--border)}
     /* Dialog / Modal */
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
-    /* Inline action bar on manual detail page (visible on mobile + desktop) */
-    .doc-actions-inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border-light)}
+    /* Inline action bar on manual detail page — right-aligned, sticky so it
+       stays visible while scrolling the content. */
+    .doc-actions-inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end;position:sticky;top:0;z-index:20;background:var(--bg);padding:10px 0;margin:-10px 0 12px;border-bottom:1px solid var(--border-light)}
     /* Google Docs-style version history */
     .gdocs-history-overlay{position:fixed;inset:0;background:#f6f8fc;z-index:200;display:flex;animation:modalIn .15s}
     .gdocs-history-panel{display:flex;flex-direction:column;width:100%;height:100%}
