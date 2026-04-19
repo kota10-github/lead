@@ -3004,7 +3004,8 @@
         }
       } else {
         const id = data.nextManualId++;
-        data.manuals.push({ id, projectId, title, purpose, authority, paceTagId: paceTagId, paceSchedule: paceSchedule, operationPace: '', responseSpeed: speed, taskRoadmap: roadmap, history: [], createdBy: 0 });
+        data.manuals.push({ id, projectId, title, purpose, authority, paceTagId: paceTagId, paceSchedule: paceSchedule, operationPace: '', responseSpeed: speed, taskRoadmap: roadmap, history: [], createdBy: 0, _modTs: bumpModTs(0) });
+        markDirty('manuals', id);
         saveData();
         if (typeof pushSyncNow === 'function') pushSyncNow();
         toast('マニュアルを作成しました'); navigate('manual-detail', { id });
@@ -3613,33 +3614,66 @@
     var SYNC_URL = '/api/sync';
     var syncDebounce = null;
     var SYNC_KEYS = ['users','projects','manuals','goals','todos','dailyTasks','tags','paceTags','permissions','assignees','nextId','nextTodoId','nextProjectId','nextManualId','nextGoalId','nextTagId','nextPaceTagId','nextUserId','nextDailyId','projectTasks','nextProjectTaskId'];
-    // Dirty set — items modified locally since last successful push.
-    // Persisted to localStorage so that a reload mid-edit-before-push still
-    // protects the item from being clobbered by a stale/future-dated remote.
+    // Dirty map — items modified locally since last successful push.
+    // Stored as {key: timestamp} so a stale entry (>5 min old) auto-expires.
+    // Without expiration, a failed push would leave the item "dirty forever"
+    // and block cross-device updates from that item permanently.
     var DIRTY_KEY = 'bo-manual-dirty';
-    var _dirtySet = (function(){
+    var DIRTY_MAX_AGE = 5 * 60 * 1000; // 5 min
+    var _dirtyMap = (function(){
       try {
         var raw = localStorage.getItem(DIRTY_KEY);
-        return new Set(raw ? JSON.parse(raw) : []);
-      } catch(e) { return new Set(); }
+        if (!raw) return {};
+        var v = JSON.parse(raw);
+        // Migration from old Array format → {key: ts}
+        if (Array.isArray(v)) {
+          var map = {};
+          var now = Date.now();
+          v.forEach(function(k){ map[k] = now; });
+          return map;
+        }
+        return v || {};
+      } catch(e) { return {}; }
     })();
+    // Expose a Set-like shim so existing callers keep working
+    var _dirtySet = {
+      add: function(k){ _dirtyMap[k] = Date.now(); _persistDirty(); },
+      has: function(k){ return isDirtyKey(k); },
+      delete: function(k){ var had = !!_dirtyMap[k]; delete _dirtyMap[k]; if (had) _persistDirty(); return had; },
+      clear: function(){ _dirtyMap = {}; _persistDirty(); },
+      get size(){ return Object.keys(_dirtyMap).length; }
+    };
     function _persistDirty() {
-      try { localStorage.setItem(DIRTY_KEY, JSON.stringify(Array.from(_dirtySet))); } catch(e) {}
+      try { localStorage.setItem(DIRTY_KEY, JSON.stringify(_dirtyMap)); } catch(e) {}
     }
-    function markDirty(kind, id) { if (id != null) { _dirtySet.add(kind + ':' + id); _persistDirty(); } }
-    function isDirty(kind, id) { return _dirtySet.has(kind + ':' + id); }
+    function isDirtyKey(k) {
+      var t = _dirtyMap[k];
+      if (!t) return false;
+      if (Date.now() - t > DIRTY_MAX_AGE) {
+        delete _dirtyMap[k]; _persistDirty();
+        return false;
+      }
+      return true;
+    }
+    function markDirty(kind, id) {
+      if (id == null) return;
+      _dirtyMap[kind + ':' + id] = Date.now();
+      _persistDirty();
+    }
+    function isDirty(kind, id) { return isDirtyKey(kind + ':' + id); }
     function clearDirty(keys) {
       var changed = false;
-      keys.forEach(function(k){ if (_dirtySet.delete(k)) changed = true; });
+      keys.forEach(function(k){ if (_dirtyMap[k] != null) { delete _dirtyMap[k]; changed = true; } });
       if (changed) _persistDirty();
     }
     window.markDirty = markDirty;
+    window._dirtyMap = _dirtyMap;
 
     // Push local data to remote (debounced) — merges first + uses slim payload under 1MB
     function pushSync() {
       clearTimeout(syncDebounce);
       syncDebounce = setTimeout(function() {
-        var sending = new Set(_dirtySet);
+        var sending = new Set(Object.keys(_dirtyMap));
         fetch(SYNC_URL).then(function(r){return r.json()}).then(function(remote){
           try { mergeRemoteIntoLocal(remote); } catch(e) {}
         }).catch(function(){}).finally(function(){
@@ -3705,7 +3739,7 @@
     function pushSyncNow() {
       clearTimeout(syncDebounce);
       // Snapshot dirty set at push time — only clear keys we successfully sent
-      var sending = new Set(_dirtySet);
+      var sending = new Set(Object.keys(_dirtyMap));
       return fetch(SYNC_URL).then(function(r){return r.json()}).then(function(remote){
         try { mergeRemoteIntoLocal(remote); } catch(e) {}
       }).catch(function(){}).finally(function(){
@@ -4024,20 +4058,22 @@
       if (currentPage === 'manual-form') return;
       fetch(SYNC_URL).then(function(r){return r.json()}).then(function(remote){
         if (!remote || typeof remote !== 'object') return;
-        var beforeSnapshot = JSON.stringify({
-          tasks: (data.projectTasks||[]).length,
-          taskStates: (data.projectTasks||[]).map(function(t){return t.id+':'+t.done}).sort(),
-          manualCount: (data.manuals||[]).length
-        });
+        // Signature includes per-item _modTs so ANY content change (not just
+        // list length or done-state) triggers persist + render.
+        function sig() {
+          return JSON.stringify({
+            t: (data.projectTasks||[]).map(function(t){return t.id+':'+(t.done?1:0)+':'+(t._modTs||0);}).sort(),
+            m: (data.manuals||[]).map(function(x){return x.id+':'+(x._modTs||0)+':'+((x.taskRoadmap||'').length);}).sort(),
+            p: (data.projects||[]).map(function(x){return x.id+':'+(x._modTs||0);}).sort(),
+            tag: (data.tags||[]).map(function(x){return x.id+':'+(x._modTs||0);}).sort(),
+            pt: (data.paceTags||[]).map(function(x){return x.id+':'+(x._modTs||0);}).sort()
+          });
+        }
+        var before = sig();
         mergeRemoteIntoLocal(remote);
-        var afterSnapshot = JSON.stringify({
-          tasks: (data.projectTasks||[]).length,
-          taskStates: (data.projectTasks||[]).map(function(t){return t.id+':'+t.done}).sort(),
-          manualCount: (data.manuals||[]).length
-        });
-        if (beforeSnapshot !== afterSnapshot) {
+        var after = sig();
+        if (before !== after) {
           _origSaveData();
-          // Re-check before re-render (user may have started interacting while fetch pending)
           if (document.querySelector('.todo-checkbox.expanded')) return;
           if (document.querySelector('.modal-overlay')) return;
           render();
