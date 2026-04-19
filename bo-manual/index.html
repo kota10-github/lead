@@ -340,8 +340,10 @@
       .doc-layout{padding:0;gap:0;display:block}
       .doc-main{max-width:100%;padding:16px 16px 48px}
       .doc-meta{display:none}
-      /* Mobile: show the sticky action bar at the top of the doc */
-      .doc-actions-mobile{display:flex;gap:6px;flex-wrap:wrap;align-items:center;position:sticky;top:0;z-index:20;background:var(--bg);padding:8px 0;margin-bottom:8px;border-bottom:1px solid var(--border-light)}
+      /* Mobile: show the sticky action bar DOCKED BELOW the mobile header
+         (which is also sticky top:0 z-index:30). Use top:56px to clear the
+         header and z-index:25 so the bar is above content but under header. */
+      .doc-actions-mobile{display:flex;gap:6px;flex-wrap:wrap;align-items:center;position:sticky;top:56px;z-index:25;background:var(--bg);padding:8px 0;margin:0 -12px 8px;padding-left:12px;padding-right:12px;border-bottom:1px solid var(--border-light);box-shadow:0 2px 6px rgba(0,0,0,.03)}
       .doc-title{font-size:22px!important;margin-bottom:12px!important}
       .breadcrumb{margin-bottom:12px}
       /* Show copy / delete buttons permanently on touch devices (no hover) */
