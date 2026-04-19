@@ -3604,12 +3604,25 @@
     var syncDebounce = null;
     var SYNC_KEYS = ['users','projects','manuals','goals','todos','dailyTasks','tags','paceTags','permissions','assignees','nextId','nextTodoId','nextProjectId','nextManualId','nextGoalId','nextTagId','nextPaceTagId','nextUserId','nextDailyId','projectTasks','nextProjectTaskId'];
     // Dirty set — items modified locally since last successful push.
-    // Merge-before-push must NEVER replace a dirty item with remote (would
-    // lose the user's fresh edit if remote has a future-dated _modTs from
-    // clock skew on another device).
-    var _dirtySet = new Set();
-    function markDirty(kind, id) { if (id != null) _dirtySet.add(kind + ':' + id); }
+    // Persisted to localStorage so that a reload mid-edit-before-push still
+    // protects the item from being clobbered by a stale/future-dated remote.
+    var DIRTY_KEY = 'bo-manual-dirty';
+    var _dirtySet = (function(){
+      try {
+        var raw = localStorage.getItem(DIRTY_KEY);
+        return new Set(raw ? JSON.parse(raw) : []);
+      } catch(e) { return new Set(); }
+    })();
+    function _persistDirty() {
+      try { localStorage.setItem(DIRTY_KEY, JSON.stringify(Array.from(_dirtySet))); } catch(e) {}
+    }
+    function markDirty(kind, id) { if (id != null) { _dirtySet.add(kind + ':' + id); _persistDirty(); } }
     function isDirty(kind, id) { return _dirtySet.has(kind + ':' + id); }
+    function clearDirty(keys) {
+      var changed = false;
+      keys.forEach(function(k){ if (_dirtySet.delete(k)) changed = true; });
+      if (changed) _persistDirty();
+    }
     window.markDirty = markDirty;
 
     // Push local data to remote (debounced) — merges first + uses slim payload under 1MB
@@ -3628,7 +3641,7 @@
             body: JSON.stringify(payload)
           }).then(function(r){
             if (!r.ok) r.text().then(function(t){ console.warn('[sync] push failed', r.status, t); });
-            else sending.forEach(function(k){ _dirtySet.delete(k); });
+            else clearDirty(Array.from(sending));
           }).catch(function(e){ console.warn('[sync] push error', e); });
         });
       }, 500);
@@ -3700,7 +3713,7 @@
             } else {
               // PUT succeeded — clear items that were dirty at push time (NOT items
               // modified during the push itself, those need another round)
-              sending.forEach(function(k){ _dirtySet.delete(k); });
+              clearDirty(Array.from(sending));
             }
           }).catch(function(e){ console.warn('[sync] push error', e); });
         } catch(e) { return Promise.resolve(); }
@@ -3759,12 +3772,16 @@
           }
         });
       }
+      // _modTs-based merge for all kinds so cross-device updates propagate,
+      // BUT dirty items are always protected (so the user's unsaved edit can
+      // never be overwritten by a stale/future-dated remote), and garbage
+      // future timestamps are rejected by the FUTURE_GUARD.
       mergeByModTs('projectTasks', data.projectTasks = data.projectTasks || [], remote.projectTasks || []);
-      mergeAdditive('manuals', data.manuals = data.manuals || [], remote.manuals || []);
-      mergeAdditive('projects', data.projects = data.projects || [], remote.projects || []);
-      mergeAdditive('tags', data.tags = data.tags || [], remote.tags || []);
-      mergeAdditive('paceTags', data.paceTags = data.paceTags || [], remote.paceTags || []);
-      mergeAdditive('users', data.users = data.users || [], remote.users || []);
+      mergeByModTs('manuals', data.manuals = data.manuals || [], remote.manuals || []);
+      mergeByModTs('projects', data.projects = data.projects || [], remote.projects || []);
+      mergeByModTs('tags', data.tags = data.tags || [], remote.tags || []);
+      mergeByModTs('paceTags', data.paceTags = data.paceTags || [], remote.paceTags || []);
+      mergeByModTs('users', data.users = data.users || [], remote.users || []);
       // Merge manual.history (by ts)
       (data.manuals || []).forEach(function(lm){
         var rm = (remote.manuals || []).find(function(x){ return x.id === lm.id; });
