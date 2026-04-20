@@ -1199,14 +1199,8 @@
     // Pace tag + schedule helpers
     function getPaceTag(id) { return (data.paceTags || []).find(function(t) { return t.id === id; }); }
     // True when the tag should reveal the detailed schedule picker (繰り返しパターン).
-    // Backward-compatible: existing tags with isManual:true still qualify.
-    // Also matches tags named "主動" (the user's convention for self-driven/active).
-    function isManualPaceTag(tag) {
-      if (!tag) return false;
-      if (tag.isManual) return true;
-      var n = (tag.name || '').trim();
-      return n === '主動';
-    }
+    // Uses ONLY the existing isManual flag managed from タグ管理画面.
+    function isManualPaceTag(tag) { return !!(tag && tag.isManual); }
     function formatSchedule(s) {
       if (!s || !s.type) return '';
       var days = ['日','月','火','水','木','金','土'];
