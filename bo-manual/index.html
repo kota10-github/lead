@@ -947,6 +947,42 @@
       if (!data.nextProjectTaskId) data.nextProjectTaskId = 1;
       // Ensure project memo and files fields
       (data.projects || []).forEach(p => { if (!p.memo) p.memo = ''; if (!p.files) p.files = []; });
+      // One-time migration: 稼働ペースタグ (data.paceTags) をプロジェクトタグ
+      // (data.tags) に統合。名前が既にある場合はスキップし、ない場合だけ新規
+      // id を発行してマージ。manual.paceTagId の参照も新 id に張替。
+      (function migratePaceTagsToTags() {
+        if (!Array.isArray(data.paceTags) || data.paceTags.length === 0) return;
+        if (data._paceTagsMigrated) return; // 既にマイグレ済
+        var nameToTagId = {};
+        (data.tags || []).forEach(function(t){ if (t && t.name) nameToTagId[t.name] = t.id; });
+        var paceIdToTagId = {};
+        data.paceTags.forEach(function(pt){
+          if (!pt || !pt.name) return;
+          if (nameToTagId[pt.name]) {
+            // 同名が既に project tags にある → 既存 tag.id にリダイレクト
+            paceIdToTagId[pt.id] = nameToTagId[pt.name];
+          } else {
+            // 新規 tag として data.tags に追加
+            var newId = data.nextTagId || 1;
+            data.nextTagId = newId + 1;
+            var newTag = { id: newId, name: pt.name, color: pt.color || '#94a3b8' };
+            if (pt.isManual) newTag.isManual = true;
+            data.tags.push(newTag);
+            nameToTagId[pt.name] = newId;
+            paceIdToTagId[pt.id] = newId;
+          }
+        });
+        // manual.paceTagId 参照を新 id に張替
+        (data.manuals || []).forEach(function(m){
+          if (m && m.paceTagId != null && paceIdToTagId[m.paceTagId] != null) {
+            m.paceTagId = paceIdToTagId[m.paceTagId];
+          }
+        });
+        data._paceTagsMigrated = true;
+        // 移行結果を localStorage に即永続化 (次回リロードで重複走行しない
+        // ようにするため。saveData はまだ定義されていないので生で setItem)
+        try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch(e) {}
+      })();
     } catch {
       data = JSON.parse(JSON.stringify(DEFAULT_DATA));
     }
