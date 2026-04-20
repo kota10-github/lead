@@ -2220,7 +2220,7 @@
       html += `<div class="info-card">`;
       html += `<div class="info-section"><div class="info-section-label" style="color:var(--primary)">${icons.target} <span style="text-transform:uppercase;letter-spacing:.05em">果たすべき責任（目的）</span></div><p style="font-weight:500;white-space:pre-wrap;font-size:13px">${escapeHtml(manual.purpose)}</p></div>`;
       html += `<div class="info-section"><div class="info-section-label">${icons.shield} <span>権限</span></div><p class="text-sm" style="white-space:pre-wrap">${manual.authority ? escapeHtml(manual.authority) : '<em style="color:var(--fg-muted2)">未設定</em>'}</p></div>`;
-      html += `<div class="info-section"><div class="info-section-label" style="color:#2563eb">${icons.clock} <span>稼働ペース</span></div>${(function(){
+      html += `<div class="info-section"><div class="info-section-label">${icons.clock} <span>稼働ペース</span></div>${(function(){
         var tag = manual.paceTagId ? getPaceTag(manual.paceTagId) : null;
         if (tag) {
           var chip = '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:' + tag.color + '22;color:' + tag.color + ';font-size:12px;font-weight:500">' + escapeHtml(tag.name) + '</span>';
@@ -2229,7 +2229,6 @@
         }
         return '<p class="text-sm">' + (manual.operationPace ? escapeHtml(manual.operationPace) : '<em style="color:var(--fg-muted2)">未設定</em>') + '</p>';
       })()}</div>`;
-      html += `<div class="info-section"><div class="info-section-label" style="color:#d97706">${icons.zap} <span>対応スピード</span></div><p class="text-sm">${manual.responseSpeed ? escapeHtml(manual.responseSpeed) : '<em style="color:var(--fg-muted2)">未設定</em>'}</p></div>`;
       html += `</div></aside>`;
       html += `</div></div>`;
       el.innerHTML = html;
@@ -2298,11 +2297,8 @@
           html += '<div class="info-section"><div class="info-section-label">🛡 <span>権限</span></div><p class="text-sm" style="white-space:pre-wrap">' + escapeHtml(manual.authority) + '</p></div>';
         }
         var paceText = formatPace(manual);
-        if (paceText || manual.responseSpeed) {
-          html += '<div class="info-grid">';
-          html += '<div><div class="info-section-label" style="color:#2563eb">⏱ <span>稼働ペース</span></div><p class="text-sm">' + (paceText ? escapeHtml(paceText) : '<em style="color:var(--fg-muted2)">未設定</em>') + '</p></div>';
-          html += '<div><div class="info-section-label" style="color:#d97706">⚡ <span>対応スピード</span></div><p class="text-sm">' + (manual.responseSpeed ? escapeHtml(manual.responseSpeed) : '<em style="color:var(--fg-muted2)">未設定</em>') + '</p></div>';
-          html += '</div>';
+        if (paceText) {
+          html += '<div><div class="info-section-label">⏱ <span>稼働ペース</span></div><p class="text-sm">' + escapeHtml(paceText) + '</p></div>';
         }
         html += '</div>';
         if (manual.taskRoadmap) {
@@ -2355,7 +2351,6 @@
           <div id="f-pace-schedule-fields" data-initial='${JSON.stringify(existingSchedule).replace(/'/g,"&#39;")}'></div>
         </div>
       </div>`;
-      html += `<div class="form-group"><label class="label label-icon">${icons.zap} 対応スピード</label><textarea class="textarea" id="f-speed" rows="2" placeholder="例：問い合わせから24時間以内に対応">${escapeHtml(existing?.responseSpeed || '')}</textarea></div>`;
       if (isEdit) {
         html += `<div class="flex gap-2" style="margin-top:16px;align-items:center"><button class="btn btn-outline" onclick="navigate('manual-detail',{id:${pageParams.editId}})">閉じる</button><span id="f-save-status" style="font-size:11px;color:var(--fg-muted2);margin-left:auto"></span></div>`;
       } else {
@@ -2420,7 +2415,7 @@
           // Blur = force flush immediately (no 300ms window where reload loses data)
           editor.addEventListener('blur', flushManualFormNow);
           // Hook autosave to all other form fields + blur-flush
-          ['f-title','f-purpose','f-authority','f-speed'].forEach(function(id) {
+          ['f-title','f-purpose','f-authority'].forEach(function(id) {
             var el = document.getElementById(id);
             if (el) { el.addEventListener('input', autoSaveManualForm); el.addEventListener('blur', flushManualFormNow); }
           });
@@ -2934,7 +2929,9 @@
       var paceTagId = paceTagSel && paceTagSel.value ? Number(paceTagSel.value) : null;
       var paceTag = paceTagId ? getPaceTag(paceTagId) : null;
       var paceSchedule = isManualPaceTag(paceTag) ? collectPaceSchedule() : null;
-      var speed = (document.getElementById('f-speed')||{value:''}).value.trim();
+      // 対応スピード フィールドは撤去済み — 既存の値があればそのまま保持
+      var existingManualForSpeed = pageParams.editId ? getManual(pageParams.editId) : null;
+      var speed = existingManualForSpeed ? (existingManualForSpeed.responseSpeed || '') : '';
       var roadmapEditor = document.getElementById('f-roadmap-editor');
       var roadmap = '';
       if (roadmapEditor) {
@@ -3004,7 +3001,9 @@
       const paceTagId = paceTagSel && paceTagSel.value ? Number(paceTagSel.value) : null;
       const paceTag = paceTagId ? getPaceTag(paceTagId) : null;
       const paceSchedule = isManualPaceTag(paceTag) ? collectPaceSchedule() : null;
-      const speed = document.getElementById('f-speed').value.trim();
+      // 対応スピード フィールドは撤去済み — 既存マニュアルの値は保持
+      const _existingForSpeed = editId ? getManual(editId) : null;
+      const speed = _existingForSpeed ? (_existingForSpeed.responseSpeed || '') : '';
       const roadmapEditor = document.getElementById('f-roadmap-editor');
       // Clone editor and strip transient UI elements (bq-delete buttons) before saving
       let roadmap = '';
@@ -3190,7 +3189,6 @@
           + '  <h1 class="gdocs-preview-title">' + escapeHtml(e.title || '(無題)') + '</h1>';
         if (e.purpose) html += '<div class="gdocs-preview-field"><div class="gdocs-preview-label">目的</div><div>' + escapeHtml(e.purpose) + '</div></div>';
         if (e.authority) html += '<div class="gdocs-preview-field"><div class="gdocs-preview-label">権限</div><div>' + escapeHtml(e.authority) + '</div></div>';
-        if (e.responseSpeed) html += '<div class="gdocs-preview-field"><div class="gdocs-preview-label">対応速度</div><div>' + escapeHtml(e.responseSpeed) + '</div></div>';
         html += '  <div class="gdocs-preview-field"><div class="gdocs-preview-label">本文</div><div class="prose">' + (e.taskRoadmap || '<em style="color:var(--fg-muted2)">（本文なし）</em>') + '</div></div>';
         html += '</div>';
         previewEl.innerHTML = html;
@@ -3341,7 +3339,6 @@
           <div class="purpose-box mb-2"><div class="flex items-center gap-2">${icons.target}<p class="text-sm" style="word-break:break-word">${escapeHtml(t.manual.purpose)}</p></div></div>
           <div class="flex items-center gap-3 text-xs" style="color:var(--fg-muted);flex-wrap:wrap">${icons.folder} ${escapeHtml(project?.name || '')}
             ${(function(){var p = formatPace(t.manual); return p ? `<span class="badge badge-outline">${escapeHtml(p)}</span>` : '';})()}
-            ${t.manual.responseSpeed ? `<span class="badge badge-outline">${escapeHtml(t.manual.responseSpeed)}</span>` : ''}
           </div>
         </div>`;
       });
