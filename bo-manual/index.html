@@ -1198,6 +1198,15 @@
     function getChildTasks(parentId) { return (data.projectTasks || []).filter(function(t) { return isLive(t) && t.parentTaskId === parentId; }); }
     // Pace tag + schedule helpers
     function getPaceTag(id) { return (data.paceTags || []).find(function(t) { return t.id === id; }); }
+    // True when the tag should reveal the detailed schedule picker (繰り返しパターン).
+    // Backward-compatible: existing tags with isManual:true still qualify.
+    // Also matches tags named "主動" (the user's convention for self-driven/active).
+    function isManualPaceTag(tag) {
+      if (!tag) return false;
+      if (tag.isManual) return true;
+      var n = (tag.name || '').trim();
+      return n === '主動';
+    }
     function formatSchedule(s) {
       if (!s || !s.type) return '';
       var days = ['日','月','火','水','木','金','土'];
@@ -1225,7 +1234,7 @@
       if (manual.paceTagId) {
         var tag = getPaceTag(manual.paceTagId);
         if (tag) {
-          if (tag.isManual) {
+          if (isManualPaceTag(tag)) {
             var desc = formatSchedule(manual.paceSchedule);
             return desc ? tag.name + '（' + desc + '）' : tag.name;
           }
@@ -2227,7 +2236,7 @@
         var tag = manual.paceTagId ? getPaceTag(manual.paceTagId) : null;
         if (tag) {
           var chip = '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:' + tag.color + '22;color:' + tag.color + ';font-size:12px;font-weight:500">' + escapeHtml(tag.name) + '</span>';
-          var sch = tag.isManual && manual.paceSchedule ? '<div class="text-sm" style="margin-top:4px">' + escapeHtml(formatSchedule(manual.paceSchedule)) + '</div>' : '';
+          var sch = isManualPaceTag(tag) && manual.paceSchedule ? '<div class="text-sm" style="margin-top:4px">' + escapeHtml(formatSchedule(manual.paceSchedule)) + '</div>' : '';
           return chip + sch;
         }
         return '<p class="text-sm">' + (manual.operationPace ? escapeHtml(manual.operationPace) : '<em style="color:var(--fg-muted2)">未設定</em>') + '</p>';
@@ -2342,7 +2351,7 @@
         <div style="display:flex;gap:6px;align-items:center">
           <select id="f-pace-tag" class="input" style="flex:1" onchange="onPaceTagChange()">
             <option value="">未設定</option>
-            ${paceTagsList.map(t => `<option value="${t.id}" data-manual="${t.isManual ? 1 : 0}" ${existingPaceTagId === t.id ? 'selected' : ''}>${escapeHtml(t.name)}</option>`).join('')}
+            ${paceTagsList.map(t => `<option value="${t.id}" data-manual="${isManualPaceTag(t) ? 1 : 0}" ${existingPaceTagId === t.id ? 'selected' : ''}>${escapeHtml(t.name)}</option>`).join('')}
           </select>
           <button type="button" class="btn btn-outline btn-sm" onclick="navigate('tags')" title="タグを管理">管理</button>
         </div>
@@ -2935,7 +2944,7 @@
       var paceTagSel = document.getElementById('f-pace-tag');
       var paceTagId = paceTagSel && paceTagSel.value ? Number(paceTagSel.value) : null;
       var paceTag = paceTagId ? getPaceTag(paceTagId) : null;
-      var paceSchedule = (paceTag && paceTag.isManual) ? collectPaceSchedule() : null;
+      var paceSchedule = isManualPaceTag(paceTag) ? collectPaceSchedule() : null;
       var speed = (document.getElementById('f-speed')||{value:''}).value.trim();
       var roadmapEditor = document.getElementById('f-roadmap-editor');
       var roadmap = '';
@@ -3005,7 +3014,7 @@
       const paceTagSel = document.getElementById('f-pace-tag');
       const paceTagId = paceTagSel && paceTagSel.value ? Number(paceTagSel.value) : null;
       const paceTag = paceTagId ? getPaceTag(paceTagId) : null;
-      const paceSchedule = (paceTag && paceTag.isManual) ? collectPaceSchedule() : null;
+      const paceSchedule = isManualPaceTag(paceTag) ? collectPaceSchedule() : null;
       const speed = document.getElementById('f-speed').value.trim();
       const roadmapEditor = document.getElementById('f-roadmap-editor');
       // Clone editor and strip transient UI elements (bq-delete buttons) before saving
