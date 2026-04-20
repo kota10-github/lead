@@ -983,43 +983,67 @@
       // 一度だけ: "受動/超受動/主動" 以外のタグを削除する (ユーザー要望)。
       // 色・ID は一切変更しない。存在しない場合も自動作成しない。
       // 一度フラグが立ったら以降 2 度と走らない → ユーザーの追加/削除を尊重。
+      // v2 bump: 既に _tagStripDone=true の端末でも、余計なデフォルトタグ
+      // (週1日/スポット対応/手動スケジュール 等) が残ってるケースがあったので
+      // もう 1 回だけ強制的に走らせる。
       (function oneShotStripNonPaceTags() {
-        if (data._tagStripDone) return; // 済
+        if (data._tagStripDoneV2) return; // v2 済
         data.tags = data.tags || [];
         var KEEP = { '受動':1, '超受動':1, '主動':1 };
-        var removedIds = {};
-        var before = data.tags.length;
-        data.tags = data.tags.filter(function(t){
-          if (t && t.name && KEEP[t.name]) return true;
-          if (t && t.id != null) removedIds[t.id] = true;
-          return false;
+        var now = Date.now();
+        var strippedIds = {};
+        var changed = false;
+        // tombstone 方式で削除 → 他端末にも伝搬する
+        // (bumpModTs/markDirty はこのタイミングで未定義。tombstone の _modTs を
+        //  今の時刻にしておけば merge で必ず local が勝つので十分。)
+        data.tags.forEach(function(t){
+          if (!t || !t.name) return;
+          if (KEEP[t.name]) return;
+          if (!t._deleted) {
+            t._deleted = true;
+            t._modTs = Math.max(now, (t._modTs || 0) + 1);
+            strippedIds[t.id] = true;
+            changed = true;
+          }
         });
-        // paceTags も掃除 (名前が KEEP なもののみ → 実質全削除で良い。
-        // manual.paceTagId が paceTags を指していたらタグ名で tags 内を再解決)
+        // manual.paceTagId で削除対象を指してたら、もし paceTags 側に正しい名前が
+        // あれば同名の生き残り tag に張替、なければ null
         (data.manuals || []).forEach(function(m){
           if (!m || m.paceTagId == null) return;
-          if (removedIds[m.paceTagId]) {
-            // 旧 id が paceTags 側だった可能性 → 名前で解決を試みる
+          if (strippedIds[m.paceTagId]) {
             var oldPace = (data.paceTags || []).find(function(p){ return p.id === m.paceTagId; });
             if (oldPace && KEEP[oldPace.name]) {
-              var match = data.tags.find(function(t){ return t.name === oldPace.name; });
+              var match = data.tags.find(function(t){ return t.name === oldPace.name && !t._deleted; });
               m.paceTagId = match ? match.id : null;
             } else {
               m.paceTagId = null;
             }
+            changed = true;
           }
         });
         (data.projects || []).forEach(function(p){
-          if (p && p.tagId != null && removedIds[p.tagId]) p.tagId = null;
+          if (p && p.tagId != null && strippedIds[p.tagId]) { p.tagId = null; changed = true; }
         });
-        data.paceTags = [];
+        // paceTags 全体もクリア
+        if (Array.isArray(data.paceTags) && data.paceTags.length > 0) {
+          data.paceTags = []; changed = true;
+        }
+        data._tagStripDoneV2 = true;
         data._tagStripDone = true;
         data._paceTagsMigrated = true;
-        if (before !== data.tags.length) {
-          try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch(e) {}
-        } else {
-          // フラグだけ追加された場合も永続化 (次回スキップのため)
-          try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch(e) {}
+        try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch(e) {}
+        // tombstone した tag を dirty としてマーク (push 時に remote で復活しない
+        // よう保護)。 _dirtyMap はこの時点で未定義なので、直接 localStorage に
+        // 書いておけば後で _dirtyMap 初期化時に読み込まれる。
+        if (changed) {
+          try {
+            var dirtyKey = 'bo-manual-dirty';
+            var raw = localStorage.getItem(dirtyKey);
+            var dm = raw ? JSON.parse(raw) : {};
+            if (!dm || Array.isArray(dm)) dm = {};
+            Object.keys(strippedIds).forEach(function(id){ dm['tags:' + id] = now; });
+            localStorage.setItem(dirtyKey, JSON.stringify(dm));
+          } catch(e) {}
         }
       })();
     } catch {
