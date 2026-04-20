@@ -980,16 +980,16 @@
       if (!data.nextProjectTaskId) data.nextProjectTaskId = 1;
       // Ensure project memo and files fields
       (data.projects || []).forEach(p => { if (!p.memo) p.memo = ''; if (!p.files) p.files = []; });
-      // One-time migration: 稼働ペースタグ (data.paceTags) をプロジェクトタグ
-      // (data.tags) に統合し、受動/超受動/主動 以外は削除 (ユーザー要望)。
-      (function migratePaceTagsToTags() {
-        if (data._paceTagsMigrated) return; // 既にマイグレ済
-
+      // 冪等マイグレーション: 稼働ペースタグ (paceTags) を tags にマージし、
+      // 受動/超受動/主動 以外のタグは常に削除する。過去に _paceTagsMigrated
+      // フラグが立っていたデバイスも、余計なタグが残っていれば再度クリーン
+      // アップする (以前の migration は strip 処理が無かったため)。
+      (function cleanupTagsIdempotent() {
         data.tags = data.tags || [];
         data.paceTags = data.paceTags || [];
         var ALLOW = { '受動': '#06b6d4', '超受動': '#8b5cf6', '主動': '#f59e0b' };
 
-        // 1) paceTags から tags にマージ (同名はスキップ)
+        // 1) paceTags → tags マージ
         var nameToTagId = {};
         data.tags.forEach(function(t){ if (t && t.name) nameToTagId[t.name] = t.id; });
         var paceIdToTagId = {};
@@ -997,34 +997,33 @@
           if (!pt || !pt.name) return;
           if (nameToTagId[pt.name]) {
             paceIdToTagId[pt.id] = nameToTagId[pt.name];
-          } else {
+          } else if (ALLOW[pt.name]) {
+            // 許可リストにあるものだけ追加 (そうでないならここで捨てる)
             var newId = data.nextTagId || 1;
             data.nextTagId = newId + 1;
-            var newTag = { id: newId, name: pt.name, color: pt.color || '#94a3b8' };
-            if (pt.isManual) newTag.isManual = true;
+            var newTag = { id: newId, name: pt.name, color: ALLOW[pt.name] };
             data.tags.push(newTag);
             nameToTagId[pt.name] = newId;
             paceIdToTagId[pt.id] = newId;
           }
         });
-
-        // 2) manual.paceTagId の参照を張替
         (data.manuals || []).forEach(function(m){
           if (m && m.paceTagId != null && paceIdToTagId[m.paceTagId] != null) {
             m.paceTagId = paceIdToTagId[m.paceTagId];
           }
         });
 
-        // 3) 受動/超受動/主動 以外のタグを削除
-        var removedTagIds = {};
+        // 2) 受動/超受動/主動 以外を削除 (冪等)
+        var removed = {};
+        var tagsLenBefore = data.tags.length;
         data.tags = data.tags.filter(function(t){
           if (!t) return false;
           if (ALLOW[t.name]) return true;
-          removedTagIds[t.id] = true;
+          removed[t.id] = true;
           return false;
         });
 
-        // 4) 受動/超受動/主動 が欠けていれば追加 (色も固定)
+        // 3) 欠けてたら追加 (3種固定)
         var haveNames = {};
         data.tags.forEach(function(t){ haveNames[t.name] = true; });
         Object.keys(ALLOW).forEach(function(name){
@@ -1035,16 +1034,19 @@
           }
         });
 
-        // 5) project.tagId / manual.paceTagId が削除済 tag を指していたら null 化
+        // 4) dangling 参照を null
+        var changed = false;
         (data.projects || []).forEach(function(p){
-          if (p && p.tagId != null && removedTagIds[p.tagId]) p.tagId = null;
+          if (p && p.tagId != null && removed[p.tagId]) { p.tagId = null; changed = true; }
         });
         (data.manuals || []).forEach(function(m){
-          if (m && m.paceTagId != null && removedTagIds[m.paceTagId]) m.paceTagId = null;
+          if (m && m.paceTagId != null && removed[m.paceTagId]) { m.paceTagId = null; changed = true; }
         });
 
-        data._paceTagsMigrated = true;
-        try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch(e) {}
+        if (tagsLenBefore !== data.tags.length || changed || !data._paceTagsMigrated) {
+          data._paceTagsMigrated = true;
+          try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch(e) {}
+        }
       })();
     } catch {
       data = JSON.parse(JSON.stringify(DEFAULT_DATA));
