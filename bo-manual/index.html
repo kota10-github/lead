@@ -1285,9 +1285,9 @@
     // paceTagId が旧 data.paceTags を指している場合はそちらにフォールバック。
     function getPaceTag(id) {
       if (id == null) return undefined;
-      var t = (data.tags || []).find(function(x) { return x.id === id; });
+      var t = (data.tags || []).find(function(x) { return x.id === id && !x._deleted; });
       if (t) return t;
-      return (data.paceTags || []).find(function(x) { return x.id === id; });
+      return (data.paceTags || []).find(function(x) { return x.id === id && !x._deleted; });
     }
     // 繰り返しパターンピッカーを表示する条件:
     //   - tag.isManual === true (手動スケジュール旧タグの後方互換)
@@ -1423,7 +1423,7 @@
     function getProjectColor(projectId) {
       var proj = getProject(projectId);
       if (!proj || !proj.tagId) return { bg: '#94a3b8', light: '#f1f5f9', text: '#475569' };
-      var tag = (data.tags || []).find(function(t) { return t.id === proj.tagId; });
+      var tag = (data.tags || []).find(function(t) { return t.id === proj.tagId && !t._deleted; });
       if (!tag) return { bg: '#94a3b8', light: '#f1f5f9', text: '#475569' };
       return { bg: tag.color, light: tag.color + '20', text: tag.color };
     }
@@ -1438,11 +1438,12 @@
       html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
       html += '<h2 style="font-size:16px;font-weight:600">プロジェクトタグ</h2>';
       html += '<button class="btn btn-primary btn-sm" onclick="showTagDialog()">+ 新規</button></div>';
-      if (!data.tags || data.tags.length === 0) {
+      var liveTagsList = (data.tags || []).filter(function(t){ return !t._deleted; });
+      if (liveTagsList.length === 0) {
         html += '<div class="empty" style="padding:20px"><p style="font-size:13px;color:var(--fg-muted2)">タグがありません</p></div>';
       } else {
         html += '<div style="display:flex;flex-direction:column;gap:8px">';
-        data.tags.forEach(function(tag) {
+        liveTagsList.forEach(function(tag) {
           var projCount = data.projects.filter(function(p) { return p.tagId === tag.id; }).length;
           html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg)">';
           html += '<div style="display:flex;align-items:center;gap:12px"><span style="width:16px;height:16px;border-radius:50%;background:' + tag.color + ';flex-shrink:0"></span><span style="font-weight:500;font-size:14px">' + escapeHtml(tag.name) + '</span><span class="badge badge-secondary">' + projCount + ' プロジェクト</span></div>';
@@ -1541,7 +1542,9 @@
         [
           { label: 'キャンセル', onClick: function(o) { o.remove(); } },
           { label: '削除', class: 'btn btn-destructive', onClick: function(o) {
-            data.tags = (data.tags || []).filter(function(t) { return t.id !== tagId; });
+            // tombstone: merge で復活しないよう物理削除でなく _deleted フラグを立てる
+            var t = (data.tags || []).find(function(x) { return x.id === tagId; });
+            if (t) { t._deleted = true; t._modTs = bumpModTs(t._modTs); markDirty('tags', t.id); }
             data.projects.forEach(function(p) { if (p.tagId === tagId) p.tagId = null; });
             saveData(); o.remove(); render(); toast('タグを削除しました');
           }}
@@ -2472,8 +2475,8 @@
       // Pace tag selector + manual schedule builder
       const existingPaceTagId = existing?.paceTagId || null;
       const existingSchedule = existing?.paceSchedule || {};
-      // 稼働ペースはプロジェクトタグを使う (data.tags)
-      const paceTagsList = (data.tags || []);
+      // 稼働ペースはプロジェクトタグを使う (data.tags)。tombstone は除外。
+      const paceTagsList = (data.tags || []).filter(t => !t._deleted);
       html += `<div class="form-group"><label class="label label-icon">${icons.clock} 稼働ペース</label>
         <div style="display:flex;gap:6px;align-items:center">
           <select id="f-pace-tag" class="input" style="flex:1" onchange="onPaceTagChange()">
