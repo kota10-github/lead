@@ -4064,6 +4064,22 @@
           if (rt > lt) {
             Object.keys(l).forEach(function(k){ delete l[k]; });
             Object.assign(l, r);
+            return;
+          }
+          // lt == rt == 0 なら誰も timestamp 付きで編集してない。
+          // 古い JS が pushed した "無印" データと、新 JS が localStorage に
+          // 持ってる "無印" データで content が食い違う可能性があるので、
+          // この場合は remote を採用する (tags/projects 等の軽量項目のみ)。
+          // 重たい manuals/projectTasks は現状維持 (既存挙動壊さない)。
+          if (lt === 0 && rt === 0 && (kind === 'tags' || kind === 'projects' || kind === 'paceTags' || kind === 'users')) {
+            var differs = false;
+            ['name','color','isManual','parentId','tagId'].forEach(function(k){
+              if (r[k] !== undefined && r[k] !== l[k]) differs = true;
+            });
+            if (differs) {
+              Object.keys(l).forEach(function(k){ delete l[k]; });
+              Object.assign(l, r);
+            }
           }
         });
       }
