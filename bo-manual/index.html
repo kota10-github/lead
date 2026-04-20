@@ -1197,10 +1197,23 @@
     function getTopLevelTasksByProject(pid) { return (data.projectTasks || []).filter(function(t) { return isLive(t) && t.projectId === pid && !t.parentTaskId; }); }
     function getChildTasks(parentId) { return (data.projectTasks || []).filter(function(t) { return isLive(t) && t.parentTaskId === parentId; }); }
     // Pace tag + schedule helpers
-    function getPaceTag(id) { return (data.paceTags || []).find(function(t) { return t.id === id; }); }
-    // True when the tag should reveal the detailed schedule picker (繰り返しパターン).
-    // Uses ONLY the existing isManual flag managed from タグ管理画面.
-    function isManualPaceTag(tag) { return !!(tag && tag.isManual); }
+    // 稼働ペースはプロジェクトタグ (data.tags) を使う。既存マニュアルの
+    // paceTagId が旧 data.paceTags を指している場合はそちらにフォールバック。
+    function getPaceTag(id) {
+      if (id == null) return undefined;
+      var t = (data.tags || []).find(function(x) { return x.id === id; });
+      if (t) return t;
+      return (data.paceTags || []).find(function(x) { return x.id === id; });
+    }
+    // 繰り返しパターンピッカーを表示する条件:
+    //   - tag.isManual === true (手動スケジュール旧タグの後方互換)
+    //   - または tag.name が "主動" (プロジェクトタグには isManual がないので名前で判定)
+    function isManualPaceTag(tag) {
+      if (!tag) return false;
+      if (tag.isManual) return true;
+      var n = (tag.name || '').trim();
+      return n === '主動';
+    }
     function formatSchedule(s) {
       if (!s || !s.type) return '';
       var days = ['日','月','火','水','木','金','土'];
@@ -1355,26 +1368,7 @@
       }
       html += '</section>';
 
-      // Pace tags section
-      html += '<section>';
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
-      html += '<h2 style="font-size:16px;font-weight:600">稼働ペースタグ</h2>';
-      html += '<button class="btn btn-primary btn-sm" onclick="showPaceTagManageDialog()">+ 新規</button></div>';
-      if (!data.paceTags || data.paceTags.length === 0) {
-        html += '<div class="empty" style="padding:20px"><p style="font-size:13px;color:var(--fg-muted2)">タグがありません</p></div>';
-      } else {
-        html += '<div style="display:flex;flex-direction:column;gap:8px">';
-        data.paceTags.forEach(function(tag) {
-          var manCount = data.manuals.filter(function(m) { return m.paceTagId === tag.id; }).length;
-          html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg)">';
-          html += '<div style="display:flex;align-items:center;gap:12px"><span style="width:16px;height:16px;border-radius:50%;background:' + tag.color + ';flex-shrink:0"></span><span style="font-weight:500;font-size:14px">' + escapeHtml(tag.name) + '</span>';
-          if (tag.isManual) html += '<span class="badge badge-outline" style="font-size:10px">手動スケジュール</span>';
-          html += '<span class="badge badge-secondary">' + manCount + ' マニュアル</span></div>';
-          html += '<div style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm" onclick="showPaceTagManageDialog(' + tag.id + ')">' + icons.pencil + '</button><button class="btn btn-ghost btn-sm" style="color:var(--destructive)" onclick="confirmDeletePaceTag(' + tag.id + ')">' + icons.trash + '</button></div></div>';
-        });
-        html += '</div>';
-      }
-      html += '</section>';
+      // 稼働ペースタグ セクションは削除 (プロジェクトタグに統合)
       el.innerHTML = html;
     }
 
@@ -2340,7 +2334,8 @@
       // Pace tag selector + manual schedule builder
       const existingPaceTagId = existing?.paceTagId || null;
       const existingSchedule = existing?.paceSchedule || {};
-      const paceTagsList = (data.paceTags || []);
+      // 稼働ペースはプロジェクトタグを使う (data.tags)
+      const paceTagsList = (data.tags || []);
       html += `<div class="form-group"><label class="label label-icon">${icons.clock} 稼働ペース</label>
         <div style="display:flex;gap:6px;align-items:center">
           <select id="f-pace-tag" class="input" style="flex:1" onchange="onPaceTagChange()">
