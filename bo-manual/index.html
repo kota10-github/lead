@@ -1550,8 +1550,18 @@
             if (!name) { toast('タグ名を入力してください'); return; }
             var selColor = document.querySelector('.tag-color-opt[style*="outline: 3px"]') || document.querySelector('.tag-color-opt[style*="outline:3px"]');
             var color = selColor ? selColor.getAttribute('data-color') : TAG_PRESET_COLORS[0];
-            if (editTag) { editTag.name = name; editTag.color = color; toast('タグを更新しました'); }
-            else { if (!data.tags) data.tags = []; data.tags.push({ id: data.nextTagId++, name: name, color: color }); toast('タグを作成しました'); }
+            if (editTag) {
+              editTag.name = name; editTag.color = color;
+              editTag._modTs = bumpModTs(editTag._modTs);
+              markDirty('tags', editTag.id);
+              toast('タグを更新しました');
+            } else {
+              if (!data.tags) data.tags = [];
+              var newId = data.nextTagId++;
+              data.tags.push({ id: newId, name: name, color: color, _modTs: bumpModTs(0) });
+              markDirty('tags', newId);
+              toast('タグを作成しました');
+            }
             saveData(); o.remove(); render();
           }}
         ]
