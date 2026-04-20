@@ -980,58 +980,45 @@
       if (!data.nextProjectTaskId) data.nextProjectTaskId = 1;
       // Ensure project memo and files fields
       (data.projects || []).forEach(p => { if (!p.memo) p.memo = ''; if (!p.files) p.files = []; });
-      // 冪等マイグレーション: 3 タグ (受動/超受動/主動) を固定 ID に正規化する。
-      // 端末間で同一名が異なる ID になって cross-device 参照が壊れる事故を根絶。
-      // 固定: 受動=1, 超受動=2, 主動=3
-      (function normalizeCanonicalTags() {
+      // 一度だけ: "受動/超受動/主動" 以外のタグを削除する (ユーザー要望)。
+      // 色・ID は一切変更しない。存在しない場合も自動作成しない。
+      // 一度フラグが立ったら以降 2 度と走らない → ユーザーの追加/削除を尊重。
+      (function oneShotStripNonPaceTags() {
+        if (data._tagStripDone) return; // 済
         data.tags = data.tags || [];
-        data.paceTags = data.paceTags || [];
-        var CANON = [
-          { id: 1, name: '受動', color: '#06b6d4' },
-          { id: 2, name: '超受動', color: '#8b5cf6' },
-          { id: 3, name: '主動', color: '#f59e0b' }
-        ];
-        var ALLOW = {}; CANON.forEach(function(c){ ALLOW[c.name] = c; });
-
-        // 旧 tag id → 新 canonical id の対応表を作る
-        // paceTags も対象 (旧データで manual.paceTagId が paceTags を指してる場合)
-        var oldIdToNewId = {};
-        (data.tags || []).forEach(function(t){
-          if (t && ALLOW[t.name]) oldIdToNewId[t.id] = ALLOW[t.name].id;
+        var KEEP = { '受動':1, '超受動':1, '主動':1 };
+        var removedIds = {};
+        var before = data.tags.length;
+        data.tags = data.tags.filter(function(t){
+          if (t && t.name && KEEP[t.name]) return true;
+          if (t && t.id != null) removedIds[t.id] = true;
+          return false;
         });
-        (data.paceTags || []).forEach(function(pt){
-          if (pt && ALLOW[pt.name] && oldIdToNewId[pt.id] == null) {
-            oldIdToNewId[pt.id] = ALLOW[pt.name].id;
-          }
-        });
-
-        // tags を canonical 3 件だけに置き換え
-        var tagsBefore = JSON.stringify(data.tags.map(function(t){return [t.id,t.name]}).sort());
-        data.tags = CANON.map(function(c){ return Object.assign({}, c); });
-        var tagsAfter = JSON.stringify(data.tags.map(function(t){return [t.id,t.name]}).sort());
-
-        // manual.paceTagId を新 ID に張替、対応がなければ null
-        var changed = (tagsBefore !== tagsAfter);
+        // paceTags も掃除 (名前が KEEP なもののみ → 実質全削除で良い。
+        // manual.paceTagId が paceTags を指していたらタグ名で tags 内を再解決)
         (data.manuals || []).forEach(function(m){
           if (!m || m.paceTagId == null) return;
-          var newId = oldIdToNewId[m.paceTagId];
-          if (newId != null && newId !== m.paceTagId) { m.paceTagId = newId; changed = true; }
-          else if (newId == null && m.paceTagId != null) { m.paceTagId = null; changed = true; }
-        });
-        // project.tagId も同名なら canonical id に張替、不明なら null
-        (data.projects || []).forEach(function(p){
-          if (!p || p.tagId == null) return;
-          var newId = oldIdToNewId[p.tagId];
-          if (newId != null && newId !== p.tagId) { p.tagId = newId; changed = true; }
-          else if (newId == null && !data.tags.find(function(t){ return t.id === p.tagId; })) {
-            p.tagId = null; changed = true;
+          if (removedIds[m.paceTagId]) {
+            // 旧 id が paceTags 側だった可能性 → 名前で解決を試みる
+            var oldPace = (data.paceTags || []).find(function(p){ return p.id === m.paceTagId; });
+            if (oldPace && KEEP[oldPace.name]) {
+              var match = data.tags.find(function(t){ return t.name === oldPace.name; });
+              m.paceTagId = match ? match.id : null;
+            } else {
+              m.paceTagId = null;
+            }
           }
         });
-        // nextTagId を 4 以上に
-        if (!data.nextTagId || data.nextTagId < 4) { data.nextTagId = 4; changed = true; }
-
-        if (changed || !data._paceTagsMigrated) {
-          data._paceTagsMigrated = true;
+        (data.projects || []).forEach(function(p){
+          if (p && p.tagId != null && removedIds[p.tagId]) p.tagId = null;
+        });
+        data.paceTags = [];
+        data._tagStripDone = true;
+        data._paceTagsMigrated = true;
+        if (before !== data.tags.length) {
+          try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch(e) {}
+        } else {
+          // フラグだけ追加された場合も永続化 (次回スキップのため)
           try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch(e) {}
         }
       })();
