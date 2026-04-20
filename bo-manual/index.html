@@ -270,13 +270,49 @@
     .doc-meta{width:420px;flex-shrink:0;position:sticky;top:0;align-self:flex-start;max-height:100vh;overflow-y:auto;padding:16px 16px 24px 0}
     .doc-meta-actions{display:flex;gap:6px;flex-wrap:nowrap;margin-bottom:12px}
     .doc-meta-actions .btn{flex:1;white-space:nowrap;font-size:12px;padding:5px 8px;justify-content:center}
-    /* On narrower viewports (<=1200px) the right sidebar doesn't fit next to
-       the main column, so stack the meta panel BELOW the main content instead
-       of hiding it entirely. Otherwise 目的/権限/稼働ペース become invisible
-       on mobile and tablet. Action buttons are already shown via .doc-actions-mobile */
+    /* On narrower viewports (<=1200px): desktop aside won't fit next to main.
+       We use a slide-in right panel (.mobile-side-panel) instead, so hide the
+       original sidebars here. */
     @media(max-width:1200px){
-      .doc-meta{display:block;width:auto;position:static;max-height:none;overflow:visible;padding:16px 0 24px}
-      .doc-meta-actions{display:none}
+      .doc-meta{display:none}
+    }
+    /* Mobile-only slide-in side panel: holds 目次 + 目的/権限/稼働ペース */
+    .mobile-side-toggle{display:none}
+    .mobile-side-panel{display:none}
+    @media(max-width:1200px){
+      .mobile-side-toggle{
+        display:flex;align-items:center;justify-content:center;
+        position:fixed;top:72px;right:0;z-index:40;
+        width:32px;height:56px;border-radius:8px 0 0 8px;
+        background:var(--bg);border:1px solid var(--border);border-right:none;
+        box-shadow:-2px 2px 8px rgba(0,0,0,.08);
+        cursor:pointer;padding:0;font-size:16px;color:var(--fg-muted);
+      }
+      .mobile-side-toggle:hover{color:var(--primary)}
+      .mobile-side-panel{
+        display:block;position:fixed;top:0;right:0;bottom:0;
+        width:min(320px, 85vw);z-index:55;
+        background:var(--bg);border-left:1px solid var(--border);
+        box-shadow:-4px 0 20px rgba(0,0,0,.15);
+        transform:translateX(100%);transition:transform .22s ease;
+        overflow-y:auto;padding:16px 16px 32px;
+      }
+      .mobile-side-panel.open{transform:translateX(0)}
+      .mobile-side-backdrop{
+        display:none;position:fixed;inset:0;z-index:54;background:rgba(0,0,0,.3);
+      }
+      .mobile-side-backdrop.open{display:block}
+      .mobile-side-close{
+        float:right;background:transparent;border:none;cursor:pointer;
+        width:32px;height:32px;font-size:20px;color:var(--fg-muted);padding:0;
+      }
+      .mobile-side-close:hover{color:var(--fg)}
+      .mobile-side-panel .info-card{padding:0}
+      .mobile-side-panel .info-section:first-child{padding-top:8px}
+      .mobile-side-panel .mobile-toc{margin-bottom:24px}
+      .mobile-side-panel .mobile-toc-title{font-size:11px;font-weight:600;color:var(--fg-muted2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border-light)}
+      .mobile-side-panel .mobile-toc a{display:block;padding:6px 8px;font-size:13px;color:var(--fg-muted);border-radius:4px;line-height:1.4;cursor:pointer;text-decoration:none}
+      .mobile-side-panel .mobile-toc a:hover{color:var(--primary);background:var(--primary-light)}
     }
     .doc-title{font-size:28px;font-weight:700;letter-spacing:-0.02em;margin-bottom:16px}
     .doc-assignees{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:32px}
@@ -363,9 +399,8 @@
       .doc-page{margin:-16px -12px}
       .doc-layout{padding:0;gap:0;display:block}
       .doc-main{max-width:100%;padding:16px 16px 48px}
-      /* Keep .doc-meta visible on mobile — stacks below main via 1200px rule.
-         Trim the padding for mobile viewport. */
-      .doc-meta{padding:0 16px 32px}
+      /* .doc-meta / .doc-toc はモバイルでは非表示 — 代わりに右スライド
+         パネル .mobile-side-panel に集約表示。 */
       /* Mobile: show the sticky action bar DOCKED BELOW the mobile header
          (which is also sticky top:0 z-index:30). Use top:56px to clear the
          header and z-index:25 so the bar is above content but under header. */
@@ -2275,27 +2310,85 @@
         return '<p class="text-sm">' + (manual.operationPace ? escapeHtml(manual.operationPace) : '<em style="color:var(--fg-muted2)">未設定</em>') + '</p>';
       })()}</div>`;
       html += `</div></aside>`;
-      html += `</div></div>`;
+      html += `</div>`; // close doc-layout
+
+      // Mobile-only slide-in panel: 目次 + 目的/権限/稼働ペース を集約
+      // (デスクトップでは .doc-toc と .doc-meta が両側に出るのでこのパネルは display:none)
+      var paceChipMobile;
+      (function(){
+        var tag = manual.paceTagId ? getPaceTag(manual.paceTagId) : null;
+        if (tag) {
+          var chip = '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:' + tag.color + '22;color:' + tag.color + ';font-size:12px;font-weight:500">' + escapeHtml(tag.name) + '</span>';
+          var sch = isManualPaceTag(tag) && manual.paceSchedule ? '<div class="text-sm" style="margin-top:4px">' + escapeHtml(formatSchedule(manual.paceSchedule)) + '</div>' : '';
+          paceChipMobile = chip + sch;
+        } else {
+          paceChipMobile = '<p class="text-sm">' + (manual.operationPace ? escapeHtml(manual.operationPace) : '<em style="color:var(--fg-muted2)">未設定</em>') + '</p>';
+        }
+      })();
+      html += `<div class="mobile-side-backdrop" onclick="closeMobileSidePanel()"></div>`;
+      html += `<button class="mobile-side-toggle" onclick="toggleMobileSidePanel()" aria-label="目次と詳細">📑</button>`;
+      html += `<aside class="mobile-side-panel">`;
+      html += `<button class="mobile-side-close" onclick="closeMobileSidePanel()" aria-label="閉じる">×</button>`;
+      html += `<div class="mobile-toc"><div class="mobile-toc-title">目次</div><div id="toc-links-mobile"></div></div>`;
+      html += `<div class="info-card">`;
+      html += `<div class="info-section"><div class="info-section-label" style="color:var(--primary)">${icons.target} <span style="text-transform:uppercase;letter-spacing:.05em">果たすべき責任（目的）</span></div><p style="font-weight:500;white-space:pre-wrap;font-size:13px">${escapeHtml(manual.purpose)}</p></div>`;
+      html += `<div class="info-section"><div class="info-section-label">${icons.shield} <span>権限</span></div><p class="text-sm" style="white-space:pre-wrap">${manual.authority ? escapeHtml(manual.authority) : '<em style="color:var(--fg-muted2)">未設定</em>'}</p></div>`;
+      html += `<div class="info-section"><div class="info-section-label">${icons.clock} <span>稼働ペース</span></div>${paceChipMobile}</div>`;
+      html += `</div></aside>`;
+
+      html += `</div>`; // close doc-page
       el.innerHTML = html;
       setTimeout(() => {
         const content = document.getElementById('manual-content');
         const tocLinks = document.getElementById('toc-links');
+        const tocLinksMobile = document.getElementById('toc-links-mobile');
         if (!content) return;
         // Decorate copy/code blocks with コピー button on the viewer side too (no delete buttons in view mode)
         if (typeof decorateCopyBlocks === 'function') decorateCopyBlocks(content);
-        if (!tocLinks) return;
         const headings = content.querySelectorAll('h1,h2,h3');
-        headings.forEach((h, i) => {
-          h.id = `heading-${i}`;
+        const makeTocLink = function(h, i) {
           const a = document.createElement('a');
           a.href = `#heading-${i}`;
           a.textContent = h.textContent;
           a.style.paddingLeft = h.tagName === 'H3' ? '16px' : (h.tagName === 'H2' ? '0' : '0');
           a.style.fontWeight = h.tagName === 'H1' ? '600' : '400';
-          tocLinks.appendChild(a);
+          return a;
+        };
+        headings.forEach((h, i) => {
+          h.id = `heading-${i}`;
+          if (tocLinks) tocLinks.appendChild(makeTocLink(h, i));
+          if (tocLinksMobile) {
+            const aMobile = makeTocLink(h, i);
+            aMobile.addEventListener('click', function(e){
+              e.preventDefault();
+              document.getElementById(`heading-${i}`).scrollIntoView({behavior:'smooth',block:'start'});
+              closeMobileSidePanel();
+            });
+            tocLinksMobile.appendChild(aMobile);
+          }
         });
+        if (tocLinksMobile && headings.length === 0) {
+          tocLinksMobile.innerHTML = '<div style="font-size:12px;color:var(--fg-muted2);padding:4px 8px">見出しはありません</div>';
+        }
       }, 50);
     }
+
+    // Mobile side panel controls
+    function toggleMobileSidePanel() {
+      var p = document.querySelector('.mobile-side-panel');
+      var b = document.querySelector('.mobile-side-backdrop');
+      if (!p) return;
+      var isOpen = p.classList.toggle('open');
+      if (b) b.classList.toggle('open', isOpen);
+    }
+    function closeMobileSidePanel() {
+      var p = document.querySelector('.mobile-side-panel');
+      var b = document.querySelector('.mobile-side-backdrop');
+      if (p) p.classList.remove('open');
+      if (b) b.classList.remove('open');
+    }
+    window.toggleMobileSidePanel = toggleMobileSidePanel;
+    window.closeMobileSidePanel = closeMobileSidePanel;
 
     function shareManualLink(manualId) {
       var url = location.origin + location.pathname + '?manual=' + manualId;
