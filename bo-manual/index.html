@@ -5133,8 +5133,23 @@
             const desc = document.getElementById('d-proj-desc').value.trim();
             var tagVal = document.getElementById('d-proj-tag').value;
             var tagId = tagVal ? parseInt(tagVal) : null;
-            if (isEdit) { editProject.name = name; editProject.description = desc; editProject.tagId = tagId; toast('プロジェクトを更新しました'); }
-            else { data.projects.push({ id: data.nextProjectId++, name: name, description: desc, createdBy: 0, memo: '', files: [], parentId: parentId || null, tagId: tagId }); toast('プロジェクトを作成しました'); }
+            // 選択された tag が生きてる (受動/超受動/主動 のいずれか) か検証
+            if (tagId != null) {
+              var _tag = (data.tags || []).find(function(t){ return t.id === tagId && !t._deleted; });
+              var _ALLOW = {'受動':1,'超受動':1,'主動':1};
+              if (!_tag || !_ALLOW[_tag.name]) tagId = null;
+            }
+            if (isEdit) {
+              editProject.name = name; editProject.description = desc; editProject.tagId = tagId;
+              editProject._modTs = bumpModTs(editProject._modTs);
+              markDirty('projects', editProject.id);
+              toast('プロジェクトを更新しました');
+            } else {
+              var newProjId = data.nextProjectId++;
+              data.projects.push({ id: newProjId, name: name, description: desc, createdBy: 0, memo: '', files: [], parentId: parentId || null, tagId: tagId, _modTs: bumpModTs(0) });
+              markDirty('projects', newProjId);
+              toast('プロジェクトを作成しました');
+            }
             saveData(); o.remove(); render();
           }}
         ]
@@ -5149,6 +5164,8 @@
       var newName = el.textContent.trim();
       if (newName && newName !== project.name) {
         project.name = newName;
+        project._modTs = bumpModTs(project._modTs);
+        markDirty('projects', project.id);
         saveData();
         toast('\u30d7\u30ed\u30b8\u30a7\u30af\u30c8\u540d\u3092\u66f4\u65b0\u3057\u307e\u3057\u305f');
       } else if (!newName) {
@@ -5164,6 +5181,8 @@
       var newDesc = el.textContent.trim();
       if (newDesc !== (project.description || '')) {
         project.description = newDesc;
+        project._modTs = bumpModTs(project._modTs);
+        markDirty('projects', project.id);
         saveData();
         toast('\u8aac\u660e\u3092\u66f4\u65b0\u3057\u307e\u3057\u305f');
       }
@@ -5172,7 +5191,22 @@
     function changeProjectTag(projectId, tagValue) {
       const proj = data.projects.find(p => p.id === projectId);
       if (!proj) return;
-      proj.tagId = tagValue ? parseInt(tagValue) : null;
+      const newId = tagValue ? parseInt(tagValue) : null;
+      // 選択された tag が生きてる (tombstone でなく、受動/超受動/主動 のいずれか) か検証。
+      // そうでなければ null に。モバイルでキャッシュが古く bad id を送ってきた場合の保険。
+      if (newId != null) {
+        const tag = (data.tags || []).find(t => t.id === newId && !t._deleted);
+        const ALLOW = {'受動':1,'超受動':1,'主動':1};
+        if (!tag || !ALLOW[tag.name]) {
+          proj.tagId = null;
+        } else {
+          proj.tagId = newId;
+        }
+      } else {
+        proj.tagId = null;
+      }
+      proj._modTs = bumpModTs(proj._modTs);
+      markDirty('projects', proj.id);
       saveData();
       render();
       toast('タグを変更しました');
@@ -5595,6 +5629,8 @@
       const editor = document.getElementById('memo-rich-editor');
       if (!editor) return;
       project.memo = htmlToMarkdown(editor);
+      project._modTs = bumpModTs(project._modTs);
+      markDirty('projects', project.id);
       saveData();
     }
 
