@@ -2509,8 +2509,11 @@
       // Pace tag selector + manual schedule builder
       const existingPaceTagId = existing?.paceTagId || null;
       const existingSchedule = existing?.paceSchedule || {};
-      // 稼働ペースはプロジェクトタグを使う (data.tags)。tombstone は除外。
-      const paceTagsList = (data.tags || []).filter(t => !t._deleted);
+      // 稼働ペースは 受動/超受動/主動 のみ表示。
+      // ローカルのキャッシュ(migration 未実行)で余計なタグが残っていても、
+      // select の選択肢としては絶対に出さない。tombstone も除外。
+      const PACE_ALLOW = { '受動':1, '超受動':1, '主動':1 };
+      const paceTagsList = (data.tags || []).filter(t => t && !t._deleted && PACE_ALLOW[t.name]);
       html += `<div class="form-group"><label class="label label-icon">${icons.clock} 稼働ペース</label>
         <div style="display:flex;gap:6px;align-items:center">
           <select id="f-pace-tag" class="input" style="flex:1" onchange="onPaceTagChange()">
@@ -3778,8 +3781,7 @@
         html += '<div class="empty" style="padding:24px 0"><p>タスクがありません</p></div>';
       }
 
-      // Add task button with project picker
-      html += '<div class="daily-add" onclick="showAddTaskFromProjectPicker()">' + icons.plus + ' タスクを追加</div>';
+      // タスク追加ボタンは撤去 (マップ経由の + ボタンからのみ追加可能)
       el.innerHTML = html;
     }
 
