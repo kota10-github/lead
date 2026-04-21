@@ -2168,7 +2168,7 @@
         <span>タグ</span>
         <select id="proj-tag-select" onchange="changeProjectTag(${project.id}, this.value)" style="padding:2px 6px;border:none;background:transparent;color:var(--fg);font-size:13px;cursor:pointer">
           <option value="">なし</option>
-          ${(data.tags||[]).map(t=>'<option value="'+t.id+'"'+(project.tagId===t.id?' selected':'')+'>'+escapeHtml(t.name)+'</option>').join('')}
+          ${(data.tags||[]).filter(t=>t && !t._deleted && ['受動','超受動','主動'].indexOf(t.name)>=0).map(t=>'<option value="'+t.id+'"'+(project.tagId===t.id?' selected':'')+'>'+escapeHtml(t.name)+'</option>').join('')}
         </select>
         ${currentTag ? '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+currentTag.color+'"></span>' : ''}
       </div>`;
@@ -5124,7 +5124,7 @@
       showModal(isEdit ? 'プロジェクト編集' : '新規プロジェクト',
         `<div class="form-group"><label class="label">プロジェクト名</label><input class="input" id="d-proj-name" value="${escapeHtml(editProject?.name || '')}" placeholder="プロジェクト名を入力"></div>
         <div class="form-group"><label class="label">説明（任意）</label><textarea class="textarea" id="d-proj-desc" rows="3" placeholder="プロジェクトの説明">${escapeHtml(editProject?.description || '')}</textarea></div>
-        <div class="form-group"><label class="label">タグ</label><select class="input" id="d-proj-tag"><option value="">タグなし</option>${(data.tags||[]).map(t=>'<option value="'+t.id+'"'+((editProject&&editProject.tagId===t.id)?' selected':'')+'>'+escapeHtml(t.name)+'</option>').join('')}</select></div>`,
+        <div class="form-group"><label class="label">タグ</label><select class="input" id="d-proj-tag"><option value="">タグなし</option>${(data.tags||[]).filter(t=>t && !t._deleted && ['受動','超受動','主動'].indexOf(t.name)>=0).map(t=>'<option value="'+t.id+'"'+((editProject&&editProject.tagId===t.id)?' selected':'')+'>'+escapeHtml(t.name)+'</option>').join('')}</select></div>`,
         [
           { label: 'キャンセル', onClick: o => o.remove() },
           { label: isEdit ? '更新' : '作成', class: 'btn btn-primary', onClick: o => {
