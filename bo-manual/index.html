@@ -92,6 +92,7 @@
     .info-grid > div + div{border-left:1px solid var(--border)}
     /* Dialog / Modal */
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+    .manual-list-row:hover{background:var(--bg-muted)!important}
     /* Mobile-only sticky action bar (hidden on desktop where .doc-meta shows them) */
     .doc-actions-mobile{display:none}
     /* Google Docs-style version history */
@@ -1779,20 +1780,22 @@
       for (var i = 0; i < firstDay; i++) html += '<div></div>';
       for (var d = 1; d <= daysInMonth; d++) {
         var ymd = _dashCalYear + '-' + String(_dashCalMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
-        var count = (tasksByDate[ymd] || []).length;
+        var dayTasks = tasksByDate[ymd] || [];
+        var count = dayTasks.length;
         var isToday = ymd === todayStr;
         var isSelected = ymd === _dashCalSelected;
-        var bg = isSelected ? 'var(--primary)' : (isToday ? 'rgba(37,99,235,.08)' : 'transparent');
+        var bg = isSelected ? 'var(--primary)' : (isToday ? 'rgba(37,99,235,.08)' : '#fff');
         var color = isSelected ? '#fff' : (isToday ? 'var(--primary)' : 'var(--fg)');
-        var border = isToday && !isSelected ? '1px solid var(--primary)' : '1px solid transparent';
-        html += '<div onclick="dashCalSelect(\'' + ymd + '\')" style="position:relative;padding:6px 2px;text-align:center;font-size:12px;border-radius:6px;cursor:pointer;background:' + bg + ';color:' + color + ';border:' + border + ';min-height:32px;display:flex;flex-direction:column;align-items:center;justify-content:center">';
-        html += '<div>' + d + '</div>';
-        if (count > 0) {
-          var dotColor = isSelected ? '#fff' : '#ef4444';
-          html += '<div style="display:flex;gap:2px;margin-top:2px;align-items:center"><span style="width:5px;height:5px;border-radius:50%;background:' + dotColor + '"></span>';
-          if (count > 1) html += '<span style="font-size:9px;color:' + (isSelected ? '#fff' : 'var(--fg-muted)') + '">' + count + '</span>';
-          html += '</div>';
-        }
+        var border = isToday && !isSelected ? '1px solid var(--primary)' : '1px solid var(--border-light)';
+        html += '<div onclick="dashCalSelect(\'' + ymd + '\')" style="position:relative;padding:4px 3px;font-size:11px;border-radius:6px;cursor:pointer;background:' + bg + ';color:' + color + ';border:' + border + ';min-height:64px;display:flex;flex-direction:column;gap:2px;overflow:hidden">';
+        html += '<div style="font-size:11px;font-weight:600;text-align:right;line-height:1.2">' + d + (count > 1 ? '<span style="font-size:9px;opacity:.7;margin-left:3px">+' + (count-1) + '</span>' : '') + '</div>';
+        // 上位 2 件のタスク名を表示 (1 行省略)
+        dayTasks.slice(0, 2).forEach(function(t){
+          var pc = getProjectColor(t.projectId);
+          var titleColor = isSelected ? '#fff' : (t.done ? 'var(--fg-muted2)' : 'var(--fg)');
+          var titleDeco = t.done ? 'text-decoration:line-through;' : '';
+          html += '<div class="dash-cal-task" data-task="' + t.id + '" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})" style="font-size:9px;line-height:1.15;padding:1px 3px;border-left:2px solid ' + (isSelected ? '#fff' : pc.bg) + ';background:' + (isSelected ? 'rgba(255,255,255,.15)' : pc.light) + ';color:' + titleColor + ';border-radius:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' + titleDeco + '">' + escapeHtml(t.title) + '</div>';
+        });
         html += '</div>';
       }
       html += '</div>';
@@ -1824,7 +1827,12 @@
     }
 
     function renderMobileHome(el) {
-      // Today's tasks view for mobile
+      // ダッシュボードはタスク締切カレンダーのみ表示 (ユーザー要望)
+      let html = '';
+      html += buildDeadlineCalendarHtml();
+      el.innerHTML = html;
+      return;
+      // --- 以下未使用 (legacy) ---
       const allTasks = [];
       data.users.forEach(u => {
         const tasks = getManualsByUser(u.id);
@@ -1832,10 +1840,6 @@
           allTasks.push({ user: u, manual: t.manual, project: getProject(t.manual.projectId) });
         });
       });
-
-      let html = '';
-      // タスク締切カレンダー (ダッシュボード上部)
-      html += buildDeadlineCalendarHtml();
       // Today's tasks card
       html += `<div class="mobile-today-card">`;
       html += `<h3><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>今日のタスク</h3>`;
@@ -1964,8 +1968,6 @@
         let html = `<div class="page-header"><h1 class="page-title">マップ</h1>
         <div class="zoom-controls"><button onclick="changeMapZoom(-0.1)">-</button><span id="zoom-level">${Math.round(mapZoom*100)}%</span><button onclick="changeMapZoom(0.1)">+</button></div></div>`;
         html += `<div class="breadcrumb"><span class="breadcrumb-item" onclick="navigate('home')">マップ</span></div>`;
-        // タスク締切カレンダー (マップ上部)
-        html += '<div style="max-width:560px;margin:0 0 16px">' + buildDeadlineCalendarHtml() + '</div>';
         html += `<div class="mindmap-viewport" id="mindmap-viewport"><svg class="mindmap-svg" id="mindmap-svg"></svg>`;
         html += `<div class="mindmap-inner" id="mindmap-inner" style="transform:scale(${mapZoom})">`;
         (function(){
@@ -2127,6 +2129,22 @@
         var el = e.currentTarget;
         var zone = targetId ? getDropZone(e, el) : 'inside';
         el.classList.remove('drop-target','drop-before','drop-after');
+        // タスクをプロジェクトに drop → そのプロジェクトに紐付け直す
+        var taskIdStr = e.dataTransfer.getData('application/x-task-id');
+        if (taskIdStr) {
+          var tid = Number(taskIdStr);
+          var task = (data.projectTasks || []).find(function(t){ return t.id === tid && !t._deleted; });
+          if (task && targetId) {
+            task.projectId = targetId;
+            task.parentTaskId = null;
+            task._modTs = bumpModTs(task._modTs);
+            markDirty('projectTasks', task.id);
+            saveData();
+            toast('タスクをプロジェクトに移動しました');
+            render();
+          }
+          return;
+        }
         var draggedId = Number(e.dataTransfer.getData('text/plain'));
         if (!draggedId || draggedId === targetId) return;
         if (targetId && isDescendantProject(draggedId, targetId)) { toast('循環構造は作れません'); return; }
@@ -2519,31 +2537,57 @@
       el.innerHTML = html;
     }
     function renderManualList(el) {
-      let html = `<div class="page-header"><h1 class="page-title">マニュアル</h1></div>`;
-      if (data.manuals.length === 0) {
-        html += renderBreadcrumb();
-      html += `<div class="empty">${icons.book}<p>マニュアルがありません</p></div>`;
-      } else {
-        data.manuals.forEach(m => {
-          const project = getProject(m.projectId);
-          const assignees = getAssigneesForManual(m.id);
-          html += `<div class="card mb-2" style="cursor:pointer;padding:16px 20px;position:relative">
-            <div onclick="navigate('manual-detail',{id:${m.id}})">
-              <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px">
-                <div style="flex:1;min-width:0">
-                  <div class="flex items-center gap-2 mb-2">${icons.book}<span style="font-weight:500;word-break:break-word">${escapeHtml(m.title)}</span></div>
-                  <div class="purpose-box"><div class="purpose-label">${icons.target} 目的</div><p class="text-sm line-clamp-2">${escapeHtml(m.purpose)}</p></div>
-                </div>
-                <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
-                  <span class="badge badge-outline">${icons.folder} ${escapeHtml(project?.name || '')}</span>
-                  <span class="badge badge-secondary">${icons.users} ${assignees.length} 責任者</span>
-                </div>
-              </div>
-            </div>
-            <button class="btn btn-ghost btn-icon btn-sm card-delete-btn" style="position:absolute;top:8px;right:8px;color:var(--destructive)" onclick="event.stopPropagation();confirmDeleteManual(${m.id})" title="削除">${icons.trash}</button>
-          </div>`;
-        });
+      // プロジェクトごとにグルーピング (sub-project 含む、live のみ)
+      var liveManuals = (data.manuals || []).filter(function(m){ return m && !m._deleted; });
+      var total = liveManuals.length;
+      var html = '<div class="page-header"><h1 class="page-title">マニュアル <span style="color:var(--fg-muted2);font-weight:500">' + total + '</span></h1></div>';
+      html += renderBreadcrumb();
+      if (total === 0) {
+        html += '<div class="empty">' + icons.book + '<p>マニュアルがありません</p></div>';
+        el.innerHTML = html;
+        return;
       }
+      // 順序: projects 配列の順 (マップの並びに合わせる)
+      var groupedByProj = {};
+      var orderedProjIds = [];
+      (data.projects || []).forEach(function(p){
+        if (!p || p._deleted) return;
+        var ms = liveManuals.filter(function(m){ return m.projectId === p.id; });
+        if (ms.length > 0) {
+          orderedProjIds.push(p.id);
+          groupedByProj[p.id] = { project: p, manuals: ms };
+        }
+      });
+      // Project に紐づかないマニュアル (孤児) も表示
+      var orphans = liveManuals.filter(function(m){ return !m.projectId || !getProject(m.projectId); });
+      if (orphans.length > 0) {
+        orderedProjIds.push(0);
+        groupedByProj[0] = { project: null, manuals: orphans };
+      }
+      html += '<div style="display:flex;flex-direction:column;gap:22px;padding:4px 0">';
+      orderedProjIds.forEach(function(pid){
+        var g = groupedByProj[pid];
+        var color = g.project ? getProjectColor(g.project.id) : { bg: '#94a3b8', light: '#f1f5f9' };
+        var name = g.project ? g.project.name : 'その他';
+        // セクションヘッダ: 左縦バー + プロジェクト名 + 件数
+        html += '<div>';
+        html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">';
+        html += '<span style="display:inline-block;width:4px;height:20px;background:' + color.bg + ';border-radius:2px;flex-shrink:0"></span>';
+        html += '<span style="font-weight:700;font-size:15px;color:' + color.bg + '">' + escapeHtml(name) + '</span>';
+        html += '<span style="color:var(--fg-muted2);font-size:13px;font-weight:500">' + g.manuals.length + '</span>';
+        html += '</div>';
+        // マニュアル一覧 (インデント + 本アイコン)
+        html += '<div style="display:flex;flex-direction:column;gap:8px;padding-left:18px">';
+        g.manuals.forEach(function(m){
+          html += '<div class="manual-list-row" onclick="navigate(\'manual-detail\',{id:' + m.id + '})" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border:1px solid var(--border-light);border-radius:8px;cursor:pointer;transition:background .1s">';
+          // 本アイコン (プロジェクト色)
+          html += '<svg width="18" height="18" viewBox="0 0 24 24" fill="' + color.bg + '" stroke="' + color.bg + '" stroke-width="1.5" stroke-linejoin="round" style="flex-shrink:0"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>';
+          html += '<span style="font-size:14px;color:var(--fg);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(m.title) + '</span>';
+          html += '</div>';
+        });
+        html += '</div></div>';
+      });
+      html += '</div>';
       el.innerHTML = html;
     }
 
