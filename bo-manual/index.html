@@ -1249,12 +1249,12 @@
     ];
 
     // HELPER FUNCTIONS
-    function getProject(id) { return data.projects.find(p => p.id === id); }
-    function getManual(id) { return data.manuals.find(m => m.id === id); }
+    function getProject(id) { return data.projects.find(p => p.id === id && !p._deleted); }
+    function getManual(id) { return data.manuals.find(m => m.id === id && !m._deleted); }
     function getUser(id) { return data.users.find(u => u.id === id); }
     function getAssigneesForManual(mid) { return data.assignees.filter(a => a.manualId === mid).map(a => ({ ...a, user: getUser(a.userId) })); }
-    function getManualCountForProject(pid) { return data.manuals.filter(m => m.projectId === pid).length; }
-    function getManualsByProject(pid) { return data.manuals.filter(m => m.projectId === pid); }
+    function getManualCountForProject(pid) { return data.manuals.filter(m => m && !m._deleted && m.projectId === pid).length; }
+    function getManualsByProject(pid) { return data.manuals.filter(m => m && !m._deleted && m.projectId === pid); }
     function isLive(x) { return x && !x._deleted; }
     // Map: "+ ボタン" → 3 択ポップアップ (マニュアル / タスク / サブプロジェクト)
     function showAddOptionsPopup(anchorBtn, projectId, kind) {
@@ -1378,17 +1378,17 @@
     function getManualsByUser(uid) { return data.assignees.filter(a => a.userId === uid).map(a => ({ ...a, manual: getManual(a.manualId) })).filter(a => a.manual); }
     function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
         function getProjectMap() {
+      var liveProjects = data.projects.filter(function(p){ return p && !p._deleted; });
+      var liveManuals = (data.manuals || []).filter(function(m){ return m && !m._deleted; });
       function buildNode(p) {
         var node = { projectId: p.id, projectName: p.name, manuals: [], users: [], subProjects: [] };
-        data.projects.forEach(function(child) {
+        liveProjects.forEach(function(child) {
           if (child.parentId === p.id) node.subProjects.push(buildNode(child));
         });
-        // Include all manuals belonging to this project (even without assignees)
-        data.manuals.forEach(function(manual) {
+        liveManuals.forEach(function(manual) {
           if (manual.projectId !== p.id) return;
           if (!node.manuals.find(function(m) { return m.id === manual.id; })) node.manuals.push(manual);
         });
-        // Collect users from assignees
         (data.assignees || []).forEach(function(a) {
           var manual = getManual(a.manualId);
           var user = getUser(a.userId);
@@ -1399,7 +1399,7 @@
         return node;
       }
       var roots = [];
-      data.projects.forEach(function(p) { if (!p.parentId) roots.push(buildNode(p)); });
+      liveProjects.forEach(function(p) { if (!p.parentId) roots.push(buildNode(p)); });
       return roots;
     }
 
@@ -2116,7 +2116,7 @@
         html += `<div class="empty">${icons.folder}<p>プロジェクトがありません</p><button class="btn btn-outline mt-4" onclick="showProjectDialog()">${icons.plus} 最初のプロジェクトを作成</button></div>`;
       } else {
         html += `<div class="grid grid-3">`;
-        data.projects.forEach(p => {
+        data.projects.filter(p => p && !p._deleted).forEach(p => {
           const count = getManualCountForProject(p.id);
           html += `<div class="card" style="cursor:pointer;position:relative">
             <div onclick="navigate('project-detail',{id:${p.id}})">
@@ -2181,7 +2181,7 @@
       if (!project.memo) project.memo = '';
       if (!project.files) project.files = [];
       const manuals = getManualsByProject(project.id);
-      const subProjects = data.projects.filter(p => p.parentId === project.id);
+      const subProjects = data.projects.filter(p => p && !p._deleted && p.parentId === project.id);
       var pTasks = getTasksByProject(project.id);
       const currentTag = (data.tags||[]).find(t=>t.id===project.tagId);
       const backLabel = project.parentId ? '親プロジェクトへ戻る' : 'マップ';
@@ -3795,7 +3795,7 @@
     function renderTodos(el) {
       var collapsed = _loadCollapsed();
       var tasks = (data.projectTasks || []).filter(isLive);
-      var projects = (data.projects || []).slice();
+      var projects = (data.projects || []).filter(function(p){ return p && !p._deleted; });
 
       // project.id -> tasks (grouped once)
       var tasksByProject = {};
@@ -5172,7 +5172,7 @@
       let html = `<div class="page-header"><h1 class="page-title">権限管理</h1></div>`;
       html += renderBreadcrumb();
       html += `<p class="text-sm mb-4" style="color:var(--fg-muted)">プロジェクトごとにユーザーの閲覧・編集権限を設定できます。</p>`;
-      data.projects.forEach(p => {
+      data.projects.filter(p => p && !p._deleted).forEach(p => {
         html += `<div class="card mb-4"><div class="card-header"><span class="card-title">${icons.folder} ${escapeHtml(p.name)}</span></div><div class="card-body">`;
         if (data.users.length === 0) {
           html += `<p class="text-sm" style="color:var(--fg-muted)">ユーザーが登録されていません</p>`;
@@ -5342,10 +5342,35 @@
         [
           { label: 'キャンセル', onClick: o => o.remove() },
           { label: '削除', class: 'btn btn-destructive', onClick: o => {
-            const manualIds = data.manuals.filter(m => m.projectId === id).map(m => m.id);
-            data.manuals = data.manuals.filter(m => m.projectId !== id);
-            data.assignees = data.assignees.filter(a => !manualIds.includes(a.manualId));
-            data.projects = data.projects.filter(p => p.id !== id);
+            // tombstone 方式: physical 削除だと pushSync の merge で復活する。
+            // 配下のサブプロジェクト・マニュアル・タスクも cascade で tombstone。
+            var toKill = new Set([id]);
+            var changed = true;
+            while (changed) {
+              changed = false;
+              data.projects.forEach(function(p){
+                if (p && !p._deleted && p.parentId != null && toKill.has(p.parentId) && !toKill.has(p.id)) {
+                  toKill.add(p.id); changed = true;
+                }
+              });
+            }
+            var now = Date.now();
+            toKill.forEach(function(pid){
+              var p = data.projects.find(function(x){ return x.id === pid; });
+              if (p && !p._deleted) { p._deleted = true; p._modTs = bumpModTs(p._modTs); markDirty('projects', p.id); }
+            });
+            // Cascade tombstone manuals under killed projects
+            (data.manuals || []).forEach(function(m){
+              if (m && !m._deleted && toKill.has(m.projectId)) {
+                m._deleted = true; m._modTs = bumpModTs(m._modTs); markDirty('manuals', m.id);
+              }
+            });
+            // Cascade tombstone tasks under killed projects
+            (data.projectTasks || []).forEach(function(t){
+              if (t && !t._deleted && toKill.has(t.projectId)) {
+                t._deleted = true; t._modTs = bumpModTs(t._modTs); markDirty('projectTasks', t.id);
+              }
+            });
             saveData(); toast('プロジェクトを削除しました'); o.remove(); navigate('home');
           }}
         ]
