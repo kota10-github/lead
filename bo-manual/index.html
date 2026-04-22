@@ -1778,6 +1778,12 @@
         html += '<div style="font-size:10px;font-weight:600;color:' + dowColors[i] + ';text-align:center;padding:4px 0">' + d + '</div>';
       });
       for (var i = 0; i < firstDay; i++) html += '<div></div>';
+      // PC (>=1024px) はセルをさらに縦長 + タスク最大 8 件、モバイルは短め + 2 件
+      var isWide = window.innerWidth >= 1024;
+      var cellMinHeight = isWide ? 160 : 64;
+      var maxTasksShown = isWide ? 8 : 2;
+      var cellFontSize = isWide ? 14 : 11;
+      var taskFontSize = isWide ? 12 : 9;
       for (var d = 1; d <= daysInMonth; d++) {
         var ymd = _dashCalYear + '-' + String(_dashCalMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
         var dayTasks = tasksByDate[ymd] || [];
@@ -1787,14 +1793,13 @@
         var bg = isSelected ? 'var(--primary)' : (isToday ? 'rgba(37,99,235,.08)' : '#fff');
         var color = isSelected ? '#fff' : (isToday ? 'var(--primary)' : 'var(--fg)');
         var border = isToday && !isSelected ? '1px solid var(--primary)' : '1px solid var(--border-light)';
-        html += '<div onclick="dashCalSelect(\'' + ymd + '\')" style="position:relative;padding:4px 3px;font-size:11px;border-radius:6px;cursor:pointer;background:' + bg + ';color:' + color + ';border:' + border + ';min-height:64px;display:flex;flex-direction:column;gap:2px;overflow:hidden">';
-        html += '<div style="font-size:11px;font-weight:600;text-align:right;line-height:1.2">' + d + (count > 1 ? '<span style="font-size:9px;opacity:.7;margin-left:3px">+' + (count-1) + '</span>' : '') + '</div>';
-        // 上位 2 件のタスク名を表示 (1 行省略)
-        dayTasks.slice(0, 2).forEach(function(t){
+        html += '<div onclick="dashCalSelect(\'' + ymd + '\')" style="position:relative;padding:4px 4px;font-size:' + cellFontSize + 'px;border-radius:6px;cursor:pointer;background:' + bg + ';color:' + color + ';border:' + border + ';min-height:' + cellMinHeight + 'px;display:flex;flex-direction:column;gap:3px;overflow:hidden">';
+        html += '<div style="font-size:' + cellFontSize + 'px;font-weight:600;text-align:right;line-height:1.2">' + d + (count > maxTasksShown ? '<span style="font-size:9px;opacity:.7;margin-left:3px">+' + (count - maxTasksShown) + '</span>' : '') + '</div>';
+        dayTasks.slice(0, maxTasksShown).forEach(function(t){
           var pc = getProjectColor(t.projectId);
           var titleColor = isSelected ? '#fff' : (t.done ? 'var(--fg-muted2)' : 'var(--fg)');
           var titleDeco = t.done ? 'text-decoration:line-through;' : '';
-          html += '<div class="dash-cal-task" data-task="' + t.id + '" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})" style="font-size:9px;line-height:1.15;padding:1px 3px;border-left:2px solid ' + (isSelected ? '#fff' : pc.bg) + ';background:' + (isSelected ? 'rgba(255,255,255,.15)' : pc.light) + ';color:' + titleColor + ';border-radius:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' + titleDeco + '">' + escapeHtml(t.title) + '</div>';
+          html += '<div class="dash-cal-task" data-task="' + t.id + '" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})" style="font-size:' + taskFontSize + 'px;line-height:1.2;padding:2px 4px;border-left:3px solid ' + (isSelected ? '#fff' : pc.bg) + ';background:' + (isSelected ? 'rgba(255,255,255,.15)' : pc.light) + ';color:' + titleColor + ';border-radius:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' + titleDeco + '">' + escapeHtml(t.title) + '</div>';
         });
         html += '</div>';
       }
