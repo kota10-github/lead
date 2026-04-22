@@ -1660,10 +1660,11 @@
         function getVisibleChildren(parentId, pool) {
           return pool.filter(function(c){ return c._effectiveParent === parentId; });
         }
-        // Tasks inside (top-level + indented children, no connector lines)
+        // Tasks inside. プロジェクト直下でも基準インデントを付けて、プロジェクト
+        // 名の右下にネストしているように見せる (ユーザー要望)
         function renderMobileTaskRow(t, depth) {
-          var INDENT = 20, CBOX = 20;
-          var leftPad = depth * INDENT;
+          var INDENT = 18, CBOX = 20, BASE = 14;
+          var leftPad = BASE + depth * INDENT;
           html += '<div style="position:relative;padding:4px 0;padding-left:' + leftPad + 'px;font-size:12px;color:var(--fg-muted);display:flex;align-items:center;gap:6px;cursor:pointer;' + (t.done ? 'opacity:.5' : '') + '" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})">';
           html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:' + CBOX + 'px;height:' + CBOX + 'px;font-size:8px;position:relative;z-index:1" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
           html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>' + dueBadgeHtml(t);
@@ -1686,8 +1687,8 @@
               html += '</div>';
             });
             function renderSpTaskRow(t, depth) {
-              var INDENT = 20, CBOX = 20;
-              var leftPad = depth * INDENT;
+              var INDENT = 18, CBOX = 20, BASE = 14;
+              var leftPad = BASE + depth * INDENT;
               html += '<div style="position:relative;padding:4px 0;padding-left:' + leftPad + 'px;font-size:12px;color:var(--fg-muted);display:flex;align-items:center;gap:6px;cursor:pointer;' + (t.done ? 'opacity:.5' : '') + '" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})">';
               html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:' + CBOX + 'px;height:' + CBOX + 'px;font-size:8px;position:relative;z-index:1" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
               html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>' + dueBadgeHtml(t);
@@ -1806,11 +1807,12 @@
       var totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
       var isWide = window.innerWidth >= 1024;
       var rows = totalCells / 7;
-      // 画面いっぱい使う: PC は 150px 減、モバイルは mobile-header(56) + 月見出し
-      // + 月チップ(約 70px) + 曜日行(26) を引いた残りを行数で割って使い切る
+      // 画面いっぱい使う (スクロール不要)
+      // PC: 150px 減 (top toolbar + 曜日行 余白)
+      // Mobile: mobile-header(56) + 月見出し行(48) + 曜日行(28) = 132px 減
       var rowH = isWide
         ? 'calc((100vh - 150px) / ' + rows + ')'
-        : 'calc((100vh - 180px) / ' + rows + ')';
+        : 'calc((100vh - 132px) / ' + rows + ')';
       var dateSize = isWide ? 13 : 11;
       var chipSize = isWide ? 12 : 10;
       var maxChips = isWide ? 6 : 2;
@@ -1827,23 +1829,10 @@
         html += '<div style="font-size:20px;font-weight:500;color:var(--fg)">' + _dashCalYear + '年 ' + (_dashCalMonth + 1) + '月</div>';
         html += '</div>';
       } else {
-        // Mobile: Google Calendar mobile 風 — 月名 (大) + 月チップ横スクロール
-        html += '<div style="padding:10px 12px 4px;background:#fff">';
-        html += '<div style="display:flex;align-items:center;gap:4px;font-size:17px;font-weight:500;color:var(--fg);margin-bottom:10px">' + (_dashCalMonth + 1) + '月 <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="color:var(--fg-muted)"><polygon points="6,9 18,9 12,16"/></svg></div>';
-        // Month chips: current ±3
-        html += '<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch;scrollbar-width:none">';
-        var startOffset = -1;
-        for (var off = startOffset; off < startOffset + 6; off++) {
-          var cm = _dashCalMonth + off;
-          var cy = _dashCalYear;
-          while (cm < 0) { cm += 12; cy--; }
-          while (cm > 11) { cm -= 12; cy++; }
-          var sel = off === 0;
-          var chipBg = sel ? '#cfe2ff' : '#fff';
-          var chipBorder = sel ? '1px solid #cfe2ff' : '1px solid var(--border)';
-          html += '<button data-off="' + off + '" onclick="dashCalJump(' + cy + ',' + cm + ')" style="flex-shrink:0;padding:8px 18px;border-radius:999px;background:' + chipBg + ';border:' + chipBorder + ';font-size:14px;cursor:pointer;color:var(--fg);font-weight:' + (sel ? 500 : 400) + '">' + (cm + 1) + '月</button>';
-        }
-        html += '</div>';
+        // Mobile: 月名 (大) のみ、チップは撤去。スワイプで月移動
+        html += '<div style="padding:10px 12px 8px;background:#fff;display:flex;align-items:center;justify-content:space-between">';
+        html += '<div style="display:flex;align-items:center;gap:4px;font-size:17px;font-weight:500;color:var(--fg)">' + _dashCalYear + '年 ' + (_dashCalMonth + 1) + '月</div>';
+        html += '<button onclick="dashCalToday()" style="padding:4px 12px;border:1px solid var(--border);background:#fff;border-radius:999px;font-size:12px;cursor:pointer;color:var(--fg-muted)">今日</button>';
         html += '</div>';
       }
       // Weekday header row. 今日 の列は青 (Google Cal mobile スタイル)
@@ -1912,12 +1901,35 @@
     }
 
     function renderMobileHome(el) {
-      // ダッシュボードはタスク締切カレンダーのみ表示 (Google カレンダー風)
-      // main-area 内に自然なフロー配置。高さはビューポートに合わせる。
-      var html = '<div class="gcal-full-page" style="display:flex;flex-direction:column;width:100%;min-height:calc(100vh - 32px);margin:-16px -16px 0 -16px;background:#fff">';
+      // ダッシュボードはタスク締切カレンダーのみ (Google Cal 風)
+      // 画面ピッタリに収めるため高さ固定 + overflow hidden → スクロール不要
+      var vhMinus = window.innerWidth <= 768 ? 56 : 0; // mobile-header 分
+      var html = '<div class="gcal-full-page" style="display:flex;flex-direction:column;width:100%;height:calc(100vh - ' + vhMinus + 'px);margin:-16px -16px 0 -16px;background:#fff;overflow:hidden;touch-action:pan-y">';
       html += buildDeadlineCalendarHtml();
       html += '</div>';
       el.innerHTML = html;
+      // Swipe: 左フリックで翌月、右フリックで前月 (Google Cal mobile と同じ向き)
+      var wrap = el.querySelector('.gcal-full-page');
+      if (wrap && window.innerWidth <= 1024) {
+        var sx = 0, sy = 0, moved = false;
+        wrap.addEventListener('touchstart', function(e){
+          if (!e.touches || !e.touches[0]) return;
+          sx = e.touches[0].clientX; sy = e.touches[0].clientY; moved = false;
+        }, {passive:true});
+        wrap.addEventListener('touchmove', function(e){
+          if (!e.touches || !e.touches[0]) return;
+          var dx = e.touches[0].clientX - sx;
+          var dy = e.touches[0].clientY - sy;
+          if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) moved = true;
+        }, {passive:true});
+        wrap.addEventListener('touchend', function(e){
+          if (!moved) return;
+          if (!e.changedTouches || !e.changedTouches[0]) return;
+          var dx = e.changedTouches[0].clientX - sx;
+          if (dx < -50) dashCalNext();   // 左フリック → 翌月
+          else if (dx > 50) dashCalPrev(); // 右フリック → 前月
+        }, {passive:true});
+      }
       return;
       // --- 以下未使用 (legacy) ---
       const allTasks = [];
@@ -2226,7 +2238,7 @@
         var el = e.currentTarget;
         var zone = targetId ? getDropZone(e, el) : 'inside';
         el.classList.remove('drop-target','drop-before','drop-after');
-        // タスクをプロジェクトに drop → そのプロジェクトに紐付け直す
+        // タスクをプロジェクトに drop → そのプロジェクトに紐付け直す (子孫も cascade)
         var taskIdStr = e.dataTransfer.getData('application/x-task-id');
         if (taskIdStr) {
           var tid = Number(taskIdStr);
@@ -2236,8 +2248,9 @@
             task.parentTaskId = null;
             task._modTs = bumpModTs(task._modTs);
             markDirty('projectTasks', task.id);
+            cascadeTaskProjectId(task.id, targetId);
             saveData();
-            toast('タスクをプロジェクトに移動しました');
+            toast('タスクをプロジェクトに移動しました (子孫含む)');
             render();
           }
           return;
@@ -2315,6 +2328,28 @@
         else if (zone === 'after') el.classList.add('drop-after');
         else el.classList.add('drop-target');
       }
+      // タスク rootId 以下の全子孫の projectId を newProjId に cascade 更新
+      function cascadeTaskProjectId(rootId, newProjId) {
+        var all = data.projectTasks || [];
+        var toUpdate = new Set([rootId]);
+        var changed = true;
+        while (changed) {
+          changed = false;
+          all.forEach(function(t){
+            if (t && !t._deleted && t.parentTaskId != null && toUpdate.has(t.parentTaskId) && !toUpdate.has(t.id)) {
+              toUpdate.add(t.id); changed = true;
+            }
+          });
+        }
+        toUpdate.forEach(function(id){
+          var t = all.find(function(x){ return x.id === id; });
+          if (t && t.projectId !== newProjId) {
+            t.projectId = newProjId;
+            t._modTs = bumpModTs(t._modTs);
+            markDirty('projectTasks', t.id);
+          }
+        });
+      }
       function handleTaskDrop(e, targetId) {
         e.preventDefault();
         e.stopPropagation();
@@ -2327,11 +2362,10 @@
         var src = (data.projectTasks || []).find(function(t){ return t.id === draggedId && !t._deleted; });
         var tgt = (data.projectTasks || []).find(function(t){ return t.id === targetId && !t._deleted; });
         if (!src || !tgt) return;
-        // タスクは プロジェクト をまたげない (projectId は target に合わせる)
-        src.projectId = tgt.projectId;
+        // projectId は target に合わせる + 子孫タスクも全部同じ projectId に cascade
+        var newProjId = tgt.projectId;
         if (zone === 'inside') {
           src.parentTaskId = tgt.id;
-          // 最後尾へ移動
           var idx = data.projectTasks.indexOf(src);
           if (idx >= 0) { data.projectTasks.splice(idx, 1); data.projectTasks.push(src); }
         } else {
@@ -2342,12 +2376,15 @@
           if (zone === 'after') toIdx += 1;
           data.projectTasks.splice(toIdx, 0, src);
         }
+        src.projectId = newProjId;
         src._modTs = bumpModTs(src._modTs);
         markDirty('projectTasks', src.id);
+        cascadeTaskProjectId(src.id, newProjId);
         saveData();
-        toast(zone === 'inside' ? 'タスクを移動しました' : '並び順を変更しました');
+        toast(zone === 'inside' ? 'タスクを移動しました (子孫含む)' : '並び順を変更しました');
         render();
       }
+      window.cascadeTaskProjectId = cascadeTaskProjectId;
       window.handleTaskDragStart = handleTaskDragStart;
       window.handleTaskDragEnd = handleTaskDragEnd;
       window.handleTaskDragOver = handleTaskDragOver;
