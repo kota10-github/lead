@@ -1622,7 +1622,15 @@
       let html = '<div style="padding:4px 0">';
       html += '<h1 class="page-title" style="margin-bottom:16px">マップ</h1>';
       // Root node
-      html += '<div onclick="navigate(\'team-detail\')" style="background:#1e293b;color:#fff;padding:10px 16px;border-radius:10px;font-weight:600;font-size:14px;margin-bottom:12px;text-align:center;cursor:pointer">BOチーム</div>';
+      html += '<div onclick="navigate(\'team-detail\')" style="background:#1e293b;color:#fff;padding:10px 16px;border-radius:10px;font-weight:600;font-size:14px;margin-bottom:4px;text-align:center;cursor:pointer">BOチーム</div>';
+      (function(){
+        var tp = (data.teamMeta && data.teamMeta.purpose) ? data.teamMeta.purpose : '';
+        if (tp) {
+          html += '<div onclick="navigate(\'team-detail\')" style="margin:0 4px 12px;padding:8px 12px;background:#fff;border:1px solid var(--border-light);border-radius:8px;font-size:12px;line-height:1.5;color:var(--fg);white-space:pre-wrap;word-break:break-word;cursor:pointer"><div style="font-size:10px;font-weight:600;color:var(--primary);margin-bottom:4px">大目的</div>' + escapeHtml(tp) + '</div>';
+        } else {
+          html += '<div onclick="navigate(\'team-detail\')" style="margin:0 4px 12px;padding:6px 12px;background:transparent;border:1px dashed var(--border);border-radius:8px;font-size:11px;color:var(--fg-muted2);font-style:italic;cursor:pointer;text-align:center">タップして大目的を入力</div>';
+        }
+      })();
       // Projects as vertical cards
       projects.forEach(proj => {
         const c = getProjectColor(proj.projectId);
@@ -1857,7 +1865,18 @@
         html += `<div class="breadcrumb"><span class="breadcrumb-item" onclick="navigate('home')">マップ</span></div>`;
         html += `<div class="mindmap-viewport" id="mindmap-viewport"><svg class="mindmap-svg" id="mindmap-svg"></svg>`;
         html += `<div class="mindmap-inner" id="mindmap-inner" style="transform:scale(${mapZoom})">`;
-        html += `<div class="root-wrap" style="display:flex;flex-direction:column;justify-content:center;padding-top:32px;position:relative"><div class="node-root" data-node="root" style="cursor:pointer" onclick="navigate('team-detail')" ondragover="event.preventDefault();this.classList.add('drop-target')" ondragleave="this.classList.remove('drop-target','drop-before','drop-after')" ondrop="handleProjectDrop(event,null)" title="BOチーム 大目的">BOチーム</div><button class="map-add-btn-plus" title="プロジェクトを追加" onclick="showProjectDialog()" style="align-self:center;margin-top:8px">+</button></div>`;
+        (function(){
+          var teamPurpose = (data.teamMeta && data.teamMeta.purpose) ? data.teamMeta.purpose : '';
+          html += '<div class="root-wrap" style="display:flex;flex-direction:column;justify-content:center;padding-top:32px;position:relative;max-width:260px">';
+          html += '<div class="node-root" data-node="root" style="cursor:pointer" onclick="navigate(\'team-detail\')" ondragover="event.preventDefault();this.classList.add(\'drop-target\')" ondragleave="this.classList.remove(\'drop-target\',\'drop-before\',\'drop-after\')" ondrop="handleProjectDrop(event,null)" title="BOチーム 大目的">BOチーム</div>';
+          if (teamPurpose) {
+            html += '<div class="root-purpose" onclick="navigate(\'team-detail\')" style="margin-top:8px;padding:10px 12px;background:#fff;border:1px solid var(--border-light);border-radius:8px;font-size:12px;line-height:1.5;color:var(--fg);white-space:pre-wrap;word-break:break-word;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.04)"><div style="font-size:10px;font-weight:600;color:var(--primary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">大目的</div>' + escapeHtml(teamPurpose) + '</div>';
+          } else {
+            html += '<div class="root-purpose" onclick="navigate(\'team-detail\')" style="margin-top:8px;padding:8px 12px;background:transparent;border:1px dashed var(--border);border-radius:8px;font-size:11px;line-height:1.4;color:var(--fg-muted2);font-style:italic;cursor:pointer;text-align:center">タップして大目的を入力</div>';
+          }
+          html += '<button class="map-add-btn-plus" title="プロジェクトを追加" onclick="showProjectDialog()" style="align-self:center;margin-top:8px">+</button>';
+          html += '</div>';
+        })();
         html += `<div class="project-col">`;
         projects.forEach((proj, pi) => {
           const c = getProjectColor(proj.projectId);
