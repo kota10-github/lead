@@ -978,6 +978,8 @@
       if (!data.nextPaceTagId) data.nextPaceTagId = 1;
       if (!data.projectTasks) data.projectTasks = [];
       if (!data.nextProjectTaskId) data.nextProjectTaskId = 1;
+      // BOチーム の大目的 (team-level 詳細ページ用)
+      if (!data.teamMeta) data.teamMeta = { purpose: '', _modTs: 0 };
       // Ensure project memo and files fields
       (data.projects || []).forEach(p => { if (!p.memo) p.memo = ''; if (!p.files) p.files = []; });
       // 一度だけ: "受動/超受動/主動" 以外のタグを削除する (ユーザー要望)。
@@ -1424,6 +1426,7 @@
       switch (currentPage) {
         case 'dashboard': renderMobileHome(main); break;
         case 'home': renderHome(main); break;
+      case 'team-detail': renderTeamDetail(main); break;
       case 'project-detail': renderProjectDetail(main); break;
             case 'manuals': renderManualList(main); break;
         case 'manual-detail': renderManualDetail(main); break;
@@ -1619,7 +1622,7 @@
       let html = '<div style="padding:4px 0">';
       html += '<h1 class="page-title" style="margin-bottom:16px">マップ</h1>';
       // Root node
-      html += '<div style="background:#1e293b;color:#fff;padding:10px 16px;border-radius:10px;font-weight:600;font-size:14px;margin-bottom:12px;text-align:center">BOチーム</div>';
+      html += '<div onclick="navigate(\'team-detail\')" style="background:#1e293b;color:#fff;padding:10px 16px;border-radius:10px;font-weight:600;font-size:14px;margin-bottom:12px;text-align:center;cursor:pointer">BOチーム</div>';
       // Projects as vertical cards
       projects.forEach(proj => {
         const c = getProjectColor(proj.projectId);
@@ -1854,7 +1857,7 @@
         html += `<div class="breadcrumb"><span class="breadcrumb-item" onclick="navigate('home')">マップ</span></div>`;
         html += `<div class="mindmap-viewport" id="mindmap-viewport"><svg class="mindmap-svg" id="mindmap-svg"></svg>`;
         html += `<div class="mindmap-inner" id="mindmap-inner" style="transform:scale(${mapZoom})">`;
-        html += `<div class="root-wrap" style="display:flex;flex-direction:column;justify-content:center;padding-top:32px;position:relative"><div class="node-root" data-node="root" ondragover="event.preventDefault();this.classList.add('drop-target')" ondragleave="this.classList.remove('drop-target','drop-before','drop-after')" ondrop="handleProjectDrop(event,null)">BOチーム</div><button class="map-add-btn-plus" title="プロジェクトを追加" onclick="showProjectDialog()" style="align-self:center;margin-top:8px">+</button></div>`;
+        html += `<div class="root-wrap" style="display:flex;flex-direction:column;justify-content:center;padding-top:32px;position:relative"><div class="node-root" data-node="root" style="cursor:pointer" onclick="navigate('team-detail')" ondragover="event.preventDefault();this.classList.add('drop-target')" ondragleave="this.classList.remove('drop-target','drop-before','drop-after')" ondrop="handleProjectDrop(event,null)" title="BOチーム 大目的">BOチーム</div><button class="map-add-btn-plus" title="プロジェクトを追加" onclick="showProjectDialog()" style="align-self:center;margin-top:8px">+</button></div>`;
         html += `<div class="project-col">`;
         projects.forEach((proj, pi) => {
           const c = getProjectColor(proj.projectId);
@@ -2018,6 +2021,9 @@
           if (zone === 'after') toIdx += 1;
           data.projects.splice(toIdx, 0, proj);
         }
+        // cross-device: _modTs bump + markDirty (親変更 / 並び順変更が伝搬する)
+        proj._modTs = bumpModTs(proj._modTs);
+        markDirty('projects', proj.id);
         saveData();
         toast(zone === 'inside' ? 'プロジェクトを移動しました' : '並び順を変更しました');
         render();
@@ -2130,6 +2136,45 @@
     }
 
     // PROJECT DETAIL
+    // BOチーム 大目的 (team-level) 詳細ページ
+    function renderTeamDetail(el) {
+      if (!data.teamMeta) data.teamMeta = { purpose: '', _modTs: 0 };
+      var html = '<div class="doc-page">';
+      html += '<button class="back-float" onclick="navigate(\'home\')">' + icons.arrowLeft + ' マップ</button>';
+      html += '<div class="doc-layout">';
+      html += '<main class="doc-main">';
+      html += renderBreadcrumb();
+      html += '<h1 class="doc-title">BOチーム</h1>';
+      html += '<div class="info-section" style="margin-top:16px"><div class="info-section-label" style="color:var(--primary)">' + icons.target + ' <span style="text-transform:uppercase;letter-spacing:.05em">大目的</span></div>';
+      html += '<textarea id="team-purpose-edit" class="textarea" rows="10" placeholder="BOチーム 全体の大目的を入力" style="width:100%;min-height:220px;font-size:15px;line-height:1.7;margin-top:6px">' + escapeHtml(data.teamMeta.purpose || '') + '</textarea>';
+      html += '<div id="team-purpose-status" style="font-size:11px;color:var(--fg-muted2);margin-top:4px"></div>';
+      html += '</div>';
+      html += '</main></div></div>';
+      el.innerHTML = html;
+      // Autosave on input (synchronous write to data + LS; debounced push)
+      setTimeout(function(){
+        var ta = document.getElementById('team-purpose-edit');
+        if (!ta) return;
+        var statusEl = document.getElementById('team-purpose-status');
+        ta.addEventListener('input', function(){
+          var val = ta.value;
+          if (val === (data.teamMeta.purpose || '')) return;
+          data.teamMeta.purpose = val;
+          data.teamMeta._modTs = bumpModTs(data.teamMeta._modTs);
+          markDirty('teamMeta', 0);
+          saveData();
+          if (statusEl) {
+            statusEl.textContent = '保存しました';
+            setTimeout(function(){ if (statusEl && statusEl.textContent === '保存しました') statusEl.textContent = ''; }, 1200);
+          }
+        });
+        ta.addEventListener('blur', function(){
+          if (typeof pushSyncNow === 'function') pushSyncNow();
+        });
+      }, 30);
+    }
+    window.renderTeamDetail = renderTeamDetail;
+
     function renderProjectDetail(el) {
       const project = getProject(pageParams.id);
       if (!project) { el.innerHTML = '<p>プロジェクトが見つかりません</p>'; return; }
@@ -3730,58 +3775,123 @@
       return labels.join(' › ');
     }
 
-    function renderTodos(el) {
-      var html = '';
-      var tasks = (data.projectTasks || []).filter(isLive);
+    // 折りたたみ状態 (デバイスローカル永続化。cross-device 同期はしない — UX state)
+    var COLLAPSE_KEY = 'bo-tasks-collapse';
+    function _loadCollapsed() {
+      try { return new Set(JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '[]')); }
+      catch(e) { return new Set(); }
+    }
+    function _saveCollapsed(s) {
+      try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify(Array.from(s))); } catch(e){}
+    }
+    function toggleTaskTreeNode(key) {
+      var s = _loadCollapsed();
+      if (s.has(key)) s.delete(key); else s.add(key);
+      _saveCollapsed(s);
+      render();
+    }
+    window.toggleTaskTreeNode = toggleTaskTreeNode;
 
-      // Group by project
-      var grouped = {};
-      tasks.forEach(function(t) {
+    function renderTodos(el) {
+      var collapsed = _loadCollapsed();
+      var tasks = (data.projectTasks || []).filter(isLive);
+      var projects = (data.projects || []).slice();
+
+      // project.id -> tasks (grouped once)
+      var tasksByProject = {};
+      tasks.forEach(function(t){
         var pid = t.projectId || 0;
-        if (!grouped[pid]) grouped[pid] = [];
-        grouped[pid].push(t);
+        (tasksByProject[pid] = tasksByProject[pid] || []).push(t);
       });
 
-      var projectIds = Object.keys(grouped);
-      if (projectIds.length > 0) {
-        projectIds.forEach(function(pid) {
-          var proj = getProject(Number(pid));
-          var projName = proj ? proj.name : 'その他';
-          var projColor = proj ? getProjectColor(Number(pid)) : { bg: '#94a3b8' };
-          html += '<div style="margin-bottom:16px">';
-          html += '<div style="font-size:11px;font-weight:600;color:' + projColor.bg + ';margin-bottom:4px;display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:' + projColor.bg + '"></span>' + escapeHtml(projName) + '</div>';
-          // Group children under their parent within this project's tasks
-          var projectTaskIdSet = {};
-          grouped[pid].forEach(function(t){ projectTaskIdSet[t.id] = true; });
-          var topLevel = grouped[pid].filter(function(t){ return !t.parentTaskId || !projectTaskIdSet[t.parentTaskId]; });
-          function renderMyTasksRow(t, depth) {
-            var INDENT = 24, CBOX = 24; // checkbox width in this view is ~24 via CSS .todo-checkbox
-            var leftPad = depth * INDENT;
-            var conn = '';
-            if (depth > 0) {
-              var vx = (depth - 1) * INDENT + CBOX / 2;
-              var hxEnd = depth * INDENT;
-              conn = '<span aria-hidden="true" style="position:absolute;left:0;top:0;bottom:0;width:' + hxEnd + 'px;pointer-events:none">' +
-                '<span style="position:absolute;left:' + vx + 'px;top:0;height:50%;width:1px;background:var(--border)"></span>' +
-                '<span style="position:absolute;left:' + vx + 'px;top:50%;width:' + (hxEnd - vx) + 'px;height:1px;background:var(--border)"></span>' +
-                '</span>';
-            }
-            html += '<div class="todo-item' + (t.done ? ' done' : '') + '" style="position:relative;margin:0;border:none;padding:3px 0;padding-left:' + leftPad + 'px;cursor:pointer" onclick="navigate(\'task-detail\',{id:' + t.id + '})">' + conn;
-            html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="position:relative;z-index:1" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? icons.check : '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
-            html += '<div style="flex:1;min-width:0">';
-            html += '<div class="todo-title">' + escapeHtml(t.title) + dueBadgeHtml(t) + '</div>';
-            html += '</div></div>';
-            var children = grouped[pid].filter(function(c){ return c.parentTaskId === t.id; });
-            children.forEach(function(c){ renderMyTasksRow(c, depth + 1); });
-          }
-          topLevel.forEach(function(t) { renderMyTasksRow(t, 0); });
-          html += '</div>';
-        });
-      } else {
-        html += '<div class="empty" style="padding:24px 0"><p>タスクがありません</p></div>';
+      var html = '';
+      // チェブロン (開閉トグル)
+      function chevron(isOpen, key) {
+        return '<span class="tree-chev" style="display:inline-block;width:18px;text-align:center;cursor:pointer;color:var(--fg-muted);user-select:none;flex-shrink:0" onclick="event.stopPropagation();toggleTaskTreeNode(\'' + key + '\')">' + (isOpen ? '▼' : '▶') + '</span>';
       }
 
-      // タスク追加ボタンは撤去 (マップ経由の + ボタンからのみ追加可能)
+      // --- BOチーム (大目的) ヘッダ ---
+      var teamKey = 'team';
+      var teamOpen = !collapsed.has(teamKey);
+      var teamPurpose = (data.teamMeta && data.teamMeta.purpose) ? data.teamMeta.purpose : '';
+      html += '<div class="tree-node team-node" style="padding:10px 8px;margin-bottom:4px;border-bottom:2px solid var(--border);display:flex;align-items:center;gap:6px">';
+      html += chevron(teamOpen, teamKey);
+      html += '<div style="flex:1;min-width:0;cursor:pointer" onclick="navigate(\'team-detail\')">';
+      html += '<div style="font-size:14px;font-weight:700;color:#1e293b">BOチーム <span style="font-size:11px;color:var(--fg-muted);font-weight:500">大目的</span></div>';
+      if (teamPurpose) {
+        html += '<div style="font-size:12px;color:var(--fg-muted);margin-top:2px;white-space:pre-wrap">' + escapeHtml(teamPurpose) + '</div>';
+      } else {
+        html += '<div style="font-size:11px;color:var(--fg-muted2);margin-top:2px;font-style:italic">タップして大目的を入力</div>';
+      }
+      html += '</div></div>';
+
+      if (!teamOpen) { el.innerHTML = html; return; }
+
+      // --- プロジェクト階層 (root projects → sub-projects recursively) ---
+      function renderProjectNode(project, depth) {
+        var projKey = 'proj:' + project.id;
+        var projOpen = !collapsed.has(projKey);
+        var color = getProjectColor(project.id);
+        var projTasks = (tasksByProject[project.id] || []);
+        var subProjects = projects.filter(function(p){ return p.parentId === project.id; });
+        var hasChildren = projTasks.length > 0 || subProjects.length > 0 || !!project.description;
+        var indent = depth * 18 + 8;
+        html += '<div class="tree-node project-node" style="padding:8px;padding-left:' + indent + 'px;display:flex;align-items:flex-start;gap:6px;border-left:3px solid ' + color.bg + ';margin:6px 0;background:' + color.light + '22">';
+        if (hasChildren) html += chevron(projOpen, projKey);
+        else html += '<span style="display:inline-block;width:18px;flex-shrink:0"></span>';
+        html += '<div style="flex:1;min-width:0;cursor:pointer" onclick="navigate(\'project-detail\',{id:' + project.id + '})">';
+        var labelDepth = depth === 0 ? '中目的' : ('小目的' + (depth > 1 ? ' (階層 ' + (depth+1) + ')' : ''));
+        html += '<div style="font-size:13px;font-weight:600;color:' + color.bg + '">' + escapeHtml(project.name) + ' <span style="font-size:10px;color:var(--fg-muted);font-weight:500">' + labelDepth + '</span></div>';
+        if (project.description) {
+          html += '<div style="font-size:12px;color:var(--fg-muted);margin-top:2px;white-space:pre-wrap">' + escapeHtml(project.description) + '</div>';
+        }
+        html += '</div></div>';
+
+        if (!projOpen) return;
+
+        // タスク (階層付き)
+        var projTaskSet = {};
+        projTasks.forEach(function(t){ projTaskSet[t.id] = true; });
+        var topTasks = projTasks.filter(function(t){ return !t.parentTaskId || !projTaskSet[t.parentTaskId]; });
+        topTasks.forEach(function(t){ renderTaskNode(t, depth + 1, projTasks); });
+
+        // Sub-projects (再帰)
+        subProjects.forEach(function(sp){ renderProjectNode(sp, depth + 1); });
+      }
+
+      function renderTaskNode(task, depth, siblingPool) {
+        var taskKey = 'task:' + task.id;
+        var taskOpen = !collapsed.has(taskKey);
+        var children = siblingPool.filter(function(c){ return c.parentTaskId === task.id; });
+        var hasChildren = children.length > 0;
+        var indent = depth * 18 + 8;
+        html += '<div class="todo-item' + (task.done ? ' done' : '') + '" style="position:relative;margin:0;border:none;padding:4px 0 4px ' + indent + 'px;cursor:pointer;display:flex;align-items:center;gap:6px" onclick="navigate(\'task-detail\',{id:' + task.id + '})">';
+        if (hasChildren) html += chevron(taskOpen, taskKey);
+        else html += '<span style="display:inline-block;width:18px;flex-shrink:0"></span>';
+        html += '<div class="todo-checkbox ' + (task.done ? 'checked' : '') + '" style="flex-shrink:0" onclick="event.stopPropagation();expandProjectTaskActions(this,' + task.id + ',' + task.done + ')">' + (task.done ? icons.check : '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
+        html += '<div style="flex:1;min-width:0">';
+        html += '<div class="todo-title">' + escapeHtml(task.title) + dueBadgeHtml(task) + '</div>';
+        html += '</div></div>';
+        if (taskOpen && hasChildren) {
+          children.forEach(function(c){ renderTaskNode(c, depth + 1, siblingPool); });
+        }
+      }
+
+      var rootProjects = projects.filter(function(p){ return !p.parentId; });
+      if (rootProjects.length === 0 && tasks.length === 0) {
+        html += '<div class="empty" style="padding:24px 0"><p>プロジェクトもタスクもありません</p></div>';
+      } else {
+        rootProjects.forEach(function(p){ renderProjectNode(p, 0); });
+        // Tasks without project (fallback)
+        var orphanTasks = tasks.filter(function(t){ return !t.projectId || !getProject(t.projectId); });
+        if (orphanTasks.length > 0) {
+          html += '<div style="margin-top:16px;padding-top:8px;border-top:1px solid var(--border-light)"><div style="font-size:11px;color:var(--fg-muted2);padding:4px 8px">その他</div></div>';
+          var orphanSet = {}; orphanTasks.forEach(function(t){ orphanSet[t.id] = true; });
+          var topOrphans = orphanTasks.filter(function(t){ return !t.parentTaskId || !orphanSet[t.parentTaskId]; });
+          topOrphans.forEach(function(t){ renderTaskNode(t, 0, orphanTasks); });
+        }
+      }
+
       el.innerHTML = html;
     }
 
@@ -4095,6 +4205,18 @@
       mergeByModTs('tags', data.tags = data.tags || [], remote.tags || []);
       mergeByModTs('paceTags', data.paceTags = data.paceTags || [], remote.paceTags || []);
       mergeByModTs('users', data.users = data.users || [], remote.users || []);
+      // teamMeta (単一オブジェクト) を _modTs で merge
+      if (remote.teamMeta && typeof remote.teamMeta === 'object') {
+        if (!data.teamMeta) data.teamMeta = { purpose: '', _modTs: 0 };
+        var ltTM = (data.teamMeta._modTs || 0);
+        var rtTM = (remote.teamMeta._modTs || 0);
+        var tmNotDirty = !isDirty('teamMeta', 0);
+        if (tmNotDirty && rtTM <= (Date.now() + 24*60*60*1000)) {
+          if (rtTM > ltTM || (ltTM === 0 && rtTM === 0 && (remote.teamMeta.purpose || '') !== (data.teamMeta.purpose || ''))) {
+            data.teamMeta = { purpose: remote.teamMeta.purpose || '', _modTs: rtTM };
+          }
+        }
+      }
       // Merge manual.history (by ts)
       (data.manuals || []).forEach(function(lm){
         var rm = (remote.manuals || []).find(function(x){ return x.id === lm.id; });
