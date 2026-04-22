@@ -1635,7 +1635,7 @@
       // Projects as vertical cards
       projects.forEach(proj => {
         const c = getProjectColor(proj.projectId);
-        html += '<div style="margin-bottom:10px;border-left:3px solid ' + c.bg + ';background:#fff;border-radius:8px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,.06)" onclick="navigate(\'project-detail\',{id:' + proj.projectId + '})">';
+        html += '<div style="margin-bottom:10px;background:#fff;border-radius:8px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,.06)" onclick="navigate(\'project-detail\',{id:' + proj.projectId + '})">';
         var mProjTasks = getTasksByProject(proj.projectId);
         html += '<div style="font-weight:600;font-size:13px;color:' + c.text + ';margin-bottom:4px">' + escapeHtml(proj.projectName) + ' <span style="opacity:.5;font-size:11px">(' + (proj.manuals.length + mProjTasks.filter(function(t){return !t.done}).length) + ')</span></div>';
         // Manuals inside
@@ -1744,6 +1744,14 @@
     }
     function dashCalPrev() { _dashCalMonth--; if (_dashCalMonth < 0) { _dashCalMonth = 11; _dashCalYear--; } _saveDashCalState(); render(); }
     function dashCalNext() { _dashCalMonth++; if (_dashCalMonth > 11) { _dashCalMonth = 0; _dashCalYear++; } _saveDashCalState(); render(); }
+    function dashCalToday() {
+      var d = new Date();
+      _dashCalYear = d.getFullYear();
+      _dashCalMonth = d.getMonth();
+      _dashCalSelected = null;
+      _saveDashCalState();
+      render();
+    }
     function dashCalSelect(ymd) {
       _dashCalSelected = (_dashCalSelected === ymd) ? null : ymd;
       _saveDashCalState();
@@ -1751,91 +1759,115 @@
     }
     window.dashCalPrev = dashCalPrev;
     window.dashCalNext = dashCalNext;
+    window.dashCalToday = dashCalToday;
     window.dashCalSelect = dashCalSelect;
     function buildDeadlineCalendarHtml() {
-      // Collect live tasks with dueDate
+      // 完了タスクはカレンダーに出さない (live + dueDate + !done)
       var tasksByDate = {};
       (data.projectTasks || []).forEach(function(t){
-        if (!t || t._deleted || !t.dueDate) return;
+        if (!t || t._deleted || t.done || !t.dueDate) return;
         (tasksByDate[t.dueDate] = tasksByDate[t.dueDate] || []).push(t);
       });
-      var months = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
       var today = new Date();
       var todayStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
       var firstDay = new Date(_dashCalYear, _dashCalMonth, 1).getDay();
       var daysInMonth = new Date(_dashCalYear, _dashCalMonth + 1, 0).getDate();
-      var html = '<div class="deadline-cal" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:16px">';
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
-      html += '<div style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>締切カレンダー</div>';
-      html += '<div style="display:flex;align-items:center;gap:4px"><button onclick="dashCalPrev()" style="border:none;background:transparent;cursor:pointer;padding:4px 8px;font-size:14px;color:var(--fg-muted)">‹</button>';
-      html += '<span style="font-size:13px;font-weight:500;min-width:100px;text-align:center">' + _dashCalYear + '年 ' + months[_dashCalMonth] + '</span>';
-      html += '<button onclick="dashCalNext()" style="border:none;background:transparent;cursor:pointer;padding:4px 8px;font-size:14px;color:var(--fg-muted)">›</button></div>';
-      html += '</div>';
-      // Grid
-      html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">';
-      var dowColors = ['#ef4444','#64748b','#64748b','#64748b','#64748b','#64748b','#2563eb'];
-      ['日','月','火','水','木','金','土'].forEach(function(d,i){
-        html += '<div style="font-size:10px;font-weight:600;color:' + dowColors[i] + ';text-align:center;padding:4px 0">' + d + '</div>';
-      });
-      for (var i = 0; i < firstDay; i++) html += '<div></div>';
-      // PC (>=1024px) はセルをさらに縦長 + タスク最大 8 件、モバイルは短め + 2 件
+      // 7 列 × N 行 の整列を保つため先月末と翌月頭で埋める
+      var prevMonthDays = new Date(_dashCalYear, _dashCalMonth, 0).getDate();
+      var totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
       var isWide = window.innerWidth >= 1024;
-      var cellMinHeight = isWide ? 160 : 64;
-      var maxTasksShown = isWide ? 8 : 2;
-      var cellFontSize = isWide ? 14 : 11;
-      var taskFontSize = isWide ? 12 : 9;
-      for (var d = 1; d <= daysInMonth; d++) {
-        var ymd = _dashCalYear + '-' + String(_dashCalMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+      var rows = totalCells / 7;
+      // 画面高に合わせて行高を計算 (PC はビューポート高さ - ヘッダ高を全行で割る)
+      var rowH = isWide ? 'calc((100vh - 150px) / ' + rows + ')' : '72px';
+      var dateSize = isWide ? 13 : 11;
+      var chipSize = isWide ? 12 : 10;
+      var maxChips = isWide ? 6 : 2;
+
+      var html = '<div class="gcal-wrap" style="display:flex;flex-direction:column;height:100%;background:#fff">';
+      // Toolbar
+      html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border-light);flex-wrap:wrap">';
+      html += '<button class="gcal-today" onclick="dashCalToday()" style="padding:6px 16px;border:1px solid var(--border);background:#fff;border-radius:999px;font-size:13px;cursor:pointer;color:var(--fg)">今日</button>';
+      html += '<div style="display:flex;align-items:center;gap:2px">';
+      html += '<button onclick="dashCalPrev()" aria-label="前の月" style="width:32px;height:32px;border:none;background:transparent;border-radius:50%;cursor:pointer;font-size:16px;color:var(--fg-muted);display:flex;align-items:center;justify-content:center">‹</button>';
+      html += '<button onclick="dashCalNext()" aria-label="次の月" style="width:32px;height:32px;border:none;background:transparent;border-radius:50%;cursor:pointer;font-size:16px;color:var(--fg-muted);display:flex;align-items:center;justify-content:center">›</button>';
+      html += '</div>';
+      html += '<div style="font-size:' + (isWide ? 20 : 16) + 'px;font-weight:500;color:var(--fg)">' + _dashCalYear + '年 ' + (_dashCalMonth + 1) + '月</div>';
+      html += '</div>';
+      // Weekday header row
+      html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--border-light)">';
+      var dowLabels = ['日','月','火','水','木','金','土'];
+      var dowColors = ['#ef4444','#64748b','#64748b','#64748b','#64748b','#64748b','#2563eb'];
+      dowLabels.forEach(function(d,i){
+        html += '<div style="text-align:center;padding:6px 4px;font-size:11px;font-weight:500;color:' + dowColors[i] + '">' + d + '</div>';
+      });
+      html += '</div>';
+      // Grid cells
+      html += '<div class="gcal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:' + rowH + ';flex:1;min-height:0">';
+      for (var idx = 0; idx < totalCells; idx++) {
+        var dayNum, y, m, outOfMonth = false;
+        if (idx < firstDay) {
+          dayNum = prevMonthDays - firstDay + 1 + idx;
+          m = _dashCalMonth - 1; y = _dashCalYear;
+          if (m < 0) { m = 11; y--; }
+          outOfMonth = true;
+        } else if (idx >= firstDay + daysInMonth) {
+          dayNum = idx - (firstDay + daysInMonth) + 1;
+          m = _dashCalMonth + 1; y = _dashCalYear;
+          if (m > 11) { m = 0; y++; }
+          outOfMonth = true;
+        } else {
+          dayNum = idx - firstDay + 1;
+          m = _dashCalMonth; y = _dashCalYear;
+        }
+        var ymd = y + '-' + String(m+1).padStart(2,'0') + '-' + String(dayNum).padStart(2,'0');
         var dayTasks = tasksByDate[ymd] || [];
         var count = dayTasks.length;
         var isToday = ymd === todayStr;
         var isSelected = ymd === _dashCalSelected;
-        var bg = isSelected ? 'var(--primary)' : (isToday ? 'rgba(37,99,235,.08)' : '#fff');
-        var color = isSelected ? '#fff' : (isToday ? 'var(--primary)' : 'var(--fg)');
-        var border = isToday && !isSelected ? '1px solid var(--primary)' : '1px solid var(--border-light)';
-        html += '<div onclick="dashCalSelect(\'' + ymd + '\')" style="position:relative;padding:4px 4px;font-size:' + cellFontSize + 'px;border-radius:6px;cursor:pointer;background:' + bg + ';color:' + color + ';border:' + border + ';min-height:' + cellMinHeight + 'px;display:flex;flex-direction:column;gap:3px;overflow:hidden">';
-        html += '<div style="font-size:' + cellFontSize + 'px;font-weight:600;text-align:right;line-height:1.2">' + d + (count > maxTasksShown ? '<span style="font-size:9px;opacity:.7;margin-left:3px">+' + (count - maxTasksShown) + '</span>' : '') + '</div>';
-        dayTasks.slice(0, maxTasksShown).forEach(function(t){
-          var pc = getProjectColor(t.projectId);
-          var titleColor = isSelected ? '#fff' : (t.done ? 'var(--fg-muted2)' : 'var(--fg)');
-          var titleDeco = t.done ? 'text-decoration:line-through;' : '';
-          html += '<div class="dash-cal-task" data-task="' + t.id + '" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})" style="font-size:' + taskFontSize + 'px;line-height:1.2;padding:2px 4px;border-left:3px solid ' + (isSelected ? '#fff' : pc.bg) + ';background:' + (isSelected ? 'rgba(255,255,255,.15)' : pc.light) + ';color:' + titleColor + ';border-radius:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' + titleDeco + '">' + escapeHtml(t.title) + '</div>';
-        });
+        var col = idx % 7;
+        var isRightEdge = col === 6;
+        var cellBg = outOfMonth ? '#fafafa' : (isSelected ? 'rgba(37,99,235,.05)' : '#fff');
+        var borders = 'border-bottom:1px solid var(--border-light);' + (isRightEdge ? '' : 'border-right:1px solid var(--border-light);');
+        html += '<div onclick="dashCalSelect(\'' + ymd + '\')" style="position:relative;padding:4px 4px 2px;cursor:pointer;background:' + cellBg + ';' + borders + ';overflow:hidden;display:flex;flex-direction:column;gap:2px;min-height:0">';
+        // Date number (top-center-ish, small). Today: blue circle.
+        var numColor = outOfMonth ? 'var(--fg-muted2)' : (isToday ? '#fff' : (col === 0 ? '#ef4444' : (col === 6 ? '#2563eb' : 'var(--fg)')));
+        var numBg = isToday ? 'var(--primary)' : 'transparent';
+        html += '<div style="display:flex;justify-content:center;padding:2px 0 4px">';
+        html += '<span style="display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;font-size:' + dateSize + 'px;font-weight:' + (isToday ? 600 : 500) + ';background:' + numBg + ';color:' + numColor + '">' + dayNum + '</span>';
         html += '</div>';
-      }
-      html += '</div>';
-
-      // Selected day task list
-      if (_dashCalSelected) {
-        var list = (tasksByDate[_dashCalSelected] || []);
-        html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-light)">';
-        var d2 = new Date(_dashCalSelected);
-        html += '<div style="font-size:12px;font-weight:600;color:var(--fg-muted);margin-bottom:6px">' + (d2.getMonth()+1) + '月' + d2.getDate() + '日 (' + list.length + ' 件)</div>';
-        if (list.length === 0) {
-          html += '<div style="font-size:12px;color:var(--fg-muted2);padding:4px 0">この日に締切のタスクはありません</div>';
-        } else {
-          list.sort(function(a,b){ return (a.title||'').localeCompare(b.title||''); });
-          list.forEach(function(t){
-            var proj = getProject(t.projectId);
-            var c = getProjectColor(t.projectId);
-            html += '<div onclick="navigate(\'task-detail\',{id:' + t.id + '})" style="padding:8px 10px;margin-bottom:4px;border:1px solid var(--border-light);border-radius:6px;display:flex;align-items:center;gap:8px;cursor:pointer;background:#fff">';
-            html += '<span style="width:6px;height:6px;border-radius:50%;background:' + c.bg + ';flex-shrink:0"></span>';
-            html += '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500;' + (t.done ? 'text-decoration:line-through;opacity:.5' : '') + '">' + escapeHtml(t.title) + '</div>';
-            if (proj) html += '<div style="font-size:10px;color:var(--fg-muted)">' + escapeHtml(proj.name) + '</div>';
-            html += '</div></div>';
-          });
+        // Task chips
+        var shown = dayTasks.slice(0, maxChips);
+        shown.forEach(function(t){
+          var pc = getProjectColor(t.projectId);
+          html += '<div class="dash-cal-task" data-task="' + t.id + '" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})" title="' + escapeHtml(t.title) + '" style="display:flex;align-items:center;gap:4px;padding:1px 6px;background:' + pc.bg + ';color:#fff;border-radius:3px;font-size:' + chipSize + 'px;line-height:1.35;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(t.title) + '</div>';
+        });
+        if (count > maxChips) {
+          html += '<div style="font-size:' + (chipSize - 1) + 'px;color:var(--fg-muted);padding:1px 6px">他 ' + (count - maxChips) + ' 件</div>';
         }
         html += '</div>';
       }
-      html += '</div>';
+      html += '</div>'; // grid
+      html += '</div>'; // wrap
       return html;
     }
 
     function renderMobileHome(el) {
-      // ダッシュボードはタスク締切カレンダーのみ表示 (ユーザー要望)
-      let html = '';
+      // ダッシュボードはタスク締切カレンダーのみ表示 (Google カレンダー風)
+      var html = '<div class="gcal-full-page" style="position:fixed;left:var(--sidebar-width,0px);right:0;top:var(--header-height,0px);bottom:0;background:#fff;z-index:5;display:flex;flex-direction:column">';
       html += buildDeadlineCalendarHtml();
+      html += '</div>';
       el.innerHTML = html;
+      // Desktop は左 sidebar 260px、mobile は 0。mobile-header は top ~56px
+      var gcal = document.querySelector('.gcal-full-page');
+      if (gcal) {
+        if (window.innerWidth <= 768) {
+          gcal.style.left = '0';
+          gcal.style.top = '56px';
+        } else {
+          gcal.style.left = '220px';
+          gcal.style.top = '0';
+        }
+      }
       return;
       // --- 以下未使用 (legacy) ---
       const allTasks = [];
