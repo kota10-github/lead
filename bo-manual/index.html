@@ -1925,7 +1925,13 @@
           var kids = getChildTasks(t.id).filter(function(k){ return !k.done; });
           html += '<div class="sub-tree-row" data-task="' + t.id + '">';
           html += '<div class="sub-tree-card-wrap">';
-          html += '<div class="node-manual" data-node="task-' + t.id + '" style="border-left:3px solid ' + (t.done ? '#059669' : color.bg) + ';background:' + color.light + ';opacity:' + (t.done ? '.5' : '1') + ';cursor:pointer" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})">';
+          html += '<div class="node-manual" data-node="task-' + t.id + '" draggable="true"' +
+            ' ondragstart="handleTaskDragStart(event,' + t.id + ')"' +
+            ' ondragend="handleTaskDragEnd(event)"' +
+            ' ondragover="handleTaskDragOver(event,' + t.id + ')"' +
+            ' ondragleave="this.classList.remove(\'drop-target\',\'drop-before\',\'drop-after\')"' +
+            ' ondrop="handleTaskDrop(event,' + t.id + ')"' +
+            ' style="border-left:3px solid ' + (t.done ? '#059669' : color.bg) + ';background:' + color.light + ';opacity:' + (t.done ? '.5' : '1') + ';cursor:pointer" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})">';
           html += '<div class="node-manual-title" style="color:' + color.bg + ';display:flex;align-items:center;gap:6px">';
           html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:24px;height:24px;font-size:10px" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
           html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>' + dueBadgeHtml(t);
@@ -2032,6 +2038,83 @@
       window.handleProjectDragEnd = handleProjectDragEnd;
       window.handleProjectDragOver = handleProjectDragOver;
       window.handleProjectDrop = handleProjectDrop;
+
+      // ===== タスクの drag & drop (マップ上でのタスク並び替え/親変更) =====
+      function isDescendantTask(ancestorId, candidateId) {
+        if (candidateId == null) return false;
+        var cur = (data.projectTasks || []).find(function(t){ return t.id === candidateId; });
+        while (cur && cur.parentTaskId != null) {
+          if (cur.parentTaskId === ancestorId) return true;
+          cur = (data.projectTasks || []).find(function(t){ return t.id === cur.parentTaskId; });
+        }
+        return false;
+      }
+      function handleTaskDragStart(e, taskId) {
+        e.stopPropagation();
+        e.dataTransfer.setData('application/x-task-id', String(taskId));
+        e.dataTransfer.setData('text/plain', 'task:' + taskId);
+        e.dataTransfer.effectAllowed = 'move';
+        window._draggingTaskId = taskId;
+        e.currentTarget.classList.add('dragging-source');
+      }
+      function handleTaskDragEnd(e) {
+        e.currentTarget.classList.remove('dragging-source');
+        document.querySelectorAll('.drop-target,.drop-before,.drop-after').forEach(function(el){
+          el.classList.remove('drop-target','drop-before','drop-after');
+        });
+        window._draggingTaskId = null;
+      }
+      function handleTaskDragOver(e, targetId) {
+        var dragged = window._draggingTaskId;
+        if (dragged == null || dragged === targetId) return;
+        if (isDescendantTask(dragged, targetId)) return; // 循環防止
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+        var el = e.currentTarget;
+        var zone = getDropZone(e, el);
+        el.classList.remove('drop-target','drop-before','drop-after');
+        if (zone === 'before') el.classList.add('drop-before');
+        else if (zone === 'after') el.classList.add('drop-after');
+        else el.classList.add('drop-target');
+      }
+      function handleTaskDrop(e, targetId) {
+        e.preventDefault();
+        e.stopPropagation();
+        var el = e.currentTarget;
+        var zone = getDropZone(e, el);
+        el.classList.remove('drop-target','drop-before','drop-after');
+        var draggedId = Number(e.dataTransfer.getData('application/x-task-id'));
+        if (!draggedId || draggedId === targetId) return;
+        if (isDescendantTask(draggedId, targetId)) { toast('循環構造は作れません'); return; }
+        var src = (data.projectTasks || []).find(function(t){ return t.id === draggedId && !t._deleted; });
+        var tgt = (data.projectTasks || []).find(function(t){ return t.id === targetId && !t._deleted; });
+        if (!src || !tgt) return;
+        // タスクは プロジェクト をまたげない (projectId は target に合わせる)
+        src.projectId = tgt.projectId;
+        if (zone === 'inside') {
+          src.parentTaskId = tgt.id;
+          // 最後尾へ移動
+          var idx = data.projectTasks.indexOf(src);
+          if (idx >= 0) { data.projectTasks.splice(idx, 1); data.projectTasks.push(src); }
+        } else {
+          src.parentTaskId = tgt.parentTaskId != null ? tgt.parentTaskId : null;
+          var fromIdx = data.projectTasks.indexOf(src);
+          if (fromIdx >= 0) data.projectTasks.splice(fromIdx, 1);
+          var toIdx = data.projectTasks.indexOf(tgt);
+          if (zone === 'after') toIdx += 1;
+          data.projectTasks.splice(toIdx, 0, src);
+        }
+        src._modTs = bumpModTs(src._modTs);
+        markDirty('projectTasks', src.id);
+        saveData();
+        toast(zone === 'inside' ? 'タスクを移動しました' : '並び順を変更しました');
+        render();
+      }
+      window.handleTaskDragStart = handleTaskDragStart;
+      window.handleTaskDragEnd = handleTaskDragEnd;
+      window.handleTaskDragOver = handleTaskDragOver;
+      window.handleTaskDrop = handleTaskDrop;
       function drawMindmapLines(projects) {
         var svg = document.getElementById('mindmap-svg');
         var inner = document.getElementById('mindmap-inner');
