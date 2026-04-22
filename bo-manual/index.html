@@ -1660,20 +1660,11 @@
         function getVisibleChildren(parentId, pool) {
           return pool.filter(function(c){ return c._effectiveParent === parentId; });
         }
-        // Tasks inside (top-level + indented children with L-connector)
+        // Tasks inside (top-level + indented children, no connector lines)
         function renderMobileTaskRow(t, depth) {
           var INDENT = 20, CBOX = 20;
           var leftPad = depth * INDENT;
-          var conn = '';
-          if (depth > 0) {
-            var vx = (depth - 1) * INDENT + CBOX / 2;
-            var hxEnd = depth * INDENT;
-            conn = '<span aria-hidden="true" style="position:absolute;left:0;top:0;bottom:0;width:' + hxEnd + 'px;pointer-events:none">' +
-              '<span style="position:absolute;left:' + vx + 'px;top:0;height:50%;width:1px;background:var(--border)"></span>' +
-              '<span style="position:absolute;left:' + vx + 'px;top:50%;width:' + (hxEnd - vx) + 'px;height:1px;background:var(--border)"></span>' +
-              '</span>';
-          }
-          html += '<div style="position:relative;padding:4px 0;padding-left:' + leftPad + 'px;font-size:12px;color:var(--fg-muted);display:flex;align-items:center;gap:6px;cursor:pointer;' + (t.done ? 'opacity:.5' : '') + '" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})">' + conn;
+          html += '<div style="position:relative;padding:4px 0;padding-left:' + leftPad + 'px;font-size:12px;color:var(--fg-muted);display:flex;align-items:center;gap:6px;cursor:pointer;' + (t.done ? 'opacity:.5' : '') + '" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})">';
           html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:' + CBOX + 'px;height:' + CBOX + 'px;font-size:8px;position:relative;z-index:1" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
           html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>' + dueBadgeHtml(t);
           html += '</div>';
@@ -1686,7 +1677,7 @@
           proj.subProjects.forEach(function renderSub(sp) {
             var sc = getProjectColor(sp.projectId);
             var spTasks = getTasksByProject(sp.projectId);
-            html += '<div style="margin-top:6px;padding-left:10px;border-left:2px solid ' + sc.bg + '">';
+            html += '<div style="margin-top:6px;padding-left:10px">';
             html += '<div style="font-size:12px;font-weight:500;color:' + sc.text + ';padding:2px 0" onclick="event.stopPropagation();navigate(\'project-detail\',{id:' + sp.projectId + '})">' + escapeHtml(sp.projectName) + '</div>';
             (sp.manuals || []).forEach(function(m) {
               html += '<div style="padding:4px 0;font-size:12px;color:var(--fg-muted);display:flex;align-items:center;gap:6px;cursor:pointer" onclick="event.stopPropagation();navigate(\'manual-detail\',{id:' + m.id + '})">';
@@ -1697,16 +1688,7 @@
             function renderSpTaskRow(t, depth) {
               var INDENT = 20, CBOX = 20;
               var leftPad = depth * INDENT;
-              var conn = '';
-              if (depth > 0) {
-                var vx = (depth - 1) * INDENT + CBOX / 2;
-                var hxEnd = depth * INDENT;
-                conn = '<span aria-hidden="true" style="position:absolute;left:0;top:0;bottom:0;width:' + hxEnd + 'px;pointer-events:none">' +
-                  '<span style="position:absolute;left:' + vx + 'px;top:0;height:50%;width:1px;background:var(--border)"></span>' +
-                  '<span style="position:absolute;left:' + vx + 'px;top:50%;width:' + (hxEnd - vx) + 'px;height:1px;background:var(--border)"></span>' +
-                  '</span>';
-              }
-              html += '<div style="position:relative;padding:4px 0;padding-left:' + leftPad + 'px;font-size:12px;color:var(--fg-muted);display:flex;align-items:center;gap:6px;cursor:pointer;' + (t.done ? 'opacity:.5' : '') + '" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})">' + conn;
+              html += '<div style="position:relative;padding:4px 0;padding-left:' + leftPad + 'px;font-size:12px;color:var(--fg-muted);display:flex;align-items:center;gap:6px;cursor:pointer;' + (t.done ? 'opacity:.5' : '') + '" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})">';
               html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:' + CBOX + 'px;height:' + CBOX + 'px;font-size:8px;position:relative;z-index:1" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
               html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>' + dueBadgeHtml(t);
               html += '</div>';
@@ -1824,8 +1806,11 @@
       var totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
       var isWide = window.innerWidth >= 1024;
       var rows = totalCells / 7;
-      // 画面高に合わせて行高を計算 (PC はビューポート高さ - ヘッダ高を全行で割る)
-      var rowH = isWide ? 'calc((100vh - 150px) / ' + rows + ')' : '72px';
+      // 画面いっぱい使う: PC は 150px 減、モバイルは mobile-header(56) + 月見出し
+      // + 月チップ(約 70px) + 曜日行(26) を引いた残りを行数で割って使い切る
+      var rowH = isWide
+        ? 'calc((100vh - 150px) / ' + rows + ')'
+        : 'calc((100vh - 180px) / ' + rows + ')';
       var dateSize = isWide ? 13 : 11;
       var chipSize = isWide ? 12 : 10;
       var maxChips = isWide ? 6 : 2;
@@ -2212,9 +2197,19 @@
         return 'inside';
       }
       function handleProjectDragOver(e, targetId) {
-        var dragged = window._draggingProjectId;
-        if (!dragged || dragged === targetId) return;
-        if (isDescendantProject(dragged, targetId)) return;
+        // タスクを別プロジェクトへ drop するのも許可 (_draggingTaskId がセット中)
+        var draggingProj = window._draggingProjectId;
+        var draggingTask = window._draggingTaskId;
+        if (draggingTask) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.dataTransfer.dropEffect = 'move';
+          e.currentTarget.classList.remove('drop-target','drop-before','drop-after');
+          e.currentTarget.classList.add('drop-target');
+          return;
+        }
+        if (!draggingProj || draggingProj === targetId) return;
+        if (isDescendantProject(draggingProj, targetId)) return;
         e.preventDefault();
         e.stopPropagation();
         e.dataTransfer.dropEffect = 'move';
