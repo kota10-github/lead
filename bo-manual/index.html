@@ -1724,6 +1724,105 @@
       el.innerHTML = html;
     }
 
+    // ====== タスク締切カレンダー widget (dashboard + desktop home 共通) ======
+    var _dashCalYear, _dashCalMonth, _dashCalSelected;
+    (function initDashCalState(){
+      try {
+        var s = JSON.parse(localStorage.getItem('bo-dash-cal') || '{}');
+        var d = new Date();
+        _dashCalYear = (typeof s.y === 'number') ? s.y : d.getFullYear();
+        _dashCalMonth = (typeof s.m === 'number') ? s.m : d.getMonth();
+        _dashCalSelected = s.sel || null; // 'YYYY-MM-DD'
+      } catch(e) {
+        var d2 = new Date();
+        _dashCalYear = d2.getFullYear(); _dashCalMonth = d2.getMonth();
+      }
+    })();
+    function _saveDashCalState() {
+      try { localStorage.setItem('bo-dash-cal', JSON.stringify({y:_dashCalYear, m:_dashCalMonth, sel:_dashCalSelected})); } catch(e){}
+    }
+    function dashCalPrev() { _dashCalMonth--; if (_dashCalMonth < 0) { _dashCalMonth = 11; _dashCalYear--; } _saveDashCalState(); render(); }
+    function dashCalNext() { _dashCalMonth++; if (_dashCalMonth > 11) { _dashCalMonth = 0; _dashCalYear++; } _saveDashCalState(); render(); }
+    function dashCalSelect(ymd) {
+      _dashCalSelected = (_dashCalSelected === ymd) ? null : ymd;
+      _saveDashCalState();
+      render();
+    }
+    window.dashCalPrev = dashCalPrev;
+    window.dashCalNext = dashCalNext;
+    window.dashCalSelect = dashCalSelect;
+    function buildDeadlineCalendarHtml() {
+      // Collect live tasks with dueDate
+      var tasksByDate = {};
+      (data.projectTasks || []).forEach(function(t){
+        if (!t || t._deleted || !t.dueDate) return;
+        (tasksByDate[t.dueDate] = tasksByDate[t.dueDate] || []).push(t);
+      });
+      var months = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+      var today = new Date();
+      var todayStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+      var firstDay = new Date(_dashCalYear, _dashCalMonth, 1).getDay();
+      var daysInMonth = new Date(_dashCalYear, _dashCalMonth + 1, 0).getDate();
+      var html = '<div class="deadline-cal" style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:16px">';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+      html += '<div style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>締切カレンダー</div>';
+      html += '<div style="display:flex;align-items:center;gap:4px"><button onclick="dashCalPrev()" style="border:none;background:transparent;cursor:pointer;padding:4px 8px;font-size:14px;color:var(--fg-muted)">‹</button>';
+      html += '<span style="font-size:13px;font-weight:500;min-width:100px;text-align:center">' + _dashCalYear + '年 ' + months[_dashCalMonth] + '</span>';
+      html += '<button onclick="dashCalNext()" style="border:none;background:transparent;cursor:pointer;padding:4px 8px;font-size:14px;color:var(--fg-muted)">›</button></div>';
+      html += '</div>';
+      // Grid
+      html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">';
+      var dowColors = ['#ef4444','#64748b','#64748b','#64748b','#64748b','#64748b','#2563eb'];
+      ['日','月','火','水','木','金','土'].forEach(function(d,i){
+        html += '<div style="font-size:10px;font-weight:600;color:' + dowColors[i] + ';text-align:center;padding:4px 0">' + d + '</div>';
+      });
+      for (var i = 0; i < firstDay; i++) html += '<div></div>';
+      for (var d = 1; d <= daysInMonth; d++) {
+        var ymd = _dashCalYear + '-' + String(_dashCalMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+        var count = (tasksByDate[ymd] || []).length;
+        var isToday = ymd === todayStr;
+        var isSelected = ymd === _dashCalSelected;
+        var bg = isSelected ? 'var(--primary)' : (isToday ? 'rgba(37,99,235,.08)' : 'transparent');
+        var color = isSelected ? '#fff' : (isToday ? 'var(--primary)' : 'var(--fg)');
+        var border = isToday && !isSelected ? '1px solid var(--primary)' : '1px solid transparent';
+        html += '<div onclick="dashCalSelect(\'' + ymd + '\')" style="position:relative;padding:6px 2px;text-align:center;font-size:12px;border-radius:6px;cursor:pointer;background:' + bg + ';color:' + color + ';border:' + border + ';min-height:32px;display:flex;flex-direction:column;align-items:center;justify-content:center">';
+        html += '<div>' + d + '</div>';
+        if (count > 0) {
+          var dotColor = isSelected ? '#fff' : '#ef4444';
+          html += '<div style="display:flex;gap:2px;margin-top:2px;align-items:center"><span style="width:5px;height:5px;border-radius:50%;background:' + dotColor + '"></span>';
+          if (count > 1) html += '<span style="font-size:9px;color:' + (isSelected ? '#fff' : 'var(--fg-muted)') + '">' + count + '</span>';
+          html += '</div>';
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+
+      // Selected day task list
+      if (_dashCalSelected) {
+        var list = (tasksByDate[_dashCalSelected] || []);
+        html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-light)">';
+        var d2 = new Date(_dashCalSelected);
+        html += '<div style="font-size:12px;font-weight:600;color:var(--fg-muted);margin-bottom:6px">' + (d2.getMonth()+1) + '月' + d2.getDate() + '日 (' + list.length + ' 件)</div>';
+        if (list.length === 0) {
+          html += '<div style="font-size:12px;color:var(--fg-muted2);padding:4px 0">この日に締切のタスクはありません</div>';
+        } else {
+          list.sort(function(a,b){ return (a.title||'').localeCompare(b.title||''); });
+          list.forEach(function(t){
+            var proj = getProject(t.projectId);
+            var c = getProjectColor(t.projectId);
+            html += '<div onclick="navigate(\'task-detail\',{id:' + t.id + '})" style="padding:8px 10px;margin-bottom:4px;border:1px solid var(--border-light);border-radius:6px;display:flex;align-items:center;gap:8px;cursor:pointer;background:#fff">';
+            html += '<span style="width:6px;height:6px;border-radius:50%;background:' + c.bg + ';flex-shrink:0"></span>';
+            html += '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500;' + (t.done ? 'text-decoration:line-through;opacity:.5' : '') + '">' + escapeHtml(t.title) + '</div>';
+            if (proj) html += '<div style="font-size:10px;color:var(--fg-muted)">' + escapeHtml(proj.name) + '</div>';
+            html += '</div></div>';
+          });
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+      return html;
+    }
+
     function renderMobileHome(el) {
       // Today's tasks view for mobile
       const allTasks = [];
@@ -1735,6 +1834,8 @@
       });
 
       let html = '';
+      // タスク締切カレンダー (ダッシュボード上部)
+      html += buildDeadlineCalendarHtml();
       // Today's tasks card
       html += `<div class="mobile-today-card">`;
       html += `<h3><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>今日のタスク</h3>`;
@@ -1863,6 +1964,8 @@
         let html = `<div class="page-header"><h1 class="page-title">マップ</h1>
         <div class="zoom-controls"><button onclick="changeMapZoom(-0.1)">-</button><span id="zoom-level">${Math.round(mapZoom*100)}%</span><button onclick="changeMapZoom(0.1)">+</button></div></div>`;
         html += `<div class="breadcrumb"><span class="breadcrumb-item" onclick="navigate('home')">マップ</span></div>`;
+        // タスク締切カレンダー (マップ上部)
+        html += '<div style="max-width:560px;margin:0 0 16px">' + buildDeadlineCalendarHtml() + '</div>';
         html += `<div class="mindmap-viewport" id="mindmap-viewport"><svg class="mindmap-svg" id="mindmap-svg"></svg>`;
         html += `<div class="mindmap-inner" id="mindmap-inner" style="transform:scale(${mapZoom})">`;
         (function(){
