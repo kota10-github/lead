@@ -1908,7 +1908,10 @@
       document.body.style.overflow = 'hidden';
       document.documentElement.style.overflow = 'hidden';
       var isMobile = window.innerWidth <= 768;
-      var topPx = isMobile ? 56 : 0;  // mobile-header 高さ
+      // mobile-header の実際の bottom を測って (margin 含む) その下に配置。
+      // offsetHeight だけだと margin が含まれず被るので rect.bottom 採用 + 余白 4px。
+      var mh = document.querySelector('.mobile-header');
+      var topPx = isMobile ? ((mh ? Math.ceil(mh.getBoundingClientRect().bottom) : 56) + 4) : 0;
       var leftPx = isMobile ? 0 : 220; // PC sidebar 幅
       // position:fixed でビューポートに直接張り付け → main-area の padding や
       // 兄弟要素に影響されず、ドキュメントスクロールも発生しない。
