@@ -1974,10 +1974,11 @@
       // offsetHeight だけだと margin が含まれず被るので rect.bottom 採用 + 余白 4px。
       var mh = document.querySelector('.mobile-header');
       var topPx = isMobile ? ((mh ? Math.ceil(mh.getBoundingClientRect().bottom) : 56) + 4) : 0;
-      var leftPx = isMobile ? 0 : 220; // PC sidebar 幅
+      // PC は CSS 変数 --sidebar-w (260px) の右側から始める
+      var leftVal = isMobile ? '0px' : 'var(--sidebar-w, 260px)';
       // position:fixed でビューポートに直接張り付け → main-area の padding や
       // 兄弟要素に影響されず、ドキュメントスクロールも発生しない。
-      var html = '<div class="gcal-full-page" style="position:fixed;top:' + topPx + 'px;left:' + leftPx + 'px;right:0;bottom:0;display:flex;flex-direction:column;background:#fff;overflow:hidden;touch-action:pan-y;z-index:5">';
+      var html = '<div class="gcal-full-page" style="position:fixed;top:' + topPx + 'px;left:' + leftVal + ';right:0;bottom:0;display:flex;flex-direction:column;background:#fff;overflow:hidden;touch-action:pan-y;z-index:5">';
       html += buildDeadlineCalendarHtml();
       html += '</div>';
       el.innerHTML = html;
