@@ -1273,10 +1273,10 @@
     //   Q3: 非重要×  緊急  → 委譲する  (橙)
     //   Q4: 非重要× 非緊急  → 削減する  (灰)
     var MATRIX_META = {
-      1: { name: '重要・緊急',     sub: '今すぐ実行', bg: '#ef4444', light: '#fef2f2' },
-      2: { name: '重要・非緊急',   sub: '計画する',   bg: '#3b82f6', light: '#eff6ff' },
-      3: { name: '非重要・緊急',   sub: '委譲する',   bg: '#f59e0b', light: '#fffbeb' },
-      4: { name: '非重要・非緊急', sub: '削減する',   bg: '#94a3b8', light: '#f1f5f9' }
+      1: { name: '重要・緊急',     sub: '今すぐ処理', hint: 'トラブル/締切当日 — 多いのは設計ミス',           bg: '#ef4444', light: '#fef2f2' },
+      2: { name: '重要・非緊急',   sub: '先に確保',   hint: '戦略/仕組化/教育 — 成果はここから生まれる',     bg: '#3b82f6', light: '#eff6ff' },
+      3: { name: '非重要・緊急',   sub: '任せる/断る', hint: '他人の都合 — 仕組化・委任で減らす',              bg: '#f59e0b', light: '#fffbeb' },
+      4: { name: '非重要・非緊急', sub: '削減/回復',  hint: '無駄は削る、休むなら意図的に',                  bg: '#94a3b8', light: '#f1f5f9' }
     };
     function getMatrixColor(q) {
       var m = MATRIX_META[q];
@@ -4253,9 +4253,12 @@
       [2, 1, 4, 3].forEach(function(q){
         var meta = MATRIX_META[q];
         html += '<div data-q="' + q + '" ondragover="matrixCellDragOver(event,' + q + ')" ondragleave="this.classList.remove(\'drop-target\')" ondrop="matrixCellDrop(event,' + q + ')" style="background:' + meta.light + ';border:1px solid ' + meta.bg + ';border-radius:8px;padding:10px;display:flex;flex-direction:column;overflow:hidden">';
-        html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid ' + meta.bg + '33">';
-        html += '<div style="font-size:13px;font-weight:700;color:' + meta.bg + '">' + meta.name + '</div>';
-        html += '<div style="font-size:11px;color:' + meta.bg + ';font-weight:500">' + meta.sub + ' · ' + byQ[q].length + '</div>';
+        html += '<div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid ' + meta.bg + '33">';
+        html += '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">';
+        html += '<div><span style="font-size:13px;font-weight:700;color:' + meta.bg + '">' + meta.name + '</span> <span style="font-size:11px;color:' + meta.bg + ';font-weight:500;margin-left:4px">' + meta.sub + '</span></div>';
+        html += '<div style="font-size:11px;color:' + meta.bg + ';font-weight:600">' + byQ[q].length + '</div>';
+        html += '</div>';
+        if (meta.hint) html += '<div style="font-size:10px;color:var(--fg-muted);margin-top:3px;line-height:1.3">' + escapeHtml(meta.hint) + '</div>';
         html += '</div>';
         html += '<div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px">';
         if (byQ[q].length === 0) {
@@ -5581,7 +5584,7 @@
         var bg = sel ? meta.bg : meta.light;
         var color = sel ? '#fff' : meta.bg;
         var border = '1px solid ' + meta.bg;
-        html += '<button onclick="setTaskMatrixQ(' + task.id + ',' + q + ')" style="padding:8px 6px;border-radius:6px;cursor:pointer;background:' + bg + ';color:' + color + ';border:' + border + ';font-size:11px;font-weight:600;text-align:center;line-height:1.3">' + escapeHtml(meta.name) + '<div style="font-size:10px;font-weight:400;opacity:.85;margin-top:2px">' + escapeHtml(meta.sub) + '</div></button>';
+        html += '<button onclick="setTaskMatrixQ(' + task.id + ',' + q + ')" title="' + escapeHtml(meta.hint || '') + '" style="padding:8px 6px;border-radius:6px;cursor:pointer;background:' + bg + ';color:' + color + ';border:' + border + ';font-size:11px;font-weight:600;text-align:center;line-height:1.3">' + escapeHtml(meta.name) + '<div style="font-size:10px;font-weight:400;opacity:.85;margin-top:2px">' + escapeHtml(meta.sub) + '</div></button>';
       });
       html += '</div>';
       if (task.matrixQ) {
