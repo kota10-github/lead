@@ -1079,6 +1079,11 @@
       return {};
     })();
     function navigate(page, params = {}) {
+      // ダッシュボードから他ページに移動する時、停止していた scroll を復活
+      if (currentPage === 'dashboard' && page !== 'dashboard') {
+        document.body.style.overflow = '';
+        document.documentElement.style.overflow = '';
+      }
       // Close sidebar on mobile navigation
       var sb = document.querySelector('.sidebar'); if (sb && sb.classList.contains('open')) { sb.classList.remove('open'); var ov = document.getElementById('sidebar-overlay'); if (ov) ov.remove(); document.body.style.overflow = ''; }
       // If leaving the manual edit form, force a final autosave + history snapshot
@@ -1807,12 +1812,9 @@
       var totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
       var isWide = window.innerWidth >= 1024;
       var rows = totalCells / 7;
-      // 画面いっぱい使う (スクロール不要)
-      // PC: 150px 減 (top toolbar + 曜日行 余白)
-      // Mobile: mobile-header(56) + 月見出し行(48) + 曜日行(28) = 132px 減
-      var rowH = isWide
-        ? 'calc((100vh - 150px) / ' + rows + ')'
-        : 'calc((100vh - 132px) / ' + rows + ')';
+      // 画面いっぱい使う (スクロール不要)。flex:1 + grid-auto-rows:minmax(0,1fr)
+      // で残りスペースを行で平等に埋める (overflow しない)。
+      var rowH = 'minmax(0, 1fr)';
       var dateSize = isWide ? 13 : 11;
       var chipSize = isWide ? 12 : 10;
       var maxChips = isWide ? 6 : 2;
@@ -1901,12 +1903,16 @@
     }
 
     function renderMobileHome(el) {
-      // ダッシュボードはタスク締切カレンダーのみ (Google Cal 風)
-      // 画面ピッタリに収めるため高さ固定 + overflow hidden → スクロール不要
-      var vhMinus = window.innerWidth <= 768 ? 56 : 0; // mobile-header 分
-      // viewport の左右いっぱいに張り出す (main-area の padding を相殺)
-      // calc(100vw - sidebar) ではなく 100vw 全幅にして position 補正
-      var html = '<div class="gcal-full-page" style="display:flex;flex-direction:column;width:100vw;height:calc(100vh - ' + vhMinus + 'px);position:relative;left:50%;right:50%;margin-left:-50vw;margin-right:-50vw;margin-top:-16px;background:#fff;overflow:hidden;touch-action:pan-y">';
+      // ダッシュボード = カレンダーのみ。body の scroll を停止して
+      // 完全にスクロール不要にする。
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      var isMobile = window.innerWidth <= 768;
+      var topPx = isMobile ? 56 : 0;  // mobile-header 高さ
+      var leftPx = isMobile ? 0 : 220; // PC sidebar 幅
+      // position:fixed でビューポートに直接張り付け → main-area の padding や
+      // 兄弟要素に影響されず、ドキュメントスクロールも発生しない。
+      var html = '<div class="gcal-full-page" style="position:fixed;top:' + topPx + 'px;left:' + leftPx + 'px;right:0;bottom:0;display:flex;flex-direction:column;background:#fff;overflow:hidden;touch-action:pan-y;z-index:5">';
       html += buildDeadlineCalendarHtml();
       html += '</div>';
       el.innerHTML = html;
