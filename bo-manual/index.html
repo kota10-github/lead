@@ -829,6 +829,10 @@
           <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
           マニュアル
         </button>
+        <button class="nav-item" data-page="matrix" onclick="navigate('matrix')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="1"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+          マトリックス
+        </button>
         <div class="sidebar-section-label">設定</div>
         <button class="nav-item" data-page="users" onclick="navigate('users')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -1262,6 +1266,34 @@
     function getManualCountForProject(pid) { return data.manuals.filter(m => m && !m._deleted && m.projectId === pid).length; }
     function getManualsByProject(pid) { return data.manuals.filter(m => m && !m._deleted && m.projectId === pid); }
     function isLive(x) { return x && !x._deleted; }
+
+    // 緊急重要マトリックス (Eisenhower)。
+    //   Q1: 重要 ×  緊急  → 今すぐ実行 (赤)
+    //   Q2: 重要 × 非緊急  → 計画する  (青)
+    //   Q3: 非重要×  緊急  → 委譲する  (橙)
+    //   Q4: 非重要× 非緊急  → 削減する  (灰)
+    var MATRIX_META = {
+      1: { name: '重要・緊急',     sub: '今すぐ実行', bg: '#ef4444', light: '#fef2f2' },
+      2: { name: '重要・非緊急',   sub: '計画する',   bg: '#3b82f6', light: '#eff6ff' },
+      3: { name: '非重要・緊急',   sub: '委譲する',   bg: '#f59e0b', light: '#fffbeb' },
+      4: { name: '非重要・非緊急', sub: '削減する',   bg: '#94a3b8', light: '#f1f5f9' }
+    };
+    function getMatrixColor(q) {
+      var m = MATRIX_META[q];
+      return m ? { bg: m.bg, light: m.light, text: m.bg } : null;
+    }
+    function setTaskMatrixQ(taskId, q) {
+      var t = (data.projectTasks || []).find(function(x){ return x.id === taskId && !x._deleted; });
+      if (!t) return;
+      var newQ = (q === 1 || q === 2 || q === 3 || q === 4) ? q : null;
+      if (t.matrixQ === newQ) return;
+      t.matrixQ = newQ;
+      t._modTs = bumpModTs(t._modTs);
+      markDirty('projectTasks', t.id);
+      saveData();
+      render();
+    }
+    window.setTaskMatrixQ = setTaskMatrixQ;
     // Map: "+ ボタン" → 3 択ポップアップ (マニュアル / タスク / サブプロジェクト)
     function showAddOptionsPopup(anchorBtn, projectId, kind) {
       // Close any existing popups
@@ -1438,6 +1470,7 @@
         case 'manual-detail': renderManualDetail(main); break;
         case 'manual-form': renderManualForm(main); break;
         case 'tasks': renderMyTasks(main); break;
+        case 'matrix': renderMatrix(main); break;
         case 'goals': renderGoals(main); break;
         case 'todos': renderTodos(main); break;
         case 'task-detail': renderProjectTaskDetail(main); break;
@@ -1885,12 +1918,15 @@
         // Task chips (drag 可能、PC では hold-drag で別日に移動)
         var shown = dayTasks.slice(0, maxChips);
         shown.forEach(function(t){
+          // matrixQ があればその色を優先 (緊急重要)、なければプロジェクト色
+          var mc = getMatrixColor(t.matrixQ);
           var pc = getProjectColor(t.projectId);
+          var chipBg = mc ? mc.bg : pc.bg;
           html += '<div class="dash-cal-task" data-task="' + t.id + '" draggable="true"' +
             ' ondragstart="gcalTaskDragStart(event,' + t.id + ')"' +
             ' ondragend="gcalTaskDragEnd(event)"' +
             ' onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})" title="' + escapeHtml(t.title) + '"' +
-            ' style="display:flex;align-items:center;gap:4px;padding:1px 6px;background:' + pc.bg + ';color:#fff;border-radius:3px;font-size:' + chipSize + 'px;line-height:1.35;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(t.title) + '</div>';
+            ' style="display:flex;align-items:center;gap:4px;padding:1px 6px;background:' + chipBg + ';color:#fff;border-radius:3px;font-size:' + chipSize + 'px;line-height:1.35;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(t.title) + '</div>';
         });
         if (count > maxChips) {
           html += '<div style="font-size:' + (chipSize - 1) + 'px;color:var(--fg-muted);padding:1px 6px">他 ' + (count - maxChips) + ' 件</div>';
@@ -2159,13 +2195,17 @@
           var kids = getChildTasks(t.id).filter(function(k){ return !k.done; });
           html += '<div class="sub-tree-row" data-task="' + t.id + '">';
           html += '<div class="sub-tree-card-wrap">';
+          // matrixQ があれば色をその quadrant カラーで上書き
+          var mc = getMatrixColor(t.matrixQ);
+          var taskBorder = t.done ? '#059669' : (mc ? mc.bg : color.bg);
+          var taskBg = mc ? mc.light : color.light;
           html += '<div class="node-manual" data-node="task-' + t.id + '" draggable="true"' +
             ' ondragstart="handleTaskDragStart(event,' + t.id + ')"' +
             ' ondragend="handleTaskDragEnd(event)"' +
             ' ondragover="handleTaskDragOver(event,' + t.id + ')"' +
             ' ondragleave="this.classList.remove(\'drop-target\',\'drop-before\',\'drop-after\')"' +
             ' ondrop="handleTaskDrop(event,' + t.id + ')"' +
-            ' style="border-left:3px solid ' + (t.done ? '#059669' : color.bg) + ';background:' + color.light + ';opacity:' + (t.done ? '.5' : '1') + ';cursor:pointer" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})">';
+            ' style="border-left:3px solid ' + taskBorder + ';background:' + taskBg + ';opacity:' + (t.done ? '.5' : '1') + ';cursor:pointer" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})">';
           html += '<div class="node-manual-title" style="color:' + color.bg + ';display:flex;align-items:center;gap:6px">';
           html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:24px;height:24px;font-size:10px" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
           html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>' + dueBadgeHtml(t);
@@ -4186,6 +4226,105 @@
     }
     window.toggleTaskTreeNode = toggleTaskTreeNode;
 
+    // ===== 緊急重要マトリックス =====
+    function renderMatrix(el) {
+      var liveTasks = (data.projectTasks || []).filter(function(t){ return t && !t._deleted && !t.done; });
+      // q -> tasks
+      var byQ = {1:[], 2:[], 3:[], 4:[], 0:[]}; // 0 = unassigned
+      liveTasks.forEach(function(t){
+        var q = (t.matrixQ === 1 || t.matrixQ === 2 || t.matrixQ === 3 || t.matrixQ === 4) ? t.matrixQ : 0;
+        byQ[q].push(t);
+      });
+      var html = '<div class="page-header"><h1 class="page-title">緊急重要マトリックス</h1></div>';
+      html += renderBreadcrumb();
+      // Layout: 2x2 with axis labels
+      html += '<div style="display:grid;grid-template-columns:32px 1fr;grid-template-rows:32px 1fr 32px;gap:0;height:calc(100vh - 200px);min-height:500px;margin-bottom:16px">';
+      // top-left blank
+      html += '<div></div>';
+      // top axis label "緊急 →"
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:0 12px;font-size:12px;color:var(--fg-muted);font-weight:600"><span>← 緊急ではない</span><span>緊急 →</span></div>';
+      // left axis label (rotated) "↑ 重要"
+      html += '<div style="display:flex;align-items:center;justify-content:center;writing-mode:vertical-rl;transform:rotate(180deg);font-size:12px;color:var(--fg-muted);font-weight:600">重要 ↑</div>';
+      // 2x2 inner grid
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:8px">';
+      // Order: top-left = Q2 (重要×非緊急), top-right = Q1 (重要×緊急)
+      //        bot-left = Q4 (非重要×非緊急), bot-right = Q3 (非重要×緊急)
+      [2, 1, 4, 3].forEach(function(q){
+        var meta = MATRIX_META[q];
+        html += '<div data-q="' + q + '" ondragover="matrixCellDragOver(event,' + q + ')" ondragleave="this.classList.remove(\'drop-target\')" ondrop="matrixCellDrop(event,' + q + ')" style="background:' + meta.light + ';border:1px solid ' + meta.bg + ';border-radius:8px;padding:10px;display:flex;flex-direction:column;overflow:hidden">';
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid ' + meta.bg + '33">';
+        html += '<div style="font-size:13px;font-weight:700;color:' + meta.bg + '">' + meta.name + '</div>';
+        html += '<div style="font-size:11px;color:' + meta.bg + ';font-weight:500">' + meta.sub + ' · ' + byQ[q].length + '</div>';
+        html += '</div>';
+        html += '<div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px">';
+        if (byQ[q].length === 0) {
+          html += '<div style="font-size:11px;color:var(--fg-muted2);text-align:center;padding:20px 0">タスクをここにドロップ</div>';
+        } else {
+          byQ[q].sort(function(a,b){ return (a.title||'').localeCompare(b.title||''); });
+          byQ[q].forEach(function(t){
+            var pc = getProjectColor(t.projectId);
+            var proj = getProject(t.projectId);
+            html += '<div class="matrix-task" draggable="true" ondragstart="matrixTaskDragStart(event,' + t.id + ')" ondragend="matrixTaskDragEnd(event)" onclick="navigate(\'task-detail\',{id:' + t.id + '})" style="background:#fff;border-left:4px solid ' + meta.bg + ';border-radius:6px;padding:6px 10px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.04)">';
+            html += '<div style="font-size:13px;font-weight:500;color:var(--fg)">' + escapeHtml(t.title) + '</div>';
+            if (proj) html += '<div style="font-size:10px;color:var(--fg-muted);display:flex;align-items:center;gap:4px;margin-top:2px"><span style="width:6px;height:6px;border-radius:50%;background:' + pc.bg + '"></span>' + escapeHtml(proj.name) + '</div>';
+            html += '</div>';
+          });
+        }
+        html += '</div></div>';
+      });
+      html += '</div>'; // 2x2
+      // bottom-left blank
+      html += '<div></div>';
+      // bottom axis arrow / spacer
+      html += '<div></div>';
+      html += '</div>'; // outer grid
+
+      // Unassigned bin (タスクをまだマトリックスに置いていない)
+      if (byQ[0].length > 0) {
+        html += '<div data-q="0" ondragover="matrixCellDragOver(event,0)" ondragleave="this.classList.remove(\'drop-target\')" ondrop="matrixCellDrop(event,0)" style="margin-top:8px;padding:12px;border:1px dashed var(--border);border-radius:8px;background:#fafafa">';
+        html += '<div style="font-size:12px;font-weight:600;color:var(--fg-muted);margin-bottom:8px">未分類 (' + byQ[0].length + ')</div>';
+        html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+        byQ[0].forEach(function(t){
+          var pc = getProjectColor(t.projectId);
+          html += '<div class="matrix-task" draggable="true" ondragstart="matrixTaskDragStart(event,' + t.id + ')" ondragend="matrixTaskDragEnd(event)" onclick="navigate(\'task-detail\',{id:' + t.id + '})" style="background:#fff;border:1px solid var(--border);border-left:4px solid ' + pc.bg + ';border-radius:6px;padding:6px 10px;cursor:pointer;font-size:13px">' + escapeHtml(t.title) + '</div>';
+        });
+        html += '</div></div>';
+      }
+      el.innerHTML = html;
+    }
+    function matrixTaskDragStart(e, taskId) {
+      e.stopPropagation();
+      e.dataTransfer.setData('application/x-matrix-task', String(taskId));
+      e.dataTransfer.effectAllowed = 'move';
+      window._matrixDragTaskId = taskId;
+      e.currentTarget.style.opacity = '0.4';
+    }
+    function matrixTaskDragEnd(e) {
+      e.currentTarget.style.opacity = '';
+      document.querySelectorAll('[data-q].drop-target').forEach(function(el){ el.classList.remove('drop-target'); });
+      window._matrixDragTaskId = null;
+    }
+    function matrixCellDragOver(e, q) {
+      if (window._matrixDragTaskId == null) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'move';
+      e.currentTarget.classList.add('drop-target');
+    }
+    function matrixCellDrop(e, q) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.currentTarget.classList.remove('drop-target');
+      var taskId = Number(e.dataTransfer.getData('application/x-matrix-task'));
+      if (!taskId) return;
+      setTaskMatrixQ(taskId, q === 0 ? null : q);
+      toast('マトリックスを更新しました');
+    }
+    window.matrixTaskDragStart = matrixTaskDragStart;
+    window.matrixTaskDragEnd = matrixTaskDragEnd;
+    window.matrixCellDragOver = matrixCellDragOver;
+    window.matrixCellDrop = matrixCellDrop;
+
     function renderTodos(el) {
       var collapsed = _loadCollapsed();
       var tasks = (data.projectTasks || []).filter(isLive);
@@ -5431,6 +5570,22 @@
       // Status
       html += '<div class="info-section"><div class="info-section-label"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>ステータス</div>';
       html += '<span class="badge ' + (task.done ? 'badge-primary' : 'badge-secondary') + '">' + (task.done ? '完了' : '未完了') + '</span>';
+      html += '</div>';
+      // 緊急重要マトリックス 4 択
+      html += '<div class="info-section"><div class="info-section-label"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="1"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="12" y1="3" x2="12" y2="21"/></svg>緊急重要マトリックス</div>';
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;max-width:280px">';
+      [2, 1, 4, 3].forEach(function(q){
+        var meta = MATRIX_META[q];
+        var sel = task.matrixQ === q;
+        var bg = sel ? meta.bg : meta.light;
+        var color = sel ? '#fff' : meta.bg;
+        var border = '1px solid ' + meta.bg;
+        html += '<button onclick="setTaskMatrixQ(' + task.id + ',' + q + ')" style="padding:8px 6px;border-radius:6px;cursor:pointer;background:' + bg + ';color:' + color + ';border:' + border + ';font-size:11px;font-weight:600;text-align:center;line-height:1.3">' + escapeHtml(meta.name) + '<div style="font-size:10px;font-weight:400;opacity:.85;margin-top:2px">' + escapeHtml(meta.sub) + '</div></button>';
+      });
+      html += '</div>';
+      if (task.matrixQ) {
+        html += '<button onclick="setTaskMatrixQ(' + task.id + ',null)" style="margin-top:6px;background:none;border:none;color:var(--fg-muted);font-size:11px;cursor:pointer;padding:0">未分類に戻す</button>';
+      }
       html += '</div>';
       // Parent task (if child)
       if (task.parentTaskId) {
