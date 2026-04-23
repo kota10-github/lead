@@ -1904,7 +1904,9 @@
       // ダッシュボードはタスク締切カレンダーのみ (Google Cal 風)
       // 画面ピッタリに収めるため高さ固定 + overflow hidden → スクロール不要
       var vhMinus = window.innerWidth <= 768 ? 56 : 0; // mobile-header 分
-      var html = '<div class="gcal-full-page" style="display:flex;flex-direction:column;width:100%;height:calc(100vh - ' + vhMinus + 'px);margin:-16px -16px 0 -16px;background:#fff;overflow:hidden;touch-action:pan-y">';
+      // viewport の左右いっぱいに張り出す (main-area の padding を相殺)
+      // calc(100vw - sidebar) ではなく 100vw 全幅にして position 補正
+      var html = '<div class="gcal-full-page" style="display:flex;flex-direction:column;width:100vw;height:calc(100vh - ' + vhMinus + 'px);position:relative;left:50%;right:50%;margin-left:-50vw;margin-right:-50vw;margin-top:-16px;background:#fff;overflow:hidden;touch-action:pan-y">';
       html += buildDeadlineCalendarHtml();
       html += '</div>';
       el.innerHTML = html;
