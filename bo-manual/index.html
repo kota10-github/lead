@@ -829,7 +829,7 @@
           <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
           マニュアル
         </button>
-        <button class="nav-item" data-page="matrix" onclick="navigate('matrix')">
+        <button class="nav-item nav-item-matrix" data-page="matrix" onclick="navigate('matrix')" style="display:none">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="1"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
           マトリックス
         </button>
@@ -1272,6 +1272,15 @@
     //   Q2: 重要 × 非緊急  → 計画する  (青)
     //   Q3: 非重要×  緊急  → 委譲する  (橙)
     //   Q4: 非重要× 非緊急  → 削減する  (灰)
+    // マトリックス機能 ON/OFF フラグ。false で UI 非表示・データは保持。
+    // 再度 true にすれば全機能 (サイドバータブ / タスク詳細 4 択 /
+    // カレンダー & マップの色オーバーライド) が復活する。
+    var MATRIX_ENABLED = false;
+    // フラグに応じてサイドバータブの可視化 (DOM 読み込み後)
+    setTimeout(function(){
+      var navEl = document.querySelector('.nav-item-matrix');
+      if (navEl) navEl.style.display = MATRIX_ENABLED ? '' : 'none';
+    }, 0);
     var MATRIX_META = {
       1: { name: '重要・緊急',     sub: '今すぐ処理', hint: 'トラブル/締切当日 — 多いのは設計ミス',           bg: '#ef4444', light: '#fef2f2' },
       2: { name: '重要・非緊急',   sub: '先に確保',   hint: '戦略/仕組化/教育 — 成果はここから生まれる',     bg: '#3b82f6', light: '#eff6ff' },
@@ -1483,7 +1492,9 @@
         case 'manual-detail': renderManualDetail(main); break;
         case 'manual-form': renderManualForm(main); break;
         case 'tasks': renderMyTasks(main); break;
-        case 'matrix': renderMatrix(main); break;
+        case 'matrix':
+          if (!MATRIX_ENABLED) { navigate(window.innerWidth <= 768 ? 'dashboard' : 'home'); return; }
+          renderMatrix(main); break;
         case 'goals': renderGoals(main); break;
         case 'todos': renderTodos(main); break;
         case 'task-detail': renderProjectTaskDetail(main); break;
@@ -1932,7 +1943,7 @@
         var shown = dayTasks.slice(0, maxChips);
         shown.forEach(function(t){
           // matrixQ があればその色を優先 (緊急重要)、なければプロジェクト色
-          var mc = getMatrixColor(t.matrixQ);
+          var mc = MATRIX_ENABLED ? getMatrixColor(t.matrixQ) : null;
           var pc = getProjectColor(t.projectId);
           var chipBg = mc ? mc.bg : pc.bg;
           html += '<div class="dash-cal-task" data-task="' + t.id + '" draggable="true"' +
@@ -2209,7 +2220,7 @@
           html += '<div class="sub-tree-row" data-task="' + t.id + '">';
           html += '<div class="sub-tree-card-wrap">';
           // matrixQ があれば色をその quadrant カラーで上書き
-          var mc = getMatrixColor(t.matrixQ);
+          var mc = MATRIX_ENABLED ? getMatrixColor(t.matrixQ) : null;
           var taskBorder = t.done ? '#059669' : (mc ? mc.bg : color.bg);
           var taskBg = mc ? mc.light : color.light;
           html += '<div class="node-manual" data-node="task-' + t.id + '" draggable="true"' +
@@ -5591,7 +5602,8 @@
       html += '<div class="info-section"><div class="info-section-label"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>ステータス</div>';
       html += '<span class="badge ' + (task.done ? 'badge-primary' : 'badge-secondary') + '">' + (task.done ? '完了' : '未完了') + '</span>';
       html += '</div>';
-      // 緊急重要マトリックス 4 択
+      // 緊急重要マトリックス 4 択 (MATRIX_ENABLED で UI 表示切替)
+      if (MATRIX_ENABLED) {
       html += '<div class="info-section"><div class="info-section-label"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="1"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="12" y1="3" x2="12" y2="21"/></svg>緊急重要マトリックス</div>';
       html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;max-width:280px">';
       [2, 1, 4, 3].forEach(function(q){
@@ -5607,6 +5619,7 @@
         html += '<button onclick="setTaskMatrixQ(' + task.id + ',null)" style="margin-top:6px;background:none;border:none;color:var(--fg-muted);font-size:11px;cursor:pointer;padding:0">未分類に戻す</button>';
       }
       html += '</div>';
+      } // end MATRIX_ENABLED
       // Parent task (if child)
       if (task.parentTaskId) {
         var parent = (data.projectTasks || []).find(function(x){ return isLive(x) && x.id === task.parentTaskId; });
