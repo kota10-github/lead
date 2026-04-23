@@ -4251,7 +4251,7 @@
       var html = '<div class="page-header"><h1 class="page-title">緊急重要マトリックス</h1></div>';
       html += renderBreadcrumb();
       // Layout: 2x2 with axis labels
-      html += '<div style="display:grid;grid-template-columns:32px 1fr;grid-template-rows:32px 1fr 32px;gap:0;height:calc(100vh - 200px);min-height:500px;margin-bottom:16px">';
+      html += '<div style="display:grid;grid-template-columns:32px 1fr;grid-template-rows:32px 1fr;gap:0;min-height:min(70vh, 640px);margin-bottom:16px;position:relative;isolation:isolate">';
       // top-left blank
       html += '<div></div>';
       // top axis label "緊急 →"
@@ -4290,17 +4290,16 @@
         html += '</div></div>';
       });
       html += '</div>'; // 2x2
-      // bottom-left blank
-      html += '<div></div>';
-      // bottom axis arrow / spacer
-      html += '<div></div>';
       html += '</div>'; // outer grid
 
       // Unassigned bin (タスクをまだマトリックスに置いていない)
+      // clear:both + 明確な境界でグリッドと重ならないよう強制
       if (byQ[0].length > 0) {
-        html += '<div data-q="0" ondragover="matrixCellDragOver(event,0)" ondragleave="this.classList.remove(\'drop-target\')" ondrop="matrixCellDrop(event,0)" style="margin-top:8px;padding:12px;border:1px dashed var(--border);border-radius:8px;background:#fafafa">';
+        html += '<div style="clear:both;height:0"></div>';
+        html += '<div data-q="0" ondragover="matrixCellDragOver(event,0)" ondragleave="this.classList.remove(\'drop-target\')" ondrop="matrixCellDrop(event,0)" style="margin-top:16px;padding:12px;border:1px dashed var(--border);border-radius:8px;background:#fafafa;position:relative;z-index:1">';
         html += '<div style="font-size:12px;font-weight:600;color:var(--fg-muted);margin-bottom:8px">未分類 (' + byQ[0].length + ')</div>';
-        html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+        // タスクは縦にスタックして重なり防止 (横並び wrap だと浮いた pill のように見える)
+        html += '<div style="display:flex;flex-direction:column;gap:6px">';
         byQ[0].forEach(function(t){
           var pc = getProjectColor(t.projectId);
           var projPath = _getProjectPathLabel(t.projectId);
