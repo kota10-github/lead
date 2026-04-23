@@ -1963,10 +1963,12 @@
     }
 
     function renderMobileHome(el) {
-      // ダッシュボード = カレンダーのみ。body の scroll を停止して
-      // 完全にスクロール不要にする。
-      document.body.style.overflow = 'hidden';
-      document.documentElement.style.overflow = 'hidden';
+      // ダッシュボード = カレンダーのみ。
+      // body overflow:hidden にすると iOS Safari で sticky な mobile-header
+      // が消えてしまうため、代わりに html の overscroll-behavior で制御する。
+      document.documentElement.style.overscrollBehavior = 'none';
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
       var isMobile = window.innerWidth <= 768;
       // mobile-header の実際の bottom を測って (margin 含む) その下に配置。
       // offsetHeight だけだと margin が含まれず被るので rect.bottom 採用 + 余白 4px。
