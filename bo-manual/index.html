@@ -308,7 +308,7 @@
       .mobile-side-panel .mobile-toc a{display:block;padding:6px 8px;font-size:13px;color:var(--fg-muted);border-radius:4px;line-height:1.4;cursor:pointer;text-decoration:none}
       .mobile-side-panel .mobile-toc a:hover{color:var(--primary);background:var(--primary-light)}
     }
-    .doc-title{font-size:28px;font-weight:700;letter-spacing:-0.02em;margin-bottom:16px}
+    .doc-title{font-size:28px;font-weight:700;letter-spacing:-0.02em;margin-bottom:16px;word-break:break-word;overflow-wrap:anywhere;white-space:normal;line-height:1.25}
     .doc-assignees{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:32px}
     /* Prose content */
     .prose{line-height:1.8;color:var(--fg)}
@@ -1087,6 +1087,7 @@
       if (currentPage === 'dashboard' && page !== 'dashboard') {
         document.body.style.overflow = '';
         document.documentElement.style.overflow = '';
+        document.documentElement.style.overscrollBehavior = '';
       }
       // Close sidebar on mobile navigation
       var sb = document.querySelector('.sidebar'); if (sb && sb.classList.contains('open')) { sb.classList.remove('open'); var ov = document.getElementById('sidebar-overlay'); if (ov) ov.remove(); document.body.style.overflow = ''; }
@@ -1498,6 +1499,8 @@
         case 'goals': renderGoals(main); break;
         case 'todos': renderTodos(main); break;
         case 'task-detail': renderProjectTaskDetail(main); break;
+        case 'day-tasks': renderDayTasks(main); break;
+        case 'day-tasks': renderDayTasks(main); break;
       case 'todo-detail': renderTodoDetail(main); break;
       case 'daily-detail': renderDailyDetail(main); break;
       case 'goal-detail': renderGoalDetail(main); break;
@@ -1845,9 +1848,10 @@
     window.gcalCellDragOver = gcalCellDragOver;
     window.gcalCellDrop = gcalCellDrop;
     function dashCalSelect(ymd) {
-      _dashCalSelected = (_dashCalSelected === ymd) ? null : ymd;
+      // 日付クリックで day-tasks ページに遷移 (その日のタスクをリスト表示)
+      _dashCalSelected = ymd;
       _saveDashCalState();
-      render();
+      navigate('day-tasks', { ymd: ymd });
     }
     window.dashCalPrev = dashCalPrev;
     window.dashCalNext = dashCalNext;
@@ -1933,7 +1937,7 @@
         var cellBg = outOfMonth ? '#fafafa' : (isSelected ? 'rgba(37,99,235,.05)' : '#fff');
         var borders = 'border-bottom:1px solid var(--border-light);' + (isRightEdge ? '' : 'border-right:1px solid var(--border-light);');
         // Cell: PC は日付中央、モバイルは中央上 (Google Cal mobile スタイル)
-        html += '<div data-ymd="' + ymd + '" ondragover="gcalCellDragOver(event)" ondragleave="this.classList.remove(\'drop-target\')" ondrop="gcalCellDrop(event, \'' + ymd + '\')" onclick="dashCalSelect(\'' + ymd + '\')" style="position:relative;padding:4px 3px 2px;cursor:pointer;background:' + cellBg + ';' + borders + ';overflow:hidden;display:flex;flex-direction:column;gap:2px;min-height:0">';
+        html += '<div data-ymd="' + ymd + '" ondragover="gcalCellDragOver(event)" ondragleave="this.classList.remove(\'drop-target\')" ondrop="gcalCellDrop(event, \'' + ymd + '\')" onclick="navigate(\'day-tasks\',{ymd:\'' + ymd + '\'})" style="position:relative;padding:4px 3px 2px;cursor:pointer;background:' + cellBg + ';' + borders + ';overflow:hidden;display:flex;flex-direction:column;gap:2px;min-height:0">';
         var numColor = outOfMonth ? 'var(--fg-muted2)' : (isToday ? '#fff' : (col === 0 ? '#ef4444' : (col === 6 ? '#2563eb' : 'var(--fg)')));
         var numBg = isToday ? '#1a73e8' : 'transparent';
         html += '<div style="display:flex;justify-content:center;padding:2px 0 2px">';
@@ -1961,6 +1965,82 @@
       html += '</div>'; // wrap
       return html;
     }
+
+    // カレンダーの日付クリック → 選択日のタスク一覧画面
+    function renderDayTasks(el) {
+      var ymd = pageParams.ymd;
+      if (!ymd) { navigate('dashboard'); return; }
+      var d = new Date(ymd);
+      var dateLabel = d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日';
+      var dowLabels = ['日','月','火','水','木','金','土'];
+      var dowColors = ['#ef4444','#64748b','#64748b','#64748b','#64748b','#64748b','#2563eb'];
+      var dowLabel = dowLabels[d.getDay()];
+      var dowColor = dowColors[d.getDay()];
+      // live + dueDate 一致 + not done (カレンダーと同条件で完了は非表示)
+      var list = (data.projectTasks || []).filter(function(t){
+        return t && !t._deleted && !t.done && t.dueDate === ymd;
+      });
+      list.sort(function(a,b){ return (a.title||'').localeCompare(b.title||''); });
+      var html = '<div style="max-width:720px;margin:0 auto">';
+      html += '<button class="btn btn-ghost btn-sm" style="margin-bottom:8px" onclick="navigate(\'dashboard\')">' + icons.arrowLeft + ' カレンダーへ戻る</button>';
+      html += '<h1 class="page-title" style="display:flex;align-items:baseline;gap:10px;margin-bottom:16px">' + dateLabel + ' <span style="font-size:14px;color:' + dowColor + ';font-weight:500">' + dowLabel + '</span> <span style="font-size:13px;color:var(--fg-muted2);font-weight:400">' + list.length + ' 件</span></h1>';
+      if (list.length === 0) {
+        html += '<div class="empty" style="padding:40px 20px;text-align:center;color:var(--fg-muted2);font-size:14px">この日に締切のタスクはありません</div>';
+      } else {
+        html += '<div style="display:flex;flex-direction:column;gap:8px">';
+        list.forEach(function(t){
+          var pc = getProjectColor(t.projectId);
+          var projPath = (typeof _getProjectPathLabel === 'function') ? _getProjectPathLabel(t.projectId) : '';
+          html += '<div onclick="navigate(\'task-detail\',{id:' + t.id + '})" style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#fff;border:1px solid var(--border-light);border-left:4px solid ' + pc.bg + ';border-radius:8px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.03)">';
+          html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:22px;height:22px;flex-shrink:0" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
+          html += '<div style="flex:1;min-width:0">';
+          if (projPath) html += '<div style="font-size:11px;color:var(--fg-muted2);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(projPath) + '</div>';
+          html += '<div style="font-size:15px;font-weight:500;color:var(--fg);word-break:break-word">' + escapeHtml(t.title) + '</div>';
+          html += '</div>';
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+      html += '</div>';
+      el.innerHTML = html;
+    }
+    window.renderDayTasks = renderDayTasks;
+
+    // 指定日のタスク一覧ページ (カレンダーから遷移)
+    function renderDayTasks(el) {
+      var ymd = (pageParams && pageParams.ymd) || '';
+      if (!ymd) { navigate(window.innerWidth <= 768 ? 'dashboard' : 'home'); return; }
+      var d = new Date(ymd);
+      var dateLabel = d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日';
+      var dayKanji = ['日','月','火','水','木','金','土'][d.getDay()];
+      // dueDate = ymd の live + 未完了 のタスク
+      var list = (data.projectTasks || []).filter(function(t){
+        return t && !t._deleted && !t.done && t.dueDate === ymd;
+      });
+      list.sort(function(a,b){ return (a.title||'').localeCompare(b.title||''); });
+      // カレンダーへ戻るボタン付き
+      var html = '<div style="padding:4px 0">';
+      html += '<button class="btn btn-ghost btn-sm mb-4" onclick="navigate(\'dashboard\')" style="padding-left:0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>カレンダーに戻る</button>';
+      html += '<h1 class="page-title" style="margin-bottom:8px">' + escapeHtml(dateLabel) + ' <span style="font-size:14px;font-weight:500;color:' + ((d.getDay()===0)?'#ef4444':(d.getDay()===6)?'#2563eb':'var(--fg-muted)') + '">(' + dayKanji + ')</span></h1>';
+      html += '<div style="font-size:12px;color:var(--fg-muted);margin-bottom:16px">' + list.length + ' 件のタスク</div>';
+      if (list.length === 0) {
+        html += '<div class="empty" style="padding:40px 0;color:var(--fg-muted2);text-align:center;font-size:13px">この日に締切のタスクはありません</div>';
+      } else {
+        html += '<div style="display:flex;flex-direction:column;gap:8px">';
+        list.forEach(function(t){
+          var pc = getProjectColor(t.projectId);
+          var projPath = _getProjectPathLabel(t.projectId);
+          html += '<div onclick="navigate(\'task-detail\',{id:' + t.id + '})" style="background:#fff;border:1px solid var(--border-light);border-left:4px solid ' + pc.bg + ';border-radius:8px;padding:12px 14px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.04)">';
+          if (projPath) html += '<div style="font-size:11px;color:var(--fg-muted2);margin-bottom:4px;display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:' + pc.bg + ';flex-shrink:0"></span>' + escapeHtml(projPath) + '</div>';
+          html += '<div style="font-size:14px;font-weight:500;color:var(--fg);word-break:break-word">' + escapeHtml(t.title) + '</div>';
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+      html += '</div>';
+      el.innerHTML = html;
+    }
+    window.renderDayTasks = renderDayTasks;
 
     function renderMobileHome(el) {
       // ダッシュボード = カレンダーのみ。
@@ -4637,7 +4717,9 @@
           var tte = document.getElementById('task-title-input');
           var tid = pageParams && pageParams.id;
           var tt = tid ? (data.projectTasks||[]).find(function(t){return isLive(t) && t.id===tid;}) : null;
-          if (tt && tte && tte.value.trim()) { tt.title = tte.value.trim(); tt._modTs = bumpModTs(tt._modTs); saveData(); }
+          var _val = tte ? (typeof tte.value === 'string' ? tte.value : (tte.textContent || '')) : '';
+          _val = _val.trim();
+          if (tt && _val) { tt.title = _val; tt._modTs = bumpModTs(tt._modTs); saveData(); }
         }
       } catch(e) {}
       if (typeof pushSyncNow === 'function') pushSyncNow();
@@ -5518,7 +5600,10 @@
       _taskTitleTimer = setTimeout(function() {
         var task = (data.projectTasks || []).find(function(t) { return isLive(t) && t.id === taskId; });
         var el = document.getElementById('task-title-input');
-        if (task && el && el.value.trim()) { task.title = el.value.trim(); task._modTs = bumpModTs(task._modTs); markDirty('projectTasks', task.id); saveData(); }
+        // contenteditable span: textContent、input: value の両方に対応
+        var val = el ? (typeof el.value === 'string' ? el.value : (el.textContent || '')) : '';
+        val = val.trim();
+        if (task && val) { task.title = val; task._modTs = bumpModTs(task._modTs); markDirty('projectTasks', task.id); saveData(); }
       }, 800);
     }
     var _taskMemoTimer = null;
@@ -5583,7 +5668,8 @@
       // Header
       html += '<div class="page-header"><h1 class="page-title" style="display:flex;align-items:center;gap:12px;flex:1;min-width:0">';
       html += '<div class="todo-checkbox ' + (task.done ? 'checked' : '') + '" onclick="toggleProjectTask(' + task.id + ')" style="flex-shrink:0">' + (task.done ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
-      html += '<input class="input" id="task-title-input" value="' + escapeHtml(task.title).replace(/"/g, '&quot;') + '" oninput="autoSaveTaskTitle(' + task.id + ')" style="font-size:22px;font-weight:600;letter-spacing:-0.02em;border:none;padding:0;background:transparent;flex:1;min-width:0;' + (task.done ? 'text-decoration:line-through;opacity:.5' : '') + '">';
+      // タイトルは contenteditable で折り返し対応 (モバイルで見切れを防止)
+      html += '<span id="task-title-input" contenteditable="true" oninput="autoSaveTaskTitle(' + task.id + ')" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}" style="font-size:22px;font-weight:600;letter-spacing:-0.02em;border:none;padding:0;background:transparent;flex:1;min-width:0;word-break:break-word;overflow-wrap:anywhere;white-space:normal;line-height:1.3;outline:none;' + (task.done ? 'text-decoration:line-through;opacity:.5' : '') + '">' + escapeHtml(task.title) + '</span>';
       html += '</h1>';
       html += '<button class="btn btn-destructive btn-sm" onclick="if(confirm(\'このタスクを削除しますか？\')){deleteProjectTask(' + task.id + ');navigate(\'todos\')}">削除</button>';
       html += '</div>';
