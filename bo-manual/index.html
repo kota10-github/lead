@@ -1282,6 +1282,19 @@
       var m = MATRIX_META[q];
       return m ? { bg: m.bg, light: m.light, text: m.bg } : null;
     }
+    // 親プロジェクトを遡って "Grandparent › Parent › Child" を返す (live のみ)
+    function _getProjectPathLabel(projectId) {
+      if (projectId == null) return '';
+      var chain = [];
+      var cur = getProject(projectId);
+      var guard = 0;
+      while (cur && guard++ < 20) {
+        chain.unshift(cur.name || '');
+        if (cur.parentId == null) break;
+        cur = getProject(cur.parentId);
+      }
+      return chain.join(' › ');
+    }
     function setTaskMatrixQ(taskId, q) {
       var t = (data.projectTasks || []).find(function(x){ return x.id === taskId && !x._deleted; });
       if (!t) return;
@@ -4267,10 +4280,10 @@
           byQ[q].sort(function(a,b){ return (a.title||'').localeCompare(b.title||''); });
           byQ[q].forEach(function(t){
             var pc = getProjectColor(t.projectId);
-            var proj = getProject(t.projectId);
+            var projPath = _getProjectPathLabel(t.projectId);
             html += '<div class="matrix-task" draggable="true" ondragstart="matrixTaskDragStart(event,' + t.id + ')" ondragend="matrixTaskDragEnd(event)" onclick="navigate(\'task-detail\',{id:' + t.id + '})" style="background:#fff;border-left:4px solid ' + meta.bg + ';border-radius:6px;padding:6px 10px;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.04)">';
+            if (projPath) html += '<div style="font-size:9px;color:var(--fg-muted2);display:flex;align-items:center;gap:4px;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="width:5px;height:5px;border-radius:50%;background:' + pc.bg + ';flex-shrink:0"></span>' + escapeHtml(projPath) + '</div>';
             html += '<div style="font-size:13px;font-weight:500;color:var(--fg)">' + escapeHtml(t.title) + '</div>';
-            if (proj) html += '<div style="font-size:10px;color:var(--fg-muted);display:flex;align-items:center;gap:4px;margin-top:2px"><span style="width:6px;height:6px;border-radius:50%;background:' + pc.bg + '"></span>' + escapeHtml(proj.name) + '</div>';
             html += '</div>';
           });
         }
@@ -4290,7 +4303,11 @@
         html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
         byQ[0].forEach(function(t){
           var pc = getProjectColor(t.projectId);
-          html += '<div class="matrix-task" draggable="true" ondragstart="matrixTaskDragStart(event,' + t.id + ')" ondragend="matrixTaskDragEnd(event)" onclick="navigate(\'task-detail\',{id:' + t.id + '})" style="background:#fff;border:1px solid var(--border);border-left:4px solid ' + pc.bg + ';border-radius:6px;padding:6px 10px;cursor:pointer;font-size:13px">' + escapeHtml(t.title) + '</div>';
+          var projPath = _getProjectPathLabel(t.projectId);
+          html += '<div class="matrix-task" draggable="true" ondragstart="matrixTaskDragStart(event,' + t.id + ')" ondragend="matrixTaskDragEnd(event)" onclick="navigate(\'task-detail\',{id:' + t.id + '})" style="background:#fff;border:1px solid var(--border);border-left:4px solid ' + pc.bg + ';border-radius:6px;padding:6px 10px;cursor:pointer">';
+          if (projPath) html += '<div style="font-size:9px;color:var(--fg-muted2);margin-bottom:1px">' + escapeHtml(projPath) + '</div>';
+          html += '<div style="font-size:13px">' + escapeHtml(t.title) + '</div>';
+          html += '</div>';
         });
         html += '</div></div>';
       }
