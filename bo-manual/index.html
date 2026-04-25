@@ -2914,7 +2914,7 @@
       if (manual.taskRoadmap) {
         html += `<div class="prose" id="manual-content">${isHtml ? manual.taskRoadmap : `<p style="white-space:pre-wrap">${escapeHtml(manual.taskRoadmap)}</p>`}</div>`;
       } else {
-        html += `<p style="color:var(--fg-muted2);font-style:italic">マニュアル内容が未設定です</p>`;
+        html += `<p style="color:var(--fg-muted2);font-style:italic">TODO が未設定です</p>`;
       }
       html += `</main>`;
       // Right aside: action buttons (top-right, original position) + manual meta info
@@ -2925,42 +2925,32 @@
         <button class="btn btn-outline btn-sm" onclick="navigate('manual-form',{editId:${manual.id}})">${icons.pencil} 編集</button>
         <button class="btn btn-outline btn-sm" style="color:var(--destructive)" onclick="confirmDeleteManual(${manual.id})">${icons.trash} 削除</button>
       </div>`;
+      // 各フィールドをレンダリングするヘルパ
+      var unsetTxt = '<em style="color:var(--fg-muted2)">未設定</em>';
+      var freqText = manual.frequency || manual.operationPace || formatPace(manual) || '';
+      var renderInfoSections = function() {
+        var s = '';
+        s += `<div class="info-section"><div class="info-section-label">${icons.zap} <span>トリガー</span></div><p class="text-sm" style="white-space:pre-wrap">${manual.trigger ? escapeHtml(manual.trigger) : unsetTxt}</p></div>`;
+        s += `<div class="info-section"><div class="info-section-label">${icons.clock} <span>頻度</span></div><p class="text-sm" style="white-space:pre-wrap">${freqText ? escapeHtml(freqText) : unsetTxt}</p></div>`;
+        s += `<div class="info-section"><div class="info-section-label" style="color:var(--primary)">${icons.target} <span style="text-transform:uppercase;letter-spacing:.05em">目的</span></div><p style="font-weight:500;white-space:pre-wrap;font-size:13px">${escapeHtml(manual.purpose || '')}</p></div>`;
+        s += `<div class="info-section"><div class="info-section-label">${icons.book} <span>INPUT</span></div><p class="text-sm" style="white-space:pre-wrap">${manual.input ? escapeHtml(manual.input) : unsetTxt}</p></div>`;
+        s += `<div class="info-section"><div class="info-section-label">${icons.clock} <span>所要時間</span></div><p class="text-sm" style="white-space:pre-wrap">${manual.estimatedTime ? escapeHtml(manual.estimatedTime) : unsetTxt}</p></div>`;
+        s += `<div class="info-section"><div class="info-section-label">${icons.check} <span>OUTPUT</span></div><p class="text-sm" style="white-space:pre-wrap">${manual.output ? escapeHtml(manual.output) : unsetTxt}</p></div>`;
+        return s;
+      };
       html += `<div class="info-card">`;
-      html += `<div class="info-section"><div class="info-section-label" style="color:var(--primary)">${icons.target} <span style="text-transform:uppercase;letter-spacing:.05em">果たすべき責任（目的）</span></div><p style="font-weight:500;white-space:pre-wrap;font-size:13px">${escapeHtml(manual.purpose)}</p></div>`;
-      html += `<div class="info-section"><div class="info-section-label">${icons.shield} <span>権限</span></div><p class="text-sm" style="white-space:pre-wrap">${manual.authority ? escapeHtml(manual.authority) : '<em style="color:var(--fg-muted2)">未設定</em>'}</p></div>`;
-      html += `<div class="info-section"><div class="info-section-label">${icons.clock} <span>稼働ペース</span></div>${(function(){
-        var tag = manual.paceTagId ? getPaceTag(manual.paceTagId) : null;
-        if (tag) {
-          var chip = '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:' + tag.color + '22;color:' + tag.color + ';font-size:12px;font-weight:500">' + escapeHtml(tag.name) + '</span>';
-          var sch = isManualPaceTag(tag) && manual.paceSchedule ? '<div class="text-sm" style="margin-top:4px">' + escapeHtml(formatSchedule(manual.paceSchedule)) + '</div>' : '';
-          return chip + sch;
-        }
-        return '<p class="text-sm">' + (manual.operationPace ? escapeHtml(manual.operationPace) : '<em style="color:var(--fg-muted2)">未設定</em>') + '</p>';
-      })()}</div>`;
+      html += renderInfoSections();
       html += `</div></aside>`;
       html += `</div>`; // close doc-layout
 
-      // Mobile-only slide-in panel: 目次 + 目的/権限/稼働ペース を集約
+      // Mobile-only slide-in panel: 目次 + 各フィールドを集約
       // (デスクトップでは .doc-toc と .doc-meta が両側に出るのでこのパネルは display:none)
-      var paceChipMobile;
-      (function(){
-        var tag = manual.paceTagId ? getPaceTag(manual.paceTagId) : null;
-        if (tag) {
-          var chip = '<span style="display:inline-block;padding:2px 8px;border-radius:10px;background:' + tag.color + '22;color:' + tag.color + ';font-size:12px;font-weight:500">' + escapeHtml(tag.name) + '</span>';
-          var sch = isManualPaceTag(tag) && manual.paceSchedule ? '<div class="text-sm" style="margin-top:4px">' + escapeHtml(formatSchedule(manual.paceSchedule)) + '</div>' : '';
-          paceChipMobile = chip + sch;
-        } else {
-          paceChipMobile = '<p class="text-sm">' + (manual.operationPace ? escapeHtml(manual.operationPace) : '<em style="color:var(--fg-muted2)">未設定</em>') + '</p>';
-        }
-      })();
       html += `<div class="mobile-side-backdrop" onclick="closeMobileSidePanel()"></div>`;
       html += `<aside class="mobile-side-panel">`;
       html += `<button class="mobile-side-close" onclick="closeMobileSidePanel()" aria-label="閉じる">×</button>`;
       html += `<div class="mobile-toc"><div class="mobile-toc-title">目次</div><div id="toc-links-mobile"></div></div>`;
       html += `<div class="info-card">`;
-      html += `<div class="info-section"><div class="info-section-label" style="color:var(--primary)">${icons.target} <span style="text-transform:uppercase;letter-spacing:.05em">果たすべき責任（目的）</span></div><p style="font-weight:500;white-space:pre-wrap;font-size:13px">${escapeHtml(manual.purpose)}</p></div>`;
-      html += `<div class="info-section"><div class="info-section-label">${icons.shield} <span>権限</span></div><p class="text-sm" style="white-space:pre-wrap">${manual.authority ? escapeHtml(manual.authority) : '<em style="color:var(--fg-muted2)">未設定</em>'}</p></div>`;
-      html += `<div class="info-section"><div class="info-section-label">${icons.clock} <span>稼働ペース</span></div>${paceChipMobile}</div>`;
+      html += renderInfoSections();
       html += `</div></aside>`;
 
       html += `</div>`; // close doc-page
@@ -3057,13 +3047,22 @@
         var html = '';
         html += '<h1 class="doc-title" style="font-size:28px;font-weight:700;margin-bottom:16px">' + escapeHtml(manual.title) + '</h1>';
         html += '<div class="info-card">';
-        html += '<div class="info-section"><div class="info-section-label" style="color:var(--primary)">🎯 <span style="text-transform:uppercase;letter-spacing:.05em">果たすべき責任（目的）</span></div><p style="font-weight:500;white-space:pre-wrap">' + escapeHtml(manual.purpose || '') + '</p></div>';
-        if (manual.authority) {
-          html += '<div class="info-section"><div class="info-section-label">🛡 <span>権限</span></div><p class="text-sm" style="white-space:pre-wrap">' + escapeHtml(manual.authority) + '</p></div>';
+        if (manual.trigger) {
+          html += '<div class="info-section"><div class="info-section-label">⚡ <span>トリガー</span></div><p class="text-sm" style="white-space:pre-wrap">' + escapeHtml(manual.trigger) + '</p></div>';
         }
-        var paceText = formatPace(manual);
-        if (paceText) {
-          html += '<div><div class="info-section-label">⏱ <span>稼働ペース</span></div><p class="text-sm">' + escapeHtml(paceText) + '</p></div>';
+        var freqText = manual.frequency || manual.operationPace || formatPace(manual) || '';
+        if (freqText) {
+          html += '<div class="info-section"><div class="info-section-label">⏱ <span>頻度</span></div><p class="text-sm" style="white-space:pre-wrap">' + escapeHtml(freqText) + '</p></div>';
+        }
+        html += '<div class="info-section"><div class="info-section-label" style="color:var(--primary)">🎯 <span style="text-transform:uppercase;letter-spacing:.05em">目的</span></div><p style="font-weight:500;white-space:pre-wrap">' + escapeHtml(manual.purpose || '') + '</p></div>';
+        if (manual.input) {
+          html += '<div class="info-section"><div class="info-section-label">📥 <span>INPUT</span></div><p class="text-sm" style="white-space:pre-wrap">' + escapeHtml(manual.input) + '</p></div>';
+        }
+        if (manual.estimatedTime) {
+          html += '<div class="info-section"><div class="info-section-label">⏱ <span>所要時間</span></div><p class="text-sm" style="white-space:pre-wrap">' + escapeHtml(manual.estimatedTime) + '</p></div>';
+        }
+        if (manual.output) {
+          html += '<div class="info-section"><div class="info-section-label">📤 <span>OUTPUT</span></div><p class="text-sm" style="white-space:pre-wrap">' + escapeHtml(manual.output) + '</p></div>';
         }
         html += '</div>';
         if (manual.taskRoadmap) {
@@ -3087,38 +3086,18 @@
       // Left sidebar: metadata
       html += `<aside>`;
       html += `<div class="form-group"><label class="label">タイトル <span style="color:var(--destructive)">*</span></label><input class="input" id="f-title" value="${escapeHtml(existing?.title || '')}" placeholder="マニュアルのタイトル"></div>`;
+      // 頻度 の初期値: 新フィールド frequency を優先し、無ければ旧 operationPace
+      // / paceTag を文字列化したものをフォールバックとして表示する (既存データ温存)
+      const existingFrequency = (existing && (existing.frequency || existing.operationPace || formatPace(existing))) || '';
+      html += `<div class="form-group"><label class="label label-icon">${icons.zap} トリガー</label><textarea class="textarea" id="f-trigger" rows="3" placeholder="どんなときに発動するか">${escapeHtml(existing?.trigger || '')}</textarea></div>`;
+      html += `<div class="form-group"><label class="label label-icon">${icons.clock} 頻度</label><input class="input" id="f-frequency" value="${escapeHtml(existingFrequency)}" placeholder="例: 週1回、毎朝、依頼があったとき など"></div>`;
       html += `<div class="card mb-4" style="border:2px solid rgba(37,99,235,.2);background:rgba(37,99,235,.03)"><div style="padding:12px">
-        <label class="label label-icon" style="color:var(--primary);font-weight:600;font-size:12px">${icons.target} 果たすべき責任（目的） <span style="color:var(--destructive)">*</span></label>
-        <textarea class="textarea" id="f-purpose" rows="4" placeholder="このマニュアルの果たすべき責任・目的を記述してください">${escapeHtml(existing?.purpose || '')}</textarea>
+        <label class="label label-icon" style="color:var(--primary);font-weight:600;font-size:12px">${icons.target} 目的 <span style="color:var(--destructive)">*</span></label>
+        <textarea class="textarea" id="f-purpose" rows="4" placeholder="このマニュアルの目的を記述してください">${escapeHtml(existing?.purpose || '')}</textarea>
       </div></div>`;
-      html += `<div class="form-group"><label class="label label-icon">${icons.shield} 権限</label><textarea class="textarea" id="f-authority" rows="3" placeholder="責任者に付与される権限の範囲">${escapeHtml(existing?.authority || '')}</textarea></div>`;
-      // Pace tag selector + manual schedule builder
-      const existingPaceTagId = existing?.paceTagId || null;
-      const existingSchedule = existing?.paceSchedule || {};
-      // 稼働ペースは 受動/超受動/主動 のみ表示。
-      // ローカルのキャッシュ(migration 未実行)で余計なタグが残っていても、
-      // select の選択肢としては絶対に出さない。tombstone も除外。
-      const PACE_ALLOW = { '受動':1, '超受動':1, '主動':1 };
-      const paceTagsList = (data.tags || []).filter(t => t && !t._deleted && PACE_ALLOW[t.name]);
-      html += `<div class="form-group"><label class="label label-icon">${icons.clock} 稼働ペース</label>
-        <div style="display:flex;gap:6px;align-items:center">
-          <select id="f-pace-tag" class="input" style="flex:1" onchange="onPaceTagChange()">
-            <option value="">未設定</option>
-            ${paceTagsList.map(t => `<option value="${t.id}" data-manual="${isManualPaceTag(t) ? 1 : 0}" ${existingPaceTagId === t.id ? 'selected' : ''}>${escapeHtml(t.name)}</option>`).join('')}
-          </select>
-          <button type="button" class="btn btn-outline btn-sm" onclick="navigate('tags')" title="タグを管理">管理</button>
-        </div>
-        <div id="f-pace-schedule" style="margin-top:10px;padding:10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-muted);display:none">
-          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px">
-            <label class="pace-radio"><input type="radio" name="schedule-type" value="frequency" onchange="onScheduleTypeChange()"> 頻度</label>
-            <label class="pace-radio"><input type="radio" name="schedule-type" value="weekly" onchange="onScheduleTypeChange()"> 曜日指定</label>
-            <label class="pace-radio"><input type="radio" name="schedule-type" value="monthly" onchange="onScheduleTypeChange()"> 日付指定</label>
-            <label class="pace-radio"><input type="radio" name="schedule-type" value="daily" onchange="onScheduleTypeChange()"> 時刻指定</label>
-            <label class="pace-radio"><input type="radio" name="schedule-type" value="interval" onchange="onScheduleTypeChange()"> 時間間隔</label>
-          </div>
-          <div id="f-pace-schedule-fields" data-initial='${JSON.stringify(existingSchedule).replace(/'/g,"&#39;")}'></div>
-        </div>
-      </div>`;
+      html += `<div class="form-group"><label class="label label-icon">${icons.book} INPUT</label><textarea class="textarea" id="f-input" rows="3" placeholder="必要な情報・素材・前提">${escapeHtml(existing?.input || '')}</textarea></div>`;
+      html += `<div class="form-group"><label class="label label-icon">${icons.clock} 所要時間</label><input class="input" id="f-est-time" value="${escapeHtml(existing?.estimatedTime || '')}" placeholder="例: 30分、1時間 など"></div>`;
+      html += `<div class="form-group"><label class="label label-icon">${icons.check} OUTPUT</label><textarea class="textarea" id="f-output" rows="3" placeholder="完了時に得られる成果物・状態">${escapeHtml(existing?.output || '')}</textarea></div>`;
       if (isEdit) {
         html += `<div class="flex gap-2" style="margin-top:16px;align-items:center"><button class="btn btn-outline" onclick="navigate('manual-detail',{id:${pageParams.editId}})">閉じる</button><span id="f-save-status" style="font-size:11px;color:var(--fg-muted2);margin-left:auto"></span></div>`;
       } else {
@@ -3127,7 +3106,7 @@
       html += `</aside>`;
       // Right main: manual content editor (big)
       html += `<main>`;
-      html += `<div class="form-group"><label class="label label-icon">${icons.book} マニュアル</label>
+      html += `<div class="form-group"><label class="label label-icon">${icons.book} TODO</label>
       <div class="memo-toolbar sticky">
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('undo')" title="戻す (Cmd+Z)">↶</button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('redo')" title="進む (Cmd+Shift+Z)">↷</button>
@@ -3153,7 +3132,7 @@
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('collapse')" title="折りたたみ">▸ 折りたたみ</button>
         <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('hr')" title="水平線">─ 線</button>
       </div>
-      <div class="manual-rich-editor" id="f-roadmap-editor" contenteditable="true" data-placeholder="マニュアルの内容を記述できます（見出し・太字・リストなどが使えます）" oninput="updateManualFormToc()"></div>
+      <div class="manual-rich-editor" id="f-roadmap-editor" contenteditable="true" data-placeholder="TODO の内容を記述できます（見出し・太字・リストなどが使えます）" oninput="updateManualFormToc()"></div>
       </div>`;
       html += `</main>`;
       // Right aside: table of contents
@@ -3171,8 +3150,6 @@
           editor.innerHTML = window._pendingManualContent;
         }
         updateManualFormToc();
-        // Initialize pace schedule builder visibility/state
-        if (typeof onPaceTagChange === 'function') onPaceTagChange();
         // Decorate existing blockquotes / callouts / code / copy / details with buttons
         if (editor) {
           decorateBlockquotes(editor);
@@ -3183,18 +3160,10 @@
           // Blur = force flush immediately (no 300ms window where reload loses data)
           editor.addEventListener('blur', flushManualFormNow);
           // Hook autosave to all other form fields + blur-flush
-          ['f-title','f-purpose','f-authority'].forEach(function(id) {
+          ['f-title','f-trigger','f-frequency','f-purpose','f-input','f-est-time','f-output'].forEach(function(id) {
             var el = document.getElementById(id);
             if (el) { el.addEventListener('input', autoSaveManualForm); el.addEventListener('blur', flushManualFormNow); }
           });
-          var paceSelEl = document.getElementById('f-pace-tag');
-          if (paceSelEl) paceSelEl.addEventListener('change', function() { autoSaveManualForm(); flushManualFormNow(); });
-          // Also autosave when any schedule field changes (captured via bubbling from the builder)
-          var scheduleBox = document.getElementById('f-pace-schedule');
-          if (scheduleBox) {
-            scheduleBox.addEventListener('input', autoSaveManualForm);
-            scheduleBox.addEventListener('change', function() { autoSaveManualForm(); flushManualFormNow(); });
-          }
           // Tab / Shift+Tab for list nesting
           editor.addEventListener('keydown', function(e) {
             if (e.key === 'Tab') {
@@ -3692,14 +3661,17 @@
       if (!titleEl) return false;
       var title = titleEl.value.trim();
       var purpose = (document.getElementById('f-purpose')||{value:''}).value.trim();
-      var authority = (document.getElementById('f-authority')||{value:''}).value.trim();
-      var paceTagSel = document.getElementById('f-pace-tag');
-      var paceTagId = paceTagSel && paceTagSel.value ? Number(paceTagSel.value) : null;
-      var paceTag = paceTagId ? getPaceTag(paceTagId) : null;
-      var paceSchedule = isManualPaceTag(paceTag) ? collectPaceSchedule() : null;
-      // 対応スピード フィールドは撤去済み — 既存の値があればそのまま保持
-      var existingManualForSpeed = pageParams.editId ? getManual(pageParams.editId) : null;
-      var speed = existingManualForSpeed ? (existingManualForSpeed.responseSpeed || '') : '';
+      var trigger = (document.getElementById('f-trigger')||{value:''}).value.trim();
+      var frequency = (document.getElementById('f-frequency')||{value:''}).value.trim();
+      var input = (document.getElementById('f-input')||{value:''}).value.trim();
+      var estimatedTime = (document.getElementById('f-est-time')||{value:''}).value.trim();
+      var output = (document.getElementById('f-output')||{value:''}).value.trim();
+      // フォームから外したフィールド (権限 / 旧ペースタグ / 対応スピード) は既存値を保持
+      var existingForPreserve = pageParams.editId ? getManual(pageParams.editId) : null;
+      var authority = existingForPreserve ? (existingForPreserve.authority || '') : '';
+      var paceTagId = existingForPreserve ? (existingForPreserve.paceTagId || null) : null;
+      var paceSchedule = existingForPreserve ? (existingForPreserve.paceSchedule || null) : null;
+      var speed = existingForPreserve ? (existingForPreserve.responseSpeed || '') : '';
       var roadmapEditor = document.getElementById('f-roadmap-editor');
       var roadmap = '';
       if (roadmapEditor) {
@@ -3720,8 +3692,11 @@
       if (!editId) return false;
       var m = getManual(editId);
       if (!m) return false;
-      var prev = { title: m.title, purpose: m.purpose, authority: m.authority, paceTagId: m.paceTagId, paceSchedule: m.paceSchedule, operationPace: m.operationPace, responseSpeed: m.responseSpeed, taskRoadmap: m.taskRoadmap };
-      var contentChanged = prev.title !== title || prev.purpose !== purpose || prev.authority !== authority || prev.responseSpeed !== speed || prev.taskRoadmap !== roadmap || prev.paceTagId !== paceTagId;
+      var prev = { title: m.title, purpose: m.purpose, authority: m.authority, paceTagId: m.paceTagId, paceSchedule: m.paceSchedule, operationPace: m.operationPace, responseSpeed: m.responseSpeed, taskRoadmap: m.taskRoadmap, trigger: m.trigger, frequency: m.frequency, input: m.input, estimatedTime: m.estimatedTime, output: m.output };
+      var contentChanged = prev.title !== title || prev.purpose !== purpose || prev.taskRoadmap !== roadmap
+        || (prev.trigger || '') !== trigger || (prev.frequency || '') !== frequency
+        || (prev.input || '') !== input || (prev.estimatedTime || '') !== estimatedTime
+        || (prev.output || '') !== output;
       if (!contentChanged) { setManualFormSaveStatus(''); return false; }
       if (!m.history) m.history = [];
       // Throttle history entries: one snapshot per 3 seconds of active editing.
@@ -3730,9 +3705,8 @@
       if (Date.now() - lastHist >= 3000) {
         m.history.push(Object.assign({ ts: bumpModTs(m._modTs) }, prev));
       }
-      Object.assign(m, { title: title, purpose: purpose, authority: authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap, _modTs: bumpModTs(m._modTs) });
+      Object.assign(m, { title: title, purpose: purpose, authority: authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap, trigger: trigger, frequency: frequency, input: input, estimatedTime: estimatedTime, output: output, _modTs: bumpModTs(m._modTs) });
       markDirty('manuals', m.id);
-      if (paceTagId) m.operationPace = '';
       saveData();
       _manualFormLastSavedAt = Date.now();
       // NOTE: saveData() already schedules a 500ms-debounced pushSync; do NOT
@@ -3764,14 +3738,17 @@
     function submitManualForm(editId, projectId) {
       const title = document.getElementById('f-title').value.trim();
       const purpose = document.getElementById('f-purpose').value.trim();
-      const authority = document.getElementById('f-authority').value.trim();
-      const paceTagSel = document.getElementById('f-pace-tag');
-      const paceTagId = paceTagSel && paceTagSel.value ? Number(paceTagSel.value) : null;
-      const paceTag = paceTagId ? getPaceTag(paceTagId) : null;
-      const paceSchedule = isManualPaceTag(paceTag) ? collectPaceSchedule() : null;
-      // 対応スピード フィールドは撤去済み — 既存マニュアルの値は保持
-      const _existingForSpeed = editId ? getManual(editId) : null;
-      const speed = _existingForSpeed ? (_existingForSpeed.responseSpeed || '') : '';
+      const trigger = (document.getElementById('f-trigger')||{value:''}).value.trim();
+      const frequency = (document.getElementById('f-frequency')||{value:''}).value.trim();
+      const input = (document.getElementById('f-input')||{value:''}).value.trim();
+      const estimatedTime = (document.getElementById('f-est-time')||{value:''}).value.trim();
+      const output = (document.getElementById('f-output')||{value:''}).value.trim();
+      // フォームから外したフィールド (権限 / 旧ペースタグ / 対応スピード) は既存値を保持
+      const _existingPreserve = editId ? getManual(editId) : null;
+      const authority = _existingPreserve ? (_existingPreserve.authority || '') : '';
+      const paceTagId = _existingPreserve ? (_existingPreserve.paceTagId || null) : null;
+      const paceSchedule = _existingPreserve ? (_existingPreserve.paceSchedule || null) : null;
+      const speed = _existingPreserve ? (_existingPreserve.responseSpeed || '') : '';
       const roadmapEditor = document.getElementById('f-roadmap-editor');
       // Clone editor and strip transient UI elements (bq-delete buttons) before saving
       let roadmap = '';
@@ -3807,30 +3784,30 @@
         if (m) {
           // Save snapshot to history before overwriting
           if (!m.history) m.history = [];
-          var prevScheduleStr = JSON.stringify(m.paceSchedule || null);
-          var newScheduleStr = JSON.stringify(paceSchedule || null);
-          var changed = m.title !== title || m.purpose !== purpose || m.authority !== authority || m.paceTagId !== paceTagId || prevScheduleStr !== newScheduleStr || m.responseSpeed !== speed || m.taskRoadmap !== roadmap;
+          var changed = m.title !== title || m.purpose !== purpose || m.taskRoadmap !== roadmap
+            || (m.trigger || '') !== trigger || (m.frequency || '') !== frequency
+            || (m.input || '') !== input || (m.estimatedTime || '') !== estimatedTime
+            || (m.output || '') !== output;
           if (changed) {
             m.history.push({
               ts: Date.now(),
               title: m.title, purpose: m.purpose, authority: m.authority,
               paceTagId: m.paceTagId, paceSchedule: m.paceSchedule,
               operationPace: m.operationPace, responseSpeed: m.responseSpeed,
-              taskRoadmap: m.taskRoadmap
+              taskRoadmap: m.taskRoadmap,
+              trigger: m.trigger, frequency: m.frequency,
+              input: m.input, estimatedTime: m.estimatedTime, output: m.output
             });
-            // Keep last 50 versions only
             // History is NEVER purged
           }
-          Object.assign(m, { title, purpose, authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap, _modTs: bumpModTs(m._modTs) });
-          // Clear legacy operationPace when using new tag system
-          if (paceTagId) m.operationPace = '';
+          Object.assign(m, { title, purpose, authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap, trigger: trigger, frequency: frequency, input: input, estimatedTime: estimatedTime, output: output, _modTs: bumpModTs(m._modTs) });
           saveData();
           if (typeof pushSyncNow === 'function') pushSyncNow();
           toast('マニュアルを更新しました'); navigate('manual-detail', { id: editId });
         }
       } else {
         const id = data.nextManualId++;
-        data.manuals.push({ id, projectId, title, purpose, authority, paceTagId: paceTagId, paceSchedule: paceSchedule, operationPace: '', responseSpeed: speed, taskRoadmap: roadmap, history: [], createdBy: 0, _modTs: bumpModTs(0) });
+        data.manuals.push({ id, projectId, title, purpose, authority, paceTagId: paceTagId, paceSchedule: paceSchedule, operationPace: '', responseSpeed: speed, taskRoadmap: roadmap, trigger: trigger, frequency: frequency, input: input, estimatedTime: estimatedTime, output: output, history: [], createdBy: 0, _modTs: bumpModTs(0) });
         markDirty('manuals', id);
         saveData();
         if (typeof pushSyncNow === 'function') pushSyncNow();
