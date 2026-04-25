@@ -1053,6 +1053,33 @@
           } catch(e) {}
         }
       })();
+      // v3: v2 がユーザー作成タグ (マーケ/セールス/CS 等) まで誤って tombstone
+      // してしまったので、過去に _deleted=true になった全タグを復活させる
+      // (一度だけ)。これ以降はユーザーの削除操作を尊重する。
+      (function oneShotReviveAllTags() {
+        if (data._tagReviveDoneV3) return;
+        var nowR = Date.now();
+        var revived = [];
+        (data.tags || []).forEach(function(t) {
+          if (t && t._deleted) {
+            t._deleted = false;
+            t._modTs = Math.max(nowR, (t._modTs || 0) + 1);
+            revived.push(t.id);
+          }
+        });
+        data._tagReviveDoneV3 = true;
+        try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch(e) {}
+        if (revived.length) {
+          try {
+            var dirtyKey2 = 'bo-manual-dirty';
+            var raw2 = localStorage.getItem(dirtyKey2);
+            var dm2 = raw2 ? JSON.parse(raw2) : {};
+            if (!dm2 || Array.isArray(dm2)) dm2 = {};
+            revived.forEach(function(id){ dm2['tags:' + id] = nowR; });
+            localStorage.setItem(dirtyKey2, JSON.stringify(dm2));
+          } catch(e) {}
+        }
+      })();
     } catch {
       data = JSON.parse(JSON.stringify(DEFAULT_DATA));
     }
@@ -2728,7 +2755,7 @@
         <span>タグ</span>
         <select id="proj-tag-select" onchange="changeProjectTag(${project.id}, this.value)" style="padding:2px 6px;border:none;background:transparent;color:var(--fg);font-size:13px;cursor:pointer">
           <option value="">なし</option>
-          ${(data.tags||[]).filter(t=>t && !t._deleted && ['受動','超受動','主動'].indexOf(t.name)>=0).map(t=>'<option value="'+t.id+'"'+(project.tagId===t.id?' selected':'')+'>'+escapeHtml(t.name)+'</option>').join('')}
+          ${(data.tags||[]).filter(t=>t && !t._deleted).map(t=>'<option value="'+t.id+'"'+(project.tagId===t.id?' selected':'')+'>'+escapeHtml(t.name)+'</option>').join('')}
         </select>
         ${currentTag ? '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+currentTag.color+'"></span>' : ''}
       </div>`;
@@ -5894,7 +5921,7 @@
       showModal(isEdit ? 'プロジェクト編集' : '新規プロジェクト',
         `<div class="form-group"><label class="label">プロジェクト名</label><input class="input" id="d-proj-name" value="${escapeHtml(editProject?.name || '')}" placeholder="プロジェクト名を入力"></div>
         <div class="form-group"><label class="label">説明（任意）</label><textarea class="textarea" id="d-proj-desc" rows="3" placeholder="プロジェクトの説明">${escapeHtml(editProject?.description || '')}</textarea></div>
-        <div class="form-group"><label class="label">タグ</label><select class="input" id="d-proj-tag"><option value="">タグなし</option>${(data.tags||[]).filter(t=>t && !t._deleted && ['受動','超受動','主動'].indexOf(t.name)>=0).map(t=>'<option value="'+t.id+'"'+((editProject&&editProject.tagId===t.id)?' selected':'')+'>'+escapeHtml(t.name)+'</option>').join('')}</select></div>`,
+        <div class="form-group"><label class="label">タグ</label><select class="input" id="d-proj-tag"><option value="">タグなし</option>${(data.tags||[]).filter(t=>t && !t._deleted).map(t=>'<option value="'+t.id+'"'+((editProject&&editProject.tagId===t.id)?' selected':'')+'>'+escapeHtml(t.name)+'</option>').join('')}</select></div>`,
         [
           { label: 'キャンセル', onClick: o => o.remove() },
           { label: isEdit ? '更新' : '作成', class: 'btn btn-primary', onClick: o => {
