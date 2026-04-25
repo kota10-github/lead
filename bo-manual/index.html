@@ -5948,11 +5948,10 @@
             const desc = document.getElementById('d-proj-desc').value.trim();
             var tagVal = document.getElementById('d-proj-tag').value;
             var tagId = tagVal ? parseInt(tagVal) : null;
-            // 選択された tag が生きてる (受動/超受動/主動 のいずれか) か検証
+            // 選択された業務形態が生きてるか検証 (tombstone は不可)
             if (tagId != null) {
               var _tag = (data.tags || []).find(function(t){ return t.id === tagId && !t._deleted; });
-              var _ALLOW = {'受動':1,'超受動':1,'主動':1};
-              if (!_tag || !_ALLOW[_tag.name]) tagId = null;
+              if (!_tag) tagId = null;
             }
             if (isEdit) {
               editProject.name = name; editProject.description = desc; editProject.tagId = tagId;
@@ -6007,16 +6006,10 @@
       const proj = data.projects.find(p => p.id === projectId);
       if (!proj) return;
       const newId = tagValue ? parseInt(tagValue) : null;
-      // 選択された tag が生きてる (tombstone でなく、受動/超受動/主動 のいずれか) か検証。
-      // そうでなければ null に。モバイルでキャッシュが古く bad id を送ってきた場合の保険。
+      // 選択された業務形態が生きてるか検証 (tombstone は不可)
       if (newId != null) {
         const tag = (data.tags || []).find(t => t.id === newId && !t._deleted);
-        const ALLOW = {'受動':1,'超受動':1,'主動':1};
-        if (!tag || !ALLOW[tag.name]) {
-          proj.tagId = null;
-        } else {
-          proj.tagId = newId;
-        }
+        proj.tagId = tag ? newId : null;
       } else {
         proj.tagId = null;
       }
