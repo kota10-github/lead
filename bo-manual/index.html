@@ -166,6 +166,17 @@
     .project-col{display:flex;flex-direction:column;gap:12px}
     .project-branch{display:flex;align-items:flex-start;gap:16px}
     .project-items-col{display:flex;flex-direction:column;gap:8px}
+    /* Mind-map style collapse: ▾/▸ toggle next to a node hides its children. */
+    .map-collapse-toggle{
+      display:inline-flex;align-items:center;justify-content:center;
+      width:18px;height:18px;border-radius:4px;background:rgba(0,0,0,.06);
+      border:none;font-size:10px;cursor:pointer;margin-left:6px;padding:0;
+      color:var(--fg-muted);line-height:1;user-select:none;flex-shrink:0;
+      transition:background .12s, color .12s;
+    }
+    .map-collapse-toggle:hover{background:rgba(0,0,0,.14);color:var(--fg)}
+    .project-branch.collapsed > .sub-tree-children,
+    .sub-tree-row.collapsed > .sub-tree-children{display:none !important}
         /* Map branch add options */
     .map-add-options{display:flex;gap:6px;margin-top:6px}
     .map-add-branch{padding:5px 12px;border-radius:14px;font-size:11px;font-weight:500;border:1px dashed var(--border);background:transparent;color:var(--fg-muted);cursor:pointer;transition:all .2s;white-space:nowrap}
@@ -1690,6 +1701,33 @@
 
     // ZOOM STATE
     let mapZoom = 1;
+    // Mind-map collapse state (PC マップで枝を折りたたむ)
+    var _mapCollapsed = (function(){
+      try { return new Set(JSON.parse(localStorage.getItem('bo-map-collapsed') || '[]')); }
+      catch(e) { return new Set(); }
+    })();
+    function _saveMapCollapsed() {
+      try { localStorage.setItem('bo-map-collapsed', JSON.stringify(Array.from(_mapCollapsed))); } catch(e) {}
+    }
+    function toggleMapCollapse(key, btn) {
+      if (_mapCollapsed.has(key)) _mapCollapsed.delete(key);
+      else _mapCollapsed.add(key);
+      _saveMapCollapsed();
+      var parent = btn && btn.closest ? btn.closest('.project-branch, .sub-tree-row') : null;
+      if (parent) parent.classList.toggle('collapsed', _mapCollapsed.has(key));
+      if (btn) btn.textContent = _mapCollapsed.has(key) ? '▸' : '▾';
+      // SVG ライン再描画 (drawMindmapLines は renderDesktopHome 内のクロージャ
+      // で定義されているので、ここから直接は呼べない → render() 経由で再描画)
+      try {
+        if (typeof getProjectMap === 'function') {
+          // 軽い再レンダ: マップだけ再描画したいので home なら render
+          if (typeof currentPage !== 'undefined' && currentPage === 'home') {
+            requestAnimationFrame(function(){ if (typeof render === 'function') render(); });
+          }
+        }
+      } catch(e) {}
+    }
+    window.toggleMapCollapse = toggleMapCollapse;
     let calSelectedDate = (function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')})();
     let calViewYear = new Date().getFullYear();
     let calViewMonth = new Date().getMonth();
@@ -2271,10 +2309,14 @@
         html += `<div class="project-col">`;
         projects.forEach((proj, pi) => {
           const c = getProjectColor(proj.projectId);
-          html += `<div class="project-branch">`;
-          html += `<div class="node-project-standalone" data-node="proj-${proj.projectId}" draggable="true" ondragstart="handleProjectDragStart(event,${proj.projectId})" ondragend="handleProjectDragEnd(event)" ondragover="handleProjectDragOver(event,${proj.projectId})" ondragleave="this.classList.remove('drop-target','drop-before','drop-after')" ondrop="handleProjectDrop(event,${proj.projectId})" style="border-color:${c.bg};background:${c.light};color:${c.text}" onclick="navigate('project-detail',{id:${proj.projectId}})">`;
+          var projKey = 'proj-' + proj.projectId;
+          var projCollapsed = _mapCollapsed.has(projKey);
           var projTasks = getTasksByProject(proj.projectId);
-          html += `<div style="font-weight:600">${escapeHtml(proj.projectName)}<span style="opacity:.6;font-size:11px;margin-left:4px">(${proj.manuals.length + projTasks.filter(function(t){return !t.done}).length})</span></div>`;
+          var projHasChildren = (proj.manuals.length + projTasks.filter(function(t){return !t.done}).length + (proj.subProjects ? proj.subProjects.length : 0)) > 0;
+          html += `<div class="project-branch${projCollapsed ? ' collapsed' : ''}">`;
+          html += `<div class="node-project-standalone" data-node="proj-${proj.projectId}" draggable="true" ondragstart="handleProjectDragStart(event,${proj.projectId})" ondragend="handleProjectDragEnd(event)" ondragover="handleProjectDragOver(event,${proj.projectId})" ondragleave="this.classList.remove('drop-target','drop-before','drop-after')" ondrop="handleProjectDrop(event,${proj.projectId})" style="border-color:${c.bg};background:${c.light};color:${c.text}" onclick="navigate('project-detail',{id:${proj.projectId}})">`;
+          var toggleBtn = projHasChildren ? `<button class="map-collapse-toggle" title="${projCollapsed ? '展開' : '折りたたむ'}" onclick="event.stopPropagation();toggleMapCollapse('${projKey}', this)">${projCollapsed ? '▸' : '▾'}</button>` : '';
+          html += `<div style="font-weight:600;display:flex;align-items:center"><span>${escapeHtml(proj.projectName)}<span style="opacity:.6;font-size:11px;margin-left:4px">(${proj.manuals.length + projTasks.filter(function(t){return !t.done}).length})</span></span>${toggleBtn}</div>`;
           if (proj.users.length > 0) {
             html += `<div class="project-items-col"><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">`;
             proj.users.forEach(u => { html += `<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:var(--bg-muted);color:var(--fg-muted)">${escapeHtml(u.name)}</span>`; });
@@ -2305,9 +2347,13 @@
         function renderSubBranch(sp) {
           var sc = getProjectColor(sp.projectId);
           var spTasks = getTasksByProject(sp.projectId);
-          html += '<div class="sub-tree-row">';
+          var spKey = 'sp-' + sp.projectId;
+          var spCollapsed = _mapCollapsed.has(spKey);
+          var spHasChildren = ((sp.manuals && sp.manuals.length) || spTasks.filter(function(t){return !t.done}).length || (sp.subProjects && sp.subProjects.length)) > 0;
+          var spToggle = spHasChildren ? `<button class="map-collapse-toggle" title="${spCollapsed ? '展開' : '折りたたむ'}" onclick="event.stopPropagation();toggleMapCollapse('${spKey}', this)">${spCollapsed ? '▸' : '▾'}</button>` : '';
+          html += '<div class="sub-tree-row' + (spCollapsed ? ' collapsed' : '') + '">';
           html += '<div class="sub-tree-card-wrap">';
-          html += `<div class="node-manual" data-node="sp-${sp.projectId}" draggable="true" ondragstart="handleProjectDragStart(event,${sp.projectId})" ondragend="handleProjectDragEnd(event)" ondragover="handleProjectDragOver(event,${sp.projectId})" ondragleave="this.classList.remove('drop-target','drop-before','drop-after')" ondrop="handleProjectDrop(event,${sp.projectId})" onclick="navigate('project-detail',{id:${sp.projectId}})" style="border-left:3px solid ${sc.bg};background:${sc.light}"><div class="node-manual-title" style="color:${sc.bg};display:flex;align-items:center;gap:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:.7"><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7-4H4a2 2 0 0 0-2 2v14z"/></svg><span>${escapeHtml(sp.projectName)}</span></div>`;
+          html += `<div class="node-manual" data-node="sp-${sp.projectId}" draggable="true" ondragstart="handleProjectDragStart(event,${sp.projectId})" ondragend="handleProjectDragEnd(event)" ondragover="handleProjectDragOver(event,${sp.projectId})" ondragleave="this.classList.remove('drop-target','drop-before','drop-after')" ondrop="handleProjectDrop(event,${sp.projectId})" onclick="navigate('project-detail',{id:${sp.projectId}})" style="border-left:3px solid ${sc.bg};background:${sc.light}"><div class="node-manual-title" style="color:${sc.bg};display:flex;align-items:center;gap:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:.7"><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7-4H4a2 2 0 0 0-2 2v14z"/></svg><span>${escapeHtml(sp.projectName)}</span>${spToggle}</div>`;
           html += `<div class="node-manual-purpose">${sp.subProjects.length > 0 ? '<span style="opacity:.6;font-size:10px">' + sp.subProjects.length + '件のサブ</span>' : ''}${spTasks.length > 0 ? '<span style="opacity:.6;font-size:10px;margin-left:4px">' + spTasks.filter(function(t){return t.done}).length + '/' + spTasks.length + ' タスク</span>' : ''}</div></div>`;
           html += '</div>'; // close sub-tree-card-wrap
           // Tasks and children to the right
@@ -2333,7 +2379,11 @@
         function renderTaskBranch(t, parentColor) {
           var color = parentColor || { bg: '#94a3b8', light: '#f1f5f9' };
           var kids = getChildTasks(t.id).filter(function(k){ return !k.done; });
-          html += '<div class="sub-tree-row" data-task="' + t.id + '">';
+          var taskKey = 'task-' + t.id;
+          var taskCollapsed = _mapCollapsed.has(taskKey);
+          var taskHasChildren = kids.length > 0;
+          var taskToggle = taskHasChildren ? '<button class="map-collapse-toggle" title="' + (taskCollapsed ? '展開' : '折りたたむ') + '" onclick="event.stopPropagation();toggleMapCollapse(\'' + taskKey + '\', this)">' + (taskCollapsed ? '▸' : '▾') + '</button>' : '';
+          html += '<div class="sub-tree-row' + (taskCollapsed ? ' collapsed' : '') + '" data-task="' + t.id + '">';
           html += '<div class="sub-tree-card-wrap">';
           // matrixQ があれば色をその quadrant カラーで上書き
           var mc = MATRIX_ENABLED ? getMatrixColor(t.matrixQ) : null;
@@ -2348,7 +2398,7 @@
             ' style="border-left:3px solid ' + taskBorder + ';background:' + taskBg + ';opacity:' + (t.done ? '.5' : '1') + ';cursor:pointer" onclick="event.stopPropagation();navigate(\'task-detail\',{id:' + t.id + '})">';
           html += '<div class="node-manual-title" style="color:' + color.bg + ';display:flex;align-items:center;gap:6px">';
           html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:24px;height:24px;font-size:10px" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
-          html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>' + dueBadgeHtml(t);
+          html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>' + dueBadgeHtml(t) + taskToggle;
           html += '</div></div>';
           html += '</div>'; // close sub-tree-card-wrap
           // Right side: child tasks + add button
@@ -2621,6 +2671,7 @@
           if (!parentNode) return;
           var container = parentNode.closest('.project-branch,.sub-tree-row');
           if (!container) return;
+          if (container.classList.contains('collapsed')) return; // 折りたたみ中はライン描画しない
           var childrenDiv = container.querySelector(':scope > .sub-tree-children');
           if (!childrenDiv) return;
           var childNodes = childrenDiv.querySelectorAll(':scope > .sub-tree-row > .sub-tree-card-wrap > [data-node]');
