@@ -840,7 +840,7 @@
         </button>
         <button class="nav-item" data-page="tags" onclick="navigate('tags')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.83z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-          タグ管理
+          業務形態管理
         </button>
         <button class="nav-item" data-page="permissions" onclick="navigate('permissions')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -1053,33 +1053,39 @@
           } catch(e) {}
         }
       })();
-      // v3: v2 がユーザー作成タグ (マーケ/セールス/CS 等) まで誤って tombstone
-      // してしまったので、過去に _deleted=true になった全タグを復活させる
-      // (一度だけ)。これ以降はユーザーの削除操作を尊重する。
-      (function oneShotReviveAllTags() {
-        if (data._tagReviveDoneV3) return;
-        var nowR = Date.now();
-        var revived = [];
-        (data.tags || []).forEach(function(t) {
-          if (t && t._deleted) {
-            t._deleted = false;
-            t._modTs = Math.max(nowR, (t._modTs || 0) + 1);
-            revived.push(t.id);
+      // 業務形態は『感覚 / 仕組み / 作業』の 3 つだけに固定する。
+      // tombstone ではなく "物理削除" で処理 — リモートにも残骸を残さない。
+      // (loadData 段階・push 直前・remote merge 直後 すべてで filter する)
+      var KEEP_TAG_NAMES = { '感覚': '#f59e0b', '仕組み': '#06b6d4', '作業': '#6366f1' };
+      window.KEEP_TAG_NAMES = KEEP_TAG_NAMES;
+      function isAllowedTag(t) { return !!(t && t.name && KEEP_TAG_NAMES.hasOwnProperty(t.name)); }
+      function purgeTags(list) {
+        if (!Array.isArray(list)) return [];
+        var seen = {};
+        return list.filter(function(t) {
+          if (!isAllowedTag(t)) return false;     // 許可外 → 物理削除
+          if (t._deleted) return false;            // tombstone も物理削除
+          if (seen[t.name]) return false;          // 同名重複も物理削除
+          seen[t.name] = true;
+          return true;
+        });
+      }
+      function ensureTagWhitelist() {
+        data.tags = purgeTags(data.tags || []);
+        var seen = {};
+        data.tags.forEach(function(t){ seen[t.name] = true; });
+        Object.keys(KEEP_TAG_NAMES).forEach(function(name) {
+          if (!seen[name]) {
+            if (!data.nextTagId) data.nextTagId = (data.tags.reduce(function(m,t){return Math.max(m,t.id||0)},0) || 0) + 1;
+            data.tags.push({ id: data.nextTagId++, name: name, color: KEEP_TAG_NAMES[name], _modTs: Date.now() });
           }
         });
-        data._tagReviveDoneV3 = true;
-        try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch(e) {}
-        if (revived.length) {
-          try {
-            var dirtyKey2 = 'bo-manual-dirty';
-            var raw2 = localStorage.getItem(dirtyKey2);
-            var dm2 = raw2 ? JSON.parse(raw2) : {};
-            if (!dm2 || Array.isArray(dm2)) dm2 = {};
-            revived.forEach(function(id){ dm2['tags:' + id] = nowR; });
-            localStorage.setItem(dirtyKey2, JSON.stringify(dm2));
-          } catch(e) {}
-        }
-      })();
+      }
+      window.purgeTags = purgeTags;
+      window.ensureTagWhitelist = ensureTagWhitelist;
+      // 起動時に物理削除を実行
+      ensureTagWhitelist();
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch(e) {}
     } catch {
       data = JSON.parse(JSON.stringify(DEFAULT_DATA));
     }
@@ -1238,7 +1244,7 @@
       if (page === 'goal-detail') crumbs.push({label: '目的ツリー', page: 'goals'}, {label: '目的詳細', current: true});
       if (page === 'tasks') crumbs.push({label: 'マイタスク', current: true});
       if (page === 'users') crumbs.push({label: 'ユーザー管理', current: true});
-      if (page === 'tags') crumbs.push({label: 'タグ管理', current: true});
+      if (page === 'tags') crumbs.push({label: '業務形態管理', current: true});
       if (page === 'permissions') crumbs.push({label: '権限管理', current: true});
       if (page === 'member-page' && params.userId) {
         crumbs.push({label: 'ユーザー管理', page: 'users'});
@@ -1551,16 +1557,16 @@
     function renderTags(el) {
       var html = '';
       html += renderBreadcrumb();
-      html += '<h1 class="page-title" style="margin-bottom:24px">タグ管理</h1>';
+      html += '<h1 class="page-title" style="margin-bottom:24px">業務形態管理</h1>';
 
       // Project tags section
       html += '<section style="margin-bottom:32px">';
       html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
-      html += '<h2 style="font-size:16px;font-weight:600">プロジェクトタグ</h2>';
+      html += '<h2 style="font-size:16px;font-weight:600">業務形態</h2>';
       html += '<button class="btn btn-primary btn-sm" onclick="showTagDialog()">+ 新規</button></div>';
       var liveTagsList = (data.tags || []).filter(function(t){ return !t._deleted; });
       if (liveTagsList.length === 0) {
-        html += '<div class="empty" style="padding:20px"><p style="font-size:13px;color:var(--fg-muted2)">タグがありません</p></div>';
+        html += '<div class="empty" style="padding:20px"><p style="font-size:13px;color:var(--fg-muted2)">業務形態がありません</p></div>';
       } else {
         html += '<div style="display:flex;flex-direction:column;gap:8px">';
         liveTagsList.forEach(function(tag) {
@@ -1637,26 +1643,26 @@
         var sel = (editTag && editTag.color === c) ? ' style="outline:3px solid var(--fg);outline-offset:2px;border-radius:50%"' : '';
         return '<span class="tag-color-opt" data-color="' + c + '"' + sel + ' onclick="document.querySelectorAll(\'.tag-color-opt\').forEach(function(e){e.style.outline=\'\'});this.style.outline=\'3px solid var(--fg)\';this.style.outlineOffset=\'2px\';this.style.borderRadius=\'50%\'" style="width:28px;height:28px;border-radius:50%;background:' + c + ';cursor:pointer;display:inline-block"></span>';
       }).join('');
-      showModal(editTag ? 'タグ編集' : '新規タグ',
-        '<div class="form-group"><label class="label">タグ名</label><input class="input" id="d-tag-name" value="' + escapeHtml(editTag ? editTag.name : '') + '" placeholder="タグ名"></div><div class="form-group"><label class="label">カラー</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">' + colorOptions + '</div></div>',
+      showModal(editTag ? '業務形態を編集' : '新規業務形態',
+        '<div class="form-group"><label class="label">業務形態名</label><input class="input" id="d-tag-name" value="' + escapeHtml(editTag ? editTag.name : '') + '" placeholder="業務形態名"></div><div class="form-group"><label class="label">カラー</label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">' + colorOptions + '</div></div>',
         [
           { label: 'キャンセル', onClick: function(o) { o.remove(); } },
           { label: editTag ? '更新' : '作成', class: 'btn btn-primary', onClick: function(o) {
             var name = document.getElementById('d-tag-name').value.trim();
-            if (!name) { toast('タグ名を入力してください'); return; }
+            if (!name) { toast('業務形態名を入力してください'); return; }
             var selColor = document.querySelector('.tag-color-opt[style*="outline: 3px"]') || document.querySelector('.tag-color-opt[style*="outline:3px"]');
             var color = selColor ? selColor.getAttribute('data-color') : TAG_PRESET_COLORS[0];
             if (editTag) {
               editTag.name = name; editTag.color = color;
               editTag._modTs = bumpModTs(editTag._modTs);
               markDirty('tags', editTag.id);
-              toast('タグを更新しました');
+              toast('業務形態を更新しました');
             } else {
               if (!data.tags) data.tags = [];
               var newId = data.nextTagId++;
               data.tags.push({ id: newId, name: name, color: color, _modTs: bumpModTs(0) });
               markDirty('tags', newId);
-              toast('タグを作成しました');
+              toast('業務形態を作成しました');
             }
             saveData(); o.remove(); render();
           }}
@@ -1667,8 +1673,8 @@
     function confirmDeleteTag(tagId) {
       var tag = (data.tags || []).find(function(t) { return t.id === tagId; });
       if (!tag) return;
-      showModal('タグの削除',
-        '<p class="confirm-text">タグ「' + escapeHtml(tag.name) + '」を削除しますか？このタグが付いたプロジェクトのタグは解除されます。</p>',
+      showModal('業務形態の削除',
+        '<p class="confirm-text">業務形態「' + escapeHtml(tag.name) + '」を削除しますか？この業務形態が付いたプロジェクトでは解除されます。</p>',
         [
           { label: 'キャンセル', onClick: function(o) { o.remove(); } },
           { label: '削除', class: 'btn btn-destructive', onClick: function(o) {
@@ -1676,7 +1682,7 @@
             var t = (data.tags || []).find(function(x) { return x.id === tagId; });
             if (t) { t._deleted = true; t._modTs = bumpModTs(t._modTs); markDirty('tags', t.id); }
             data.projects.forEach(function(p) { if (p.tagId === tagId) p.tagId = null; });
-            saveData(); o.remove(); render(); toast('タグを削除しました');
+            saveData(); o.remove(); render(); toast('業務形態を削除しました');
           }}
         ]
       );
@@ -2752,7 +2758,7 @@
       html += `<p class="editable-desc" contenteditable="true" id="proj-desc-edit" data-placeholder="説明を追加..." onblur="saveProjectDescInline(${project.id})" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur()}" style="color:var(--fg-muted);margin-bottom:16px">${project.description ? escapeHtml(project.description) : ''}</p>`;
       // Overview: inline tag
       html += `<div id="sec-overview" style="display:flex;align-items:center;gap:8px;margin-bottom:24px;font-size:13px;color:var(--fg-muted)">
-        <span>タグ</span>
+        <span>業務形態</span>
         <select id="proj-tag-select" onchange="changeProjectTag(${project.id}, this.value)" style="padding:2px 6px;border:none;background:transparent;color:var(--fg);font-size:13px;cursor:pointer">
           <option value="">なし</option>
           ${(data.tags||[]).filter(t=>t && !t._deleted).map(t=>'<option value="'+t.id+'"'+(project.tagId===t.id?' selected':'')+'>'+escapeHtml(t.name)+'</option>').join('')}
@@ -4749,6 +4755,12 @@
           return copy;
         });
       }
+      // 業務形態の許可外を物理削除した状態で push (リモートに残骸を残さない)
+      if (Array.isArray(slim.tags) && typeof purgeTags === 'function') {
+        slim.tags = purgeTags(slim.tags);
+      }
+      // 旧ペースタグもリモートに残さない
+      slim.paceTags = [];
       return slim;
     }
     // Force immediate push with merge-before-push (prevents stale-tab overwrite)
@@ -4784,6 +4796,10 @@
     // Items only on local are preserved. manual.history is merged by ts (append missing).
     function mergeRemoteIntoLocal(remote) {
       if (!remote || typeof remote !== 'object') return;
+      // 業務形態のホワイトリスト: リモートが持っていても不許可名は merge 前に捨てる
+      if (Array.isArray(remote.tags) && typeof purgeTags === 'function') {
+        remote.tags = purgeTags(remote.tags);
+      }
       // Safety: reject garbage _modTs values (> 24h in the future). Bugs,
       // test pollution, or wild clock skew could push a remote row to year
       // 2286; without this cap it would win every merge forever.
@@ -4856,6 +4872,8 @@
       mergeByModTs('manuals', data.manuals = data.manuals || [], remote.manuals || []);
       mergeByModTs('projects', data.projects = data.projects || [], remote.projects || []);
       mergeByModTs('tags', data.tags = data.tags || [], remote.tags || []);
+      // merge 後に再度物理削除 → 不許可名は絶対に出てこない
+      if (typeof ensureTagWhitelist === 'function') ensureTagWhitelist();
       mergeByModTs('paceTags', data.paceTags = data.paceTags || [], remote.paceTags || []);
       mergeByModTs('users', data.users = data.users || [], remote.users || []);
       // teamMeta (単一オブジェクト) を _modTs で merge
@@ -5921,7 +5939,7 @@
       showModal(isEdit ? 'プロジェクト編集' : '新規プロジェクト',
         `<div class="form-group"><label class="label">プロジェクト名</label><input class="input" id="d-proj-name" value="${escapeHtml(editProject?.name || '')}" placeholder="プロジェクト名を入力"></div>
         <div class="form-group"><label class="label">説明（任意）</label><textarea class="textarea" id="d-proj-desc" rows="3" placeholder="プロジェクトの説明">${escapeHtml(editProject?.description || '')}</textarea></div>
-        <div class="form-group"><label class="label">タグ</label><select class="input" id="d-proj-tag"><option value="">タグなし</option>${(data.tags||[]).filter(t=>t && !t._deleted).map(t=>'<option value="'+t.id+'"'+((editProject&&editProject.tagId===t.id)?' selected':'')+'>'+escapeHtml(t.name)+'</option>').join('')}</select></div>`,
+        <div class="form-group"><label class="label">業務形態</label><select class="input" id="d-proj-tag"><option value="">未設定</option>${(data.tags||[]).filter(t=>t && !t._deleted).map(t=>'<option value="'+t.id+'"'+((editProject&&editProject.tagId===t.id)?' selected':'')+'>'+escapeHtml(t.name)+'</option>').join('')}</select></div>`,
         [
           { label: 'キャンセル', onClick: o => o.remove() },
           { label: isEdit ? '更新' : '作成', class: 'btn btn-primary', onClick: o => {
@@ -6006,7 +6024,7 @@
       markDirty('projects', proj.id);
       saveData();
       render();
-      toast('タグを変更しました');
+      toast('業務形態を変更しました');
     }
 
     function confirmDeleteProject(id) {
