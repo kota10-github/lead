@@ -166,6 +166,9 @@
     .project-col{display:flex;flex-direction:column;gap:12px}
     .project-branch{display:flex;align-items:flex-start;gap:16px}
     .project-items-col{display:flex;flex-direction:column;gap:8px}
+    /* 親タブと + ボタンを縦並びにして「親タブの真下」に + を出す */
+    .proj-col-wrap{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+    .map-add-plus-below, .sub-add-plus-below{align-self:flex-start;margin-left:4px}
     /* Mind-map style collapse: ▾/▸ toggle next to a node hides its children. */
     .map-collapse-toggle{
       display:inline-flex;align-items:center;justify-content:center;
@@ -194,7 +197,7 @@
     }
     .map-add-plus:hover, .sub-add-plus:hover, .map-add-btn-plus:hover { color: var(--primary); border-color: var(--primary); background: var(--primary-light) }
     .project-branch:hover .map-add-plus,
-    .sub-tree-row:hover > .sub-tree-children > .sub-add-plus,
+    .sub-tree-row:hover > .sub-tree-card-wrap > .sub-add-plus,
     .root-wrap:hover > .map-add-btn-plus,
     .map-add-plus.open, .sub-add-plus.open, .map-add-btn-plus.open { opacity: 1; pointer-events: auto }
     /* Touch devices: no hover, always show the + (dim) so mobile users can tap */
@@ -2314,6 +2317,7 @@
           var projTasks = getTasksByProject(proj.projectId);
           var projHasChildren = (proj.manuals.length + projTasks.filter(function(t){return !t.done}).length + (proj.subProjects ? proj.subProjects.length : 0)) > 0;
           html += `<div class="project-branch${projCollapsed ? ' collapsed' : ''}">`;
+          html += `<div class="proj-col-wrap">`;
           html += `<div class="node-project-standalone" data-node="proj-${proj.projectId}" draggable="true" ondragstart="handleProjectDragStart(event,${proj.projectId})" ondragend="handleProjectDragEnd(event)" ondragover="handleProjectDragOver(event,${proj.projectId})" ondragleave="this.classList.remove('drop-target','drop-before','drop-after')" ondrop="handleProjectDrop(event,${proj.projectId})" style="border-color:${c.bg};background:${c.light};color:${c.text}" onclick="navigate('project-detail',{id:${proj.projectId}})">`;
           var toggleBtn = projHasChildren ? `<button class="map-collapse-toggle" title="${projCollapsed ? '展開' : '折りたたむ'}" onclick="event.stopPropagation();toggleMapCollapse('${projKey}', this)">${projCollapsed ? '▸' : '▾'}</button>` : '';
           html += `<div style="font-weight:600;display:flex;align-items:center"><span>${escapeHtml(proj.projectName)}<span style="opacity:.6;font-size:11px;margin-left:4px">(${proj.manuals.length + projTasks.filter(function(t){return !t.done}).length})</span></span>${toggleBtn}</div>`;
@@ -2323,10 +2327,11 @@
             html += `</div></div>`;
           }
           html += `</div>`; // close node-project-standalone
+          // 親タブの直下に + ボタンを置く
+          html += `<button class="map-add-plus map-add-plus-below" title="追加" onclick="event.stopPropagation();showAddOptionsPopup(this,${proj.projectId},'project')">+</button>`;
+          html += `</div>`; // close proj-col-wrap
           // Manuals, tasks, and sub-projects branch to the right
           html += `<div class="sub-tree-children" data-parent="proj-${proj.projectId}">`;
-          // + ボタンは親タブのすぐ隣に置く (子の末尾だと遠いというユーザー要望)
-          html += `<button class="map-add-plus" title="追加" onclick="event.stopPropagation();showAddOptionsPopup(this,${proj.projectId},'project')">+</button>`;
           proj.manuals.forEach(m => {
             html += `<div class="node-manual" data-node="pm-${proj.projectId}-${m.id}" onclick="navigate('manual-detail',{id:${m.id}})" style="border-left:3px solid ${c.bg};background:${c.light};cursor:pointer"><div class="node-manual-title" style="color:${c.bg};display:flex;align-items:center;gap:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round" style="flex-shrink:0"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg><span>${escapeHtml(m.title)}</span><span class="node-delete-btn" onclick="event.stopPropagation();confirmDeleteManual(${m.id})" title="削除">×</span></div>`;
             if (m.purpose) html += `<div class="node-manual-purpose">${escapeHtml(m.purpose)}</div>`;
@@ -2356,10 +2361,11 @@
           html += '<div class="sub-tree-card-wrap">';
           html += `<div class="node-manual" data-node="sp-${sp.projectId}" draggable="true" ondragstart="handleProjectDragStart(event,${sp.projectId})" ondragend="handleProjectDragEnd(event)" ondragover="handleProjectDragOver(event,${sp.projectId})" ondragleave="this.classList.remove('drop-target','drop-before','drop-after')" ondrop="handleProjectDrop(event,${sp.projectId})" onclick="navigate('project-detail',{id:${sp.projectId}})" style="border-left:3px solid ${sc.bg};background:${sc.light}"><div class="node-manual-title" style="color:${sc.bg};display:flex;align-items:center;gap:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:.7"><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7-4H4a2 2 0 0 0-2 2v14z"/></svg><span>${escapeHtml(sp.projectName)}</span>${spToggle}</div>`;
           html += `<div class="node-manual-purpose">${sp.subProjects.length > 0 ? '<span style="opacity:.6;font-size:10px">' + sp.subProjects.length + '件のサブ</span>' : ''}${spTasks.length > 0 ? '<span style="opacity:.6;font-size:10px;margin-left:4px">' + spTasks.filter(function(t){return t.done}).length + '/' + spTasks.length + ' タスク</span>' : ''}</div></div>`;
+          // 親タブの直下に + ボタンを置く
+          html += '<button class="sub-add-plus sub-add-plus-below" title="追加" onclick="event.stopPropagation();showAddOptionsPopup(this,' + sp.projectId + ',\'subproject\')">+</button>';
           html += '</div>'; // close sub-tree-card-wrap
           // Tasks and children to the right
           html += '<div class="sub-tree-children">';
-          html += '<button class="sub-add-plus" title="追加" onclick="event.stopPropagation();showAddOptionsPopup(this,' + sp.projectId + ',\'subproject\')">+</button>';
           (sp.manuals || []).forEach(function(m) {
             html += '<div class="node-manual" onclick="event.stopPropagation();navigate(\'manual-detail\',{id:' + m.id + '})" style="border-left:3px solid ' + sc.bg + ';background:' + sc.light + ';cursor:pointer"><div class="node-manual-title" style="color:' + sc.bg + ';display:flex;align-items:center;gap:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round" style="flex-shrink:0"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg><span>' + escapeHtml(m.title) + '</span><span class="node-delete-btn" onclick="event.stopPropagation();confirmDeleteManual(' + m.id + ')" title="削除">×</span></div>';
             if (m.purpose) html += '<div class="node-manual-purpose">' + escapeHtml(m.purpose) + '</div>';
@@ -2401,10 +2407,11 @@
           html += '<div class="todo-checkbox ' + (t.done ? 'checked' : '') + '" style="width:24px;height:24px;font-size:10px" onclick="event.stopPropagation();expandProjectTaskActions(this,' + t.id + ',' + t.done + ')">' + (t.done ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"/></svg>') + '</div>';
           html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>' + dueBadgeHtml(t) + taskToggle;
           html += '</div></div>';
+          // 親タブの直下に + ボタンを置く
+          html += '<button class="sub-add-plus sub-add-plus-below" title="子タスクを追加" onclick="event.stopPropagation();showAddChildTask(' + t.id + ')">+</button>';
           html += '</div>'; // close sub-tree-card-wrap
-          // Right side: + は親タブ直近に表示し、その下に子タスク
+          // Right side: 子タスク
           html += '<div class="sub-tree-children">';
-          html += '<button class="sub-add-plus" title="子タスクを追加" onclick="event.stopPropagation();showAddChildTask(' + t.id + ')">+</button>';
           kids.forEach(function(c) { renderTaskBranch(c, color); });
           html += '</div>'; // close sub-tree-children
           html += '</div>'; // close sub-tree-row
