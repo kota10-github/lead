@@ -815,7 +815,7 @@
 .editable-title{cursor:text;padding:4px 8px;margin:-4px -8px;border-radius:var(--radius);border:2px solid transparent;transition:all .15s;min-width:100px;outline:none}
 .editable-title:hover{border-color:var(--border);background:var(--bg-muted)}
 .editable-title:focus{border-color:var(--primary);background:var(--bg);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
-.editable-desc{cursor:text;padding:4px 8px;margin:-4px -8px;border-radius:var(--radius);border:1px solid transparent;transition:all .15s;outline:none;font-size:14px;color:var(--fg-muted)}
+.editable-desc{cursor:text;padding:4px 8px;margin:-4px -8px;border-radius:var(--radius);border:1px solid transparent;transition:all .15s;outline:none;font-size:14px;color:var(--fg-muted);white-space:pre-wrap;word-break:break-word}
 .editable-desc:hover{border-color:var(--border);background:var(--bg-muted)}
 .editable-desc:focus{border-color:var(--primary);background:var(--bg);box-shadow:0 0 0 3px rgba(37,99,235,.1);color:var(--fg)}
 .editable-desc:empty::before{content:attr(data-placeholder);color:var(--fg-muted2);pointer-events:none}
@@ -2729,7 +2729,7 @@
             <div onclick="navigate('project-detail',{id:${p.id}})">
               <div class="card-header"><div class="flex items-center gap-2">${icons.folder}<span class="card-title">${escapeHtml(p.name)}</span></div></div>
               <div class="card-body">
-                ${p.description ? `<p class="text-sm" style="color:var(--fg-muted);margin-bottom:12px">${escapeHtml(p.description)}</p>` : ''}
+                ${p.description ? `<p class="text-sm" style="color:var(--fg-muted);margin-bottom:12px;white-space:pre-wrap;word-break:break-word">${escapeHtml(p.description)}</p>` : ''}
                 <span class="badge badge-secondary">${icons.book} ${count} マニュアル</span>
               </div>
             </div>
@@ -6051,7 +6051,9 @@
       if (!project) return;
       var el = document.getElementById('proj-desc-edit');
       if (!el) return;
-      var newDesc = el.textContent.trim();
+      // innerText を使うと <br>/<div> の境界が \n に変換され、
+      // contenteditable で Shift+Enter した改行も保存される
+      var newDesc = (el.innerText || el.textContent || '').replace(/\r\n?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
       if (newDesc !== (project.description || '')) {
         project.description = newDesc;
         project._modTs = bumpModTs(project._modTs);
