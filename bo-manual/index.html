@@ -1079,37 +1079,65 @@
           } catch(e) {}
         }
       })();
-      // 業務形態は『感覚 / 仕組み / 作業』の 3 つだけに固定する。
-      // tombstone ではなく "物理削除" で処理 — リモートにも残骸を残さない。
-      // (loadData 段階・push 直前・remote merge 直後 すべてで filter する)
-      var KEEP_TAG_NAMES = { '感覚': '#f59e0b', '仕組み': '#06b6d4', '作業': '#6366f1' };
-      window.KEEP_TAG_NAMES = KEEP_TAG_NAMES;
-      function isAllowedTag(t) { return !!(t && t.name && KEEP_TAG_NAMES.hasOwnProperty(t.name)); }
+      // 業務形態は『許可 ID リスト』方式。name-based はリネームを破壊するので
+      // 廃止。data._allowedTagIds に明示的に登録された ID だけが表に出る。
+      // - 初回 (リスト未設定): 現行の 感覚/仕組み/作業 を見つけて ID を凍結
+      // - 新規追加: showTagDialog で許可リストに append
+      // - 削除: confirmDeleteTag で許可リストから除外
+      // - リネーム: ID 不変なのでそのまま維持
+      var INIT_TAG_NAMES = { '感覚': '#f59e0b', '仕組み': '#06b6d4', '作業': '#6366f1' };
+      function _initAllowedTagIds() {
+        if (Array.isArray(data._allowedTagIds)) return;
+        var ids = [];
+        var seen = {};
+        data.tags = data.tags || [];
+        data.tags.forEach(function(t){
+          if (!t || t._deleted) return;
+          if (INIT_TAG_NAMES.hasOwnProperty(t.name) && !seen[t.name]) {
+            ids.push(t.id);
+            seen[t.name] = true;
+          }
+        });
+        Object.keys(INIT_TAG_NAMES).forEach(function(name){
+          if (!seen[name]) {
+            if (!data.nextTagId) data.nextTagId = (data.tags.reduce(function(m,t){return Math.max(m,t.id||0)},0) || 0) + 1;
+            var newTag = { id: data.nextTagId++, name: name, color: INIT_TAG_NAMES[name], _modTs: Date.now() };
+            data.tags.push(newTag);
+            ids.push(newTag.id);
+          }
+        });
+        data._allowedTagIds = ids;
+      }
+      function isAllowedTag(t) {
+        return !!(t && t.id != null && Array.isArray(data._allowedTagIds) && data._allowedTagIds.indexOf(t.id) >= 0);
+      }
       function purgeTags(list) {
         if (!Array.isArray(list)) return [];
-        var seen = {};
-        return list.filter(function(t) {
-          if (!isAllowedTag(t)) return false;     // 許可外 → 物理削除
-          if (t._deleted) return false;            // tombstone も物理削除
-          if (seen[t.name]) return false;          // 同名重複も物理削除
-          seen[t.name] = true;
+        var seenIds = {};
+        return list.filter(function(t){
+          if (!isAllowedTag(t)) return false;       // 許可 ID 外 → 物理削除
+          if (t._deleted) return false;              // tombstone も物理削除
+          if (seenIds[t.id]) return false;           // 重複 ID も物理削除
+          seenIds[t.id] = true;
           return true;
         });
       }
       function ensureTagWhitelist() {
+        _initAllowedTagIds();
         data.tags = purgeTags(data.tags || []);
-        var seen = {};
-        data.tags.forEach(function(t){ seen[t.name] = true; });
-        Object.keys(KEEP_TAG_NAMES).forEach(function(name) {
-          if (!seen[name]) {
-            if (!data.nextTagId) data.nextTagId = (data.tags.reduce(function(m,t){return Math.max(m,t.id||0)},0) || 0) + 1;
-            data.tags.push({ id: data.nextTagId++, name: name, color: KEEP_TAG_NAMES[name], _modTs: Date.now() });
-          }
-        });
+      }
+      function allowTagId(id) {
+        if (!Array.isArray(data._allowedTagIds)) data._allowedTagIds = [];
+        if (data._allowedTagIds.indexOf(id) < 0) data._allowedTagIds.push(id);
+      }
+      function disallowTagId(id) {
+        if (!Array.isArray(data._allowedTagIds)) return;
+        data._allowedTagIds = data._allowedTagIds.filter(function(x){ return x !== id; });
       }
       window.purgeTags = purgeTags;
       window.ensureTagWhitelist = ensureTagWhitelist;
-      // 起動時に物理削除を実行
+      window.allowTagId = allowTagId;
+      window.disallowTagId = disallowTagId;
       ensureTagWhitelist();
       try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch(e) {}
     } catch {
@@ -1598,11 +1626,18 @@
     }
     window.selectWorkMgmtTag = selectWorkMgmtTag;
 
+    var _workMgmtSearch = '';
+    function onWorkMgmtSearchInput(val) {
+      _workMgmtSearch = val || '';
+      _renderWorkMgmtBody();
+    }
+    window.onWorkMgmtSearchInput = onWorkMgmtSearchInput;
+
     function renderWorkMgmt(el) {
       var tags = (data.tags || []).filter(function(t){ return t && !t._deleted; });
       var liveProjects = (data.projects || []).filter(function(p){ return p && !p._deleted; });
       // 選択中タグが既に削除済みなら null へリセット
-      if (_workMgmtSelectedTag != null && !tags.find(function(t){ return t.id === _workMgmtSelectedTag; })) {
+      if (_workMgmtSelectedTag != null && _workMgmtSelectedTag !== 0 && !tags.find(function(t){ return t.id === _workMgmtSelectedTag; })) {
         _workMgmtSelectedTag = null;
       }
       var html = '<div class="page-header"><h1 class="page-title">業務管理</h1></div>';
@@ -1620,7 +1655,6 @@
         html += escapeHtml(t.name) + ' <span class="work-tab-count">' + count + '</span>';
         html += '</button>';
       });
-      // 業務形態が未設定のプロジェクト用タブ
       var noTagCount = liveProjects.filter(function(p){ return !p.tagId; }).length;
       if (noTagCount > 0) {
         var noTagActive = _workMgmtSelectedTag === 0;
@@ -1628,54 +1662,76 @@
       }
       html += '</div>';
 
-      // フィルタ後のプロジェクト一覧
+      // 検索ボックス
+      html += '<div style="margin-bottom:16px"><input class="input" id="work-mgmt-search-input" type="search" placeholder="プロジェクト名・説明・マニュアルで検索" value="' + escapeHtml(_workMgmtSearch) + '" oninput="onWorkMgmtSearchInput(this.value)" style="max-width:480px"></div>';
+      html += '<div id="work-mgmt-body"></div>';
+      el.innerHTML = html;
+      _renderWorkMgmtBody();
+    }
+    function _renderWorkMgmtBody() {
+      var body = document.getElementById('work-mgmt-body');
+      if (!body) return;
+      var tags = (data.tags || []).filter(function(t){ return t && !t._deleted; });
+      var liveProjects = (data.projects || []).filter(function(p){ return p && !p._deleted; });
+      // タグでフィルタ
       var projs = liveProjects;
       if (_workMgmtSelectedTag === 0) {
         projs = projs.filter(function(p){ return !p.tagId; });
       } else if (_workMgmtSelectedTag != null) {
         projs = projs.filter(function(p){ return p.tagId === _workMgmtSelectedTag; });
       }
-      if (projs.length === 0) {
-        html += '<div class="empty" style="padding:40px"><p>該当するプロジェクトがありません</p></div>';
-      } else {
-        html += '<div style="display:flex;flex-direction:column;gap:10px">';
-        projs.forEach(function(p){
-          var tag = p.tagId ? tags.find(function(t){ return t.id === p.tagId; }) : null;
-          var mans = (data.manuals || []).filter(function(m){ return m && !m._deleted && m.projectId === p.id; });
-          var allTsks = (data.projectTasks || []).filter(function(t){ return t && !t._deleted && t.projectId === p.id; });
-          var openTsks = allTsks.filter(function(t){ return !t.done; });
-          html += '<div class="card" style="padding:14px 18px;cursor:pointer" onclick="navigate(\'project-detail\',{id:' + p.id + '})">';
-          html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">';
-          html += '<span style="font-weight:600;font-size:14px">' + escapeHtml(p.name) + '</span>';
-          if (tag) {
-            html += '<span style="font-size:11px;padding:1px 8px;border-radius:8px;background:' + tag.color + '22;color:' + tag.color + '">' + escapeHtml(tag.name) + '</span>';
-          } else {
-            html += '<span style="font-size:11px;padding:1px 8px;border-radius:8px;background:var(--bg-muted);color:var(--fg-muted2)">業務形態未設定</span>';
-          }
-          html += '</div>';
-          if (p.description) {
-            html += '<p class="text-sm" style="color:var(--fg-muted);margin-bottom:8px;white-space:pre-wrap;word-break:break-word">' + escapeHtml(p.description) + '</p>';
-          }
-          html += '<div style="display:flex;gap:14px;font-size:12px;color:var(--fg-muted)">';
-          html += '<span>マニュアル ' + mans.length + '</span>';
-          html += '<span>タスク ' + openTsks.length + ' / ' + allTsks.length + '</span>';
-          html += '</div>';
-          // マニュアルを 3 件まで簡易表示
-          if (mans.length > 0) {
-            html += '<div style="margin-top:8px;display:flex;flex-direction:column;gap:2px">';
-            mans.slice(0, 5).forEach(function(m){
-              html += '<div style="font-size:12px;color:var(--fg-muted);padding:2px 0;cursor:pointer" onclick="event.stopPropagation();navigate(\'manual-detail\',{id:' + m.id + '})">・' + escapeHtml(m.title) + '</div>';
-            });
-            if (mans.length > 5) {
-              html += '<div style="font-size:11px;color:var(--fg-muted2)">他 ' + (mans.length - 5) + ' 件</div>';
-            }
-            html += '</div>';
-          }
-          html += '</div>';
+      // 検索でさらにフィルタ
+      var q = (_workMgmtSearch || '').trim().toLowerCase();
+      if (q) {
+        projs = projs.filter(function(p){
+          if ((p.name || '').toLowerCase().indexOf(q) >= 0) return true;
+          if ((p.description || '').toLowerCase().indexOf(q) >= 0) return true;
+          // 配下マニュアルもマッチ
+          var ms = (data.manuals || []).filter(function(m){ return m && !m._deleted && m.projectId === p.id; });
+          return ms.some(function(m){ return (m.title || '').toLowerCase().indexOf(q) >= 0; });
         });
-        html += '</div>';
       }
-      el.innerHTML = html;
+      var html = '';
+      if (projs.length === 0) {
+        body.innerHTML = '<div class="empty" style="padding:40px"><p>該当するプロジェクトがありません</p></div>';
+        return;
+      }
+      html += '<div style="display:flex;flex-direction:column;gap:10px">';
+      projs.forEach(function(p){
+        var tag = p.tagId ? tags.find(function(t){ return t.id === p.tagId; }) : null;
+        var mans = (data.manuals || []).filter(function(m){ return m && !m._deleted && m.projectId === p.id; });
+        var allTsks = (data.projectTasks || []).filter(function(t){ return t && !t._deleted && t.projectId === p.id; });
+        var openTsks = allTsks.filter(function(t){ return !t.done; });
+        html += '<div class="card" style="padding:14px 18px;cursor:pointer" onclick="navigate(\'project-detail\',{id:' + p.id + '})">';
+        html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">';
+        html += '<span style="font-weight:600;font-size:14px">' + escapeHtml(p.name) + '</span>';
+        if (tag) {
+          html += '<span style="font-size:11px;padding:1px 8px;border-radius:8px;background:' + tag.color + '22;color:' + tag.color + '">' + escapeHtml(tag.name) + '</span>';
+        } else {
+          html += '<span style="font-size:11px;padding:1px 8px;border-radius:8px;background:var(--bg-muted);color:var(--fg-muted2)">業務形態未設定</span>';
+        }
+        html += '</div>';
+        if (p.description) {
+          html += '<p class="text-sm" style="color:var(--fg-muted);margin-bottom:8px;white-space:pre-wrap;word-break:break-word">' + escapeHtml(p.description) + '</p>';
+        }
+        html += '<div style="display:flex;gap:14px;font-size:12px;color:var(--fg-muted)">';
+        html += '<span>マニュアル ' + mans.length + '</span>';
+        html += '<span>タスク ' + openTsks.length + ' / ' + allTsks.length + '</span>';
+        html += '</div>';
+        if (mans.length > 0) {
+          html += '<div style="margin-top:8px;display:flex;flex-direction:column;gap:2px">';
+          mans.slice(0, 5).forEach(function(m){
+            html += '<div style="font-size:12px;color:var(--fg-muted);padding:2px 0;cursor:pointer" onclick="event.stopPropagation();navigate(\'manual-detail\',{id:' + m.id + '})">・' + escapeHtml(m.title) + '</div>';
+          });
+          if (mans.length > 5) {
+            html += '<div style="font-size:11px;color:var(--fg-muted2)">他 ' + (mans.length - 5) + ' 件</div>';
+          }
+          html += '</div>';
+        }
+        html += '</div>';
+      });
+      html += '</div>';
+      body.innerHTML = html;
     }
 
     function renderTags(el) {
@@ -1785,6 +1841,7 @@
               if (!data.tags) data.tags = [];
               var newId = data.nextTagId++;
               data.tags.push({ id: newId, name: name, color: color, _modTs: bumpModTs(0) });
+              if (typeof allowTagId === 'function') allowTagId(newId);
               markDirty('tags', newId);
               toast('業務形態を作成しました');
             }
@@ -1802,10 +1859,11 @@
         [
           { label: 'キャンセル', onClick: function(o) { o.remove(); } },
           { label: '削除', class: 'btn btn-destructive', onClick: function(o) {
-            // tombstone: merge で復活しないよう物理削除でなく _deleted フラグを立てる
-            var t = (data.tags || []).find(function(x) { return x.id === tagId; });
-            if (t) { t._deleted = true; t._modTs = bumpModTs(t._modTs); markDirty('tags', t.id); }
+            var idx = (data.tags || []).findIndex(function(x) { return x.id === tagId; });
+            if (idx >= 0) data.tags.splice(idx, 1);  // 物理削除
+            if (typeof disallowTagId === 'function') disallowTagId(tagId);
             data.projects.forEach(function(p) { if (p.tagId === tagId) p.tagId = null; });
+            markDirty('tags', tagId);
             saveData(); o.remove(); render(); toast('業務形態を削除しました');
           }}
         ]
@@ -3030,30 +3088,71 @@
       setTimeout(function() { loadMemoToEditor(project.id); updateMemoToc(); }, 0);
       el.innerHTML = html;
     }
+    // プロジェクト階層を root → 当該 まで配列で返す
+    function getProjectChain(projId) {
+      var chain = [];
+      var cur = projId ? getProject(projId) : null;
+      var guard = 0;
+      while (cur && guard++ < 50) {
+        chain.unshift(cur);
+        cur = cur.parentId ? getProject(cur.parentId) : null;
+      }
+      return chain;
+    }
+
+    var _manualSearch = '';
+    function onManualSearchInput(val) {
+      _manualSearch = val || '';
+      _renderManualListBody();
+    }
+    window.onManualSearchInput = onManualSearchInput;
     function renderManualList(el) {
-      // プロジェクトごとにグルーピング (sub-project 含む、live のみ)
       var liveManuals = (data.manuals || []).filter(function(m){ return m && !m._deleted; });
       var total = liveManuals.length;
       var html = '<div class="page-header"><h1 class="page-title">マニュアル <span style="color:var(--fg-muted2);font-weight:500">' + total + '</span></h1></div>';
       html += renderBreadcrumb();
-      if (total === 0) {
-        html += '<div class="empty">' + icons.book + '<p>マニュアルがありません</p></div>';
-        el.innerHTML = html;
+      // 検索ボックス
+      html += '<div style="margin-bottom:18px"><input class="input" id="manual-search-input" type="search" placeholder="マニュアル名・プロジェクト名で検索" value="' + escapeHtml(_manualSearch) + '" oninput="onManualSearchInput(this.value)" style="max-width:480px"></div>';
+      html += '<div id="manual-list-body"></div>';
+      el.innerHTML = html;
+      _renderManualListBody();
+    }
+    function _renderManualListBody() {
+      var body = document.getElementById('manual-list-body');
+      if (!body) return;
+      var liveManuals = (data.manuals || []).filter(function(m){ return m && !m._deleted; });
+      if (liveManuals.length === 0) {
+        body.innerHTML = '<div class="empty">' + icons.book + '<p>マニュアルがありません</p></div>';
         return;
       }
-      // 順序: projects 配列の順 (マップの並びに合わせる)
+      // 検索フィルタ (タイトル / 親プロジェクト名 / 自身の purpose にマッチ)
+      var q = (_manualSearch || '').trim().toLowerCase();
+      var filtered = liveManuals;
+      if (q) {
+        filtered = liveManuals.filter(function(m){
+          if ((m.title || '').toLowerCase().indexOf(q) >= 0) return true;
+          if ((m.purpose || '').toLowerCase().indexOf(q) >= 0) return true;
+          var chain = getProjectChain(m.projectId);
+          return chain.some(function(p){ return (p.name || '').toLowerCase().indexOf(q) >= 0; });
+        });
+      }
+      var html = '';
+      if (filtered.length === 0) {
+        body.innerHTML = '<div class="empty" style="padding:40px"><p>該当するマニュアルがありません</p></div>';
+        return;
+      }
+      // プロジェクトごとにグルーピング
       var groupedByProj = {};
       var orderedProjIds = [];
       (data.projects || []).forEach(function(p){
         if (!p || p._deleted) return;
-        var ms = liveManuals.filter(function(m){ return m.projectId === p.id; });
+        var ms = filtered.filter(function(m){ return m.projectId === p.id; });
         if (ms.length > 0) {
           orderedProjIds.push(p.id);
           groupedByProj[p.id] = { project: p, manuals: ms };
         }
       });
-      // Project に紐づかないマニュアル (孤児) も表示
-      var orphans = liveManuals.filter(function(m){ return !m.projectId || !getProject(m.projectId); });
+      var orphans = filtered.filter(function(m){ return !m.projectId || !getProject(m.projectId); });
       if (orphans.length > 0) {
         orderedProjIds.push(0);
         groupedByProj[0] = { project: null, manuals: orphans };
@@ -3062,19 +3161,26 @@
       orderedProjIds.forEach(function(pid){
         var g = groupedByProj[pid];
         var color = g.project ? getProjectColor(g.project.id) : { bg: '#94a3b8', light: '#f1f5f9' };
-        var name = g.project ? g.project.name : 'その他';
-        // セクションヘッダ: 左縦バー + プロジェクト名 + 件数
+        var chain = g.project ? getProjectChain(g.project.id) : [];
+        // セクションヘッダ: 縦バー + 親階層チェーン (パンくず風) + 件数
         html += '<div>';
-        html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">';
+        html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">';
         html += '<span style="display:inline-block;width:4px;height:20px;background:' + color.bg + ';border-radius:2px;flex-shrink:0"></span>';
-        html += '<span style="font-weight:700;font-size:15px;color:' + color.bg + '">' + escapeHtml(name) + '</span>';
+        if (chain.length > 0) {
+          chain.forEach(function(p, i){
+            var isLeaf = i === chain.length - 1;
+            html += '<span onclick="navigate(\'project-detail\',{id:' + p.id + '})" style="cursor:pointer;font-weight:' + (isLeaf ? '700' : '500') + ';font-size:' + (isLeaf ? '15px' : '13px') + ';color:' + (isLeaf ? color.bg : 'var(--fg-muted)') + '">' + escapeHtml(p.name) + '</span>';
+            if (!isLeaf) html += '<span style="color:var(--fg-muted2);font-size:11px">›</span>';
+          });
+        } else {
+          html += '<span style="font-weight:700;font-size:15px;color:var(--fg-muted)">その他</span>';
+        }
         html += '<span style="color:var(--fg-muted2);font-size:13px;font-weight:500">' + g.manuals.length + '</span>';
         html += '</div>';
-        // マニュアル一覧 (インデント + 本アイコン)
+        // マニュアル一覧
         html += '<div style="display:flex;flex-direction:column;gap:8px;padding-left:18px">';
         g.manuals.forEach(function(m){
           html += '<div class="manual-list-row" onclick="navigate(\'manual-detail\',{id:' + m.id + '})" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border:1px solid var(--border-light);border-radius:8px;cursor:pointer;transition:background .1s">';
-          // 本アイコン (プロジェクト色)
           html += '<svg width="18" height="18" viewBox="0 0 24 24" fill="' + color.bg + '" stroke="' + color.bg + '" stroke-width="1.5" stroke-linejoin="round" style="flex-shrink:0"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>';
           html += '<span style="font-size:14px;color:var(--fg);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(m.title) + '</span>';
           html += '</div>';
@@ -3082,7 +3188,7 @@
         html += '</div></div>';
       });
       html += '</div>';
-      el.innerHTML = html;
+      body.innerHTML = html;
     }
 
     // MANUAL DETAIL (fullscreen)
