@@ -820,6 +820,14 @@
 .editable-desc:focus{border-color:var(--primary);background:var(--bg);box-shadow:0 0 0 3px rgba(37,99,235,.1);color:var(--fg)}
 .editable-desc:empty::before{content:attr(data-placeholder);color:var(--fg-muted2);pointer-events:none}
 
+/* 業務管理ページ: 業務形態切り替えタブ */
+.work-tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.work-tab{padding:10px 16px;border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--fg-muted);border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .12s,border-color .12s;display:inline-flex;align-items:center;gap:6px}
+.work-tab:hover{color:var(--fg)}
+.work-tab.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+.work-tab .work-tab-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.work-tab .work-tab-count{font-size:11px;color:var(--fg-muted2);font-weight:400}
+
     </style>
 </head>
 <body>
@@ -842,6 +850,10 @@
         <button class="nav-item" data-page="manuals" onclick="navigate('manuals')">
           <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
           マニュアル
+        </button>
+        <button class="nav-item" data-page="work-mgmt" onclick="navigate('work-mgmt')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 12h18M3 17h18"/><circle cx="6" cy="7" r="1.2" fill="currentColor" stroke="none"/><circle cx="6" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="6" cy="17" r="1.2" fill="currentColor" stroke="none"/></svg>
+          業務管理
         </button>
         <button class="nav-item nav-item-matrix" data-page="matrix" onclick="navigate('matrix')" style="display:none">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="1"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
@@ -1259,6 +1271,7 @@
       if (page === 'tasks') crumbs.push({label: 'マイタスク', current: true});
       if (page === 'users') crumbs.push({label: 'ユーザー管理', current: true});
       if (page === 'tags') crumbs.push({label: '業務形態管理', current: true});
+      if (page === 'work-mgmt') crumbs.push({label: '業務管理', current: true});
       if (page === 'permissions') crumbs.push({label: '権限管理', current: true});
       if (page === 'member-page' && params.userId) {
         crumbs.push({label: 'ユーザー管理', page: 'users'});
@@ -1553,6 +1566,7 @@
       case 'goal-detail': renderGoalDetail(main); break;
         case 'users': renderUsers(main); break;
         case 'tags': renderTags(main); break;
+        case 'work-mgmt': renderWorkMgmt(main); break;
         case 'permissions': renderPermissions(main); break;
         case 'member-page': renderMemberPage(main); break;
         default: main.innerHTML = '<p>Not Found</p>';
@@ -1566,6 +1580,102 @@
       var tag = (data.tags || []).find(function(t) { return t.id === proj.tagId && !t._deleted; });
       if (!tag) return { bg: '#94a3b8', light: '#f1f5f9', text: '#475569' };
       return { bg: tag.color, light: tag.color + '20', text: tag.color };
+    }
+
+    // 業務管理ページの選択中業務形態 (null = すべて, それ以外は tag.id)
+    var _workMgmtSelectedTag = (function(){
+      try {
+        var v = localStorage.getItem('bo-work-mgmt-tag');
+        if (v === null || v === '') return null;
+        var n = Number(v);
+        return isNaN(n) ? null : n;
+      } catch(e) { return null; }
+    })();
+    function selectWorkMgmtTag(tagId) {
+      _workMgmtSelectedTag = tagId;
+      try { localStorage.setItem('bo-work-mgmt-tag', tagId == null ? '' : String(tagId)); } catch(e) {}
+      render();
+    }
+    window.selectWorkMgmtTag = selectWorkMgmtTag;
+
+    function renderWorkMgmt(el) {
+      var tags = (data.tags || []).filter(function(t){ return t && !t._deleted; });
+      var liveProjects = (data.projects || []).filter(function(p){ return p && !p._deleted; });
+      // 選択中タグが既に削除済みなら null へリセット
+      if (_workMgmtSelectedTag != null && !tags.find(function(t){ return t.id === _workMgmtSelectedTag; })) {
+        _workMgmtSelectedTag = null;
+      }
+      var html = '<div class="page-header"><h1 class="page-title">業務管理</h1></div>';
+      html += renderBreadcrumb();
+
+      // 切り替えタブ
+      var allCount = liveProjects.length;
+      html += '<div class="work-tabs">';
+      html += '<button class="work-tab' + (_workMgmtSelectedTag == null ? ' active' : '') + '" onclick="selectWorkMgmtTag(null)">すべて <span class="work-tab-count">' + allCount + '</span></button>';
+      tags.forEach(function(t){
+        var count = liveProjects.filter(function(p){ return p.tagId === t.id; }).length;
+        var active = _workMgmtSelectedTag === t.id;
+        html += '<button class="work-tab' + (active ? ' active' : '') + '" onclick="selectWorkMgmtTag(' + t.id + ')"' + (active ? ' style="color:' + t.color + ';border-bottom-color:' + t.color + '"' : '') + '>';
+        html += '<span class="work-tab-dot" style="background:' + t.color + '"></span>';
+        html += escapeHtml(t.name) + ' <span class="work-tab-count">' + count + '</span>';
+        html += '</button>';
+      });
+      // 業務形態が未設定のプロジェクト用タブ
+      var noTagCount = liveProjects.filter(function(p){ return !p.tagId; }).length;
+      if (noTagCount > 0) {
+        var noTagActive = _workMgmtSelectedTag === 0;
+        html += '<button class="work-tab' + (noTagActive ? ' active' : '') + '" onclick="selectWorkMgmtTag(0)">未設定 <span class="work-tab-count">' + noTagCount + '</span></button>';
+      }
+      html += '</div>';
+
+      // フィルタ後のプロジェクト一覧
+      var projs = liveProjects;
+      if (_workMgmtSelectedTag === 0) {
+        projs = projs.filter(function(p){ return !p.tagId; });
+      } else if (_workMgmtSelectedTag != null) {
+        projs = projs.filter(function(p){ return p.tagId === _workMgmtSelectedTag; });
+      }
+      if (projs.length === 0) {
+        html += '<div class="empty" style="padding:40px"><p>該当するプロジェクトがありません</p></div>';
+      } else {
+        html += '<div style="display:flex;flex-direction:column;gap:10px">';
+        projs.forEach(function(p){
+          var tag = p.tagId ? tags.find(function(t){ return t.id === p.tagId; }) : null;
+          var mans = (data.manuals || []).filter(function(m){ return m && !m._deleted && m.projectId === p.id; });
+          var allTsks = (data.projectTasks || []).filter(function(t){ return t && !t._deleted && t.projectId === p.id; });
+          var openTsks = allTsks.filter(function(t){ return !t.done; });
+          html += '<div class="card" style="padding:14px 18px;cursor:pointer" onclick="navigate(\'project-detail\',{id:' + p.id + '})">';
+          html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">';
+          html += '<span style="font-weight:600;font-size:14px">' + escapeHtml(p.name) + '</span>';
+          if (tag) {
+            html += '<span style="font-size:11px;padding:1px 8px;border-radius:8px;background:' + tag.color + '22;color:' + tag.color + '">' + escapeHtml(tag.name) + '</span>';
+          } else {
+            html += '<span style="font-size:11px;padding:1px 8px;border-radius:8px;background:var(--bg-muted);color:var(--fg-muted2)">業務形態未設定</span>';
+          }
+          html += '</div>';
+          if (p.description) {
+            html += '<p class="text-sm" style="color:var(--fg-muted);margin-bottom:8px;white-space:pre-wrap;word-break:break-word">' + escapeHtml(p.description) + '</p>';
+          }
+          html += '<div style="display:flex;gap:14px;font-size:12px;color:var(--fg-muted)">';
+          html += '<span>マニュアル ' + mans.length + '</span>';
+          html += '<span>タスク ' + openTsks.length + ' / ' + allTsks.length + '</span>';
+          html += '</div>';
+          // マニュアルを 3 件まで簡易表示
+          if (mans.length > 0) {
+            html += '<div style="margin-top:8px;display:flex;flex-direction:column;gap:2px">';
+            mans.slice(0, 5).forEach(function(m){
+              html += '<div style="font-size:12px;color:var(--fg-muted);padding:2px 0;cursor:pointer" onclick="event.stopPropagation();navigate(\'manual-detail\',{id:' + m.id + '})">・' + escapeHtml(m.title) + '</div>';
+            });
+            if (mans.length > 5) {
+              html += '<div style="font-size:11px;color:var(--fg-muted2)">他 ' + (mans.length - 5) + ' 件</div>';
+            }
+            html += '</div>';
+          }
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+      el.innerHTML = html;
     }
 
     function renderTags(el) {
