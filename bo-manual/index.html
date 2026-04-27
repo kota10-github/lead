@@ -193,16 +193,23 @@
        constant size and animate only opacity (and pointer-events). */
     .map-add-plus, .sub-add-plus, .map-add-btn-plus {
       width:20px;height:20px;min-height:20px;line-height:1;padding:0;font-size:14px;font-weight:600;
-      display:inline-flex;align-items:center;justify-content:center;
+      display:inline-flex;align-items:center;justify-content:center;position:relative;
       border:1px dashed var(--border);border-radius:50%;background:transparent;color:var(--fg-muted);
-      cursor:pointer;opacity:0;pointer-events:none;transition:opacity .15s ease, color .15s, border-color .15s;
+      cursor:pointer;opacity:0;pointer-events:auto;transition:opacity .15s ease, color .15s, border-color .15s;
       flex-shrink:0;
     }
+    /* 透明ヒットエリアを 8px 拡張 — 直接ホバーで表示しやすくするため */
+    .map-add-plus::before, .sub-add-plus::before, .map-add-btn-plus::before {
+      content:'';position:absolute;inset:-8px;border-radius:50%;
+    }
     .map-add-plus:hover, .sub-add-plus:hover, .map-add-btn-plus:hover { color: var(--primary); border-color: var(--primary); background: var(--primary-light) }
-    .project-branch:hover .map-add-plus,
-    .sub-tree-row:hover .sub-add-plus,
+    /* それぞれの + は対応する領域だけで表示する */
+    .proj-row:hover > .map-add-plus-right,                  /* 親タブ周辺 → 右+ */
+    .sub-row:hover > .sub-add-plus-right,
+    .map-add-plus-below:hover,                              /* 下+ 周辺 → 下+ */
+    .sub-add-plus-below:hover,
     .root-wrap:hover > .map-add-btn-plus,
-    .map-add-plus.open, .sub-add-plus.open, .map-add-btn-plus.open { opacity: 1; pointer-events: auto }
+    .map-add-plus.open, .sub-add-plus.open, .map-add-btn-plus.open { opacity: 1 }
     /* Touch devices: no hover, always show the + (dim) so mobile users can tap */
     @media (hover: none) {
       .map-add-plus, .sub-add-plus, .map-add-btn-plus { opacity: .5; pointer-events: auto }
