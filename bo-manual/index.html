@@ -140,8 +140,10 @@
     /* MindMap */
     .mindmap-viewport{position:relative;width:100%;overflow:auto;border:1px solid rgba(226,232,240,.3);border-radius:var(--radius);background:var(--bg-muted);min-height:calc(100vh - 160px);cursor:grab}
     .mindmap-viewport:active{cursor:grabbing}
-    .mindmap-svg{position:absolute;top:0;left:0;pointer-events:none;z-index:1;transform-origin:top left}
+    .mindmap-svg{position:absolute;top:0;left:0;pointer-events:none;z-index:3;transform-origin:top left}
     .mindmap-inner{display:flex;align-items:flex-start;gap:24px;padding:32px;min-width:max-content;transform-origin:top left;transition:transform .15s ease;position:relative;z-index:2}
+    /* 接続線が + に隠されないよう、+ は線の下 (奥) に位置させる */
+    .map-add-plus, .sub-add-plus, .map-add-btn-plus{z-index:1}
     .node-root{padding:10px 20px;border-radius:12px;background:linear-gradient(135deg,#1e293b,#334155);color:#fff;font-weight:600;font-size:13px;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.15);user-select:none}
     .node-user{padding:8px 16px;border-radius:8px;font-weight:500;font-size:13px;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.1);cursor:pointer;transition:all .15s;white-space:nowrap;user-select:none}
     .node-user:hover{transform:scale(1.05);box-shadow:0 4px 12px rgba(0,0,0,.15)}
@@ -2915,7 +2917,8 @@
           if (container.classList.contains('collapsed')) return; // 折りたたみ中はライン描画しない
           var childrenDiv = container.querySelector(':scope > .sub-tree-children');
           if (!childrenDiv) return;
-          var childNodes = childrenDiv.querySelectorAll(':scope > .sub-tree-row > .sub-tree-card-wrap > [data-node]');
+          // .sub-row でラップしたので [data-node] は 1 階層深くなった
+          var childNodes = childrenDiv.querySelectorAll(':scope > .sub-tree-row > .sub-tree-card-wrap [data-node]');
           if (childNodes.length === 0) return;
           var parentPos = getPos(parentNode);
           if (!parentPos) return;
