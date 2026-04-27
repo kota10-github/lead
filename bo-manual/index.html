@@ -3285,6 +3285,76 @@
     }
 
     // MANUAL DETAIL (fullscreen)
+    // 外部URL の OGプレビュー (microlink.io 経由 / localStorage で 24h キャッシュ)
+    var URL_PREVIEW_CACHE_KEY = 'bo-url-preview-cache-v1';
+    function _readUrlPreviewCache() {
+      try { return JSON.parse(localStorage.getItem(URL_PREVIEW_CACHE_KEY) || '{}'); }
+      catch(e) { return {}; }
+    }
+    function _writeUrlPreviewCache(c) {
+      try { localStorage.setItem(URL_PREVIEW_CACHE_KEY, JSON.stringify(c)); } catch(e) {}
+    }
+    function loadUrlPreview(container) {
+      if (!container) return;
+      var url = container.getAttribute('data-url');
+      if (!url) return;
+      container.innerHTML = '<div style="padding:24px;text-align:center;color:var(--fg-muted2);font-size:13px">プレビューを読み込み中...</div>';
+      // 24h キャッシュ
+      var cache = _readUrlPreviewCache();
+      var entry = cache[url];
+      var TTL = 24 * 60 * 60 * 1000;
+      if (entry && (Date.now() - entry.ts) < TTL) {
+        if (entry.data) _renderUrlPreviewCard(container, url, entry.data);
+        else _renderUrlPreviewFallback(container, url);
+        return;
+      }
+      fetch('https://api.microlink.io/?url=' + encodeURIComponent(url))
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          var ok = d && d.status === 'success' && d.data;
+          var c = _readUrlPreviewCache();
+          c[url] = { ts: Date.now(), data: ok ? d.data : null };
+          _writeUrlPreviewCache(c);
+          if (ok) _renderUrlPreviewCard(container, url, d.data);
+          else _renderUrlPreviewFallback(container, url);
+        })
+        .catch(function(){ _renderUrlPreviewFallback(container, url); });
+    }
+    function _renderUrlPreviewCard(container, url, data) {
+      var img = data.image && data.image.url;
+      var title = data.title || url;
+      var desc = data.description || '';
+      var publisher = data.publisher || '';
+      var html = '';
+      html += '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener noreferrer" style="display:flex;text-decoration:none;color:inherit;font-family:\'Noto Sans JP\',sans-serif">';
+      if (img) {
+        html += '<div style="width:200px;flex-shrink:0;background:#f3f4f6;background-image:url(' + escapeHtml(img) + ');background-size:cover;background-position:center;min-height:160px"></div>';
+      }
+      html += '<div style="flex:1;min-width:0;padding:18px 20px">';
+      if (publisher) html += '<div style="font-size:11px;color:var(--fg-muted2);text-transform:uppercase;letter-spacing:.05em">' + escapeHtml(publisher) + '</div>';
+      html += '<div style="font-size:16px;font-weight:600;margin-top:4px;line-height:1.4;color:var(--fg)">' + escapeHtml(title) + '</div>';
+      if (desc) html += '<p style="font-size:13px;color:var(--fg-muted);margin-top:8px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">' + escapeHtml(desc) + '</p>';
+      html += '<div style="font-size:11px;color:var(--fg-muted2);margin-top:10px;word-break:break-all">' + escapeHtml(url) + '</div>';
+      html += '</div></a>';
+      container.innerHTML = html;
+    }
+    function _renderUrlPreviewFallback(container, url) {
+      var domain = '';
+      try { domain = new URL(url).hostname; } catch(e) {}
+      var html = '';
+      html += '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener noreferrer" style="display:flex;text-decoration:none;color:inherit;padding:18px 20px;align-items:center;gap:14px;font-family:\'Noto Sans JP\',sans-serif">';
+      if (domain) {
+        html += '<img src="https://www.google.com/s2/favicons?domain=' + encodeURIComponent(domain) + '&sz=64" width="40" height="40" style="border-radius:8px;flex-shrink:0;background:#f3f4f6">';
+      }
+      html += '<div style="flex:1;min-width:0">';
+      html += '<div style="font-size:14px;font-weight:600;color:var(--fg)">' + escapeHtml(domain || url) + '</div>';
+      html += '<div style="font-size:11px;color:var(--fg-muted2);margin-top:4px;word-break:break-all">' + escapeHtml(url) + '</div>';
+      html += '<div style="font-size:11px;color:var(--fg-muted2);margin-top:6px;font-style:italic">プレビューを取得できなかったため、上のリンクから直接開いてください。</div>';
+      html += '</div></a>';
+      container.innerHTML = html;
+    }
+    window.loadUrlPreview = loadUrlPreview;
+
     function renderManualDetail(el) {
       const manual = getManual(pageParams.id);
       if (!manual) { el.innerHTML = '<p>マニュアルが見つかりません</p>'; return; }
@@ -3310,17 +3380,13 @@
         html += `<span class="badge badge-secondary">${escapeHtml(a.user?.name || '不明')} <button onclick="removeAssignee(${manual.id},${a.userId})" style="margin-left:4px;opacity:.6">${icons.x}</button></span>`;
       });
       html += `<button class="btn btn-ghost btn-sm" onclick="showAddAssigneeDialog(${manual.id})">${icons.users} 追加</button></div>`;
-      // 外部リンク + プレビュー (リッチエディタは撤廃)
+      // 外部リンク + OG プレビューカード (iframe は X-Frame-Options で
+      // 拒否するサイトが多いので撤廃)
       if (manual.url) {
         html += `<div style="display:flex;align-items:center;gap:8px;margin:8px 0;flex-wrap:wrap">`;
         html += `<a href="${escapeHtml(manual.url)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:var(--primary-light,#eff6ff);border:1px solid rgba(37,99,235,.2);border-radius:8px;color:var(--primary);font-size:13px;font-weight:500;text-decoration:none;word-break:break-all;max-width:100%">${icons.external} <span>${escapeHtml(manual.url)}</span></a>`;
         html += `</div>`;
-        // 埋め込みプレビュー (X-Frame-Options で拒否されると空白になるので、
-        // 「新しいタブで開く」ボタンを別途表示)
-        html += `<div style="position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:8px;background:#fff">`;
-        html += `<iframe src="${escapeHtml(manual.url)}" style="width:100%;height:70vh;min-height:480px;border:0;display:block" loading="lazy" referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox" title="${escapeHtml(manual.title)}"></iframe>`;
-        html += `</div>`;
-        html += `<p style="font-size:11px;color:var(--fg-muted2);margin-top:6px">埋め込みを許可していないサイトは空白になることがあります。その場合は上のリンクから新しいタブで開いてください。</p>`;
+        html += `<div id="manual-url-preview" data-url="${escapeHtml(manual.url)}" style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-top:8px;background:#fff;min-height:120px"></div>`;
       } else {
         html += `<p style="color:var(--fg-muted2);font-style:italic">外部リンクが未設定です</p>`;
       }
@@ -3362,6 +3428,9 @@
 
       html += `</div>`; // close doc-page
       el.innerHTML = html;
+      // OGプレビューを非同期ロード
+      var preview = document.getElementById('manual-url-preview');
+      if (preview) loadUrlPreview(preview);
     }
 
     // Mobile side panel controls
@@ -3442,12 +3511,12 @@
           html += '<div style="margin-top:20px;display:flex;gap:8px;flex-wrap:wrap">';
           html += '<a href="' + escapeHtml(manual.url) + '" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:#eff6ff;border:1px solid rgba(37,99,235,.2);border-radius:8px;color:var(--primary);font-size:13px;font-weight:500;text-decoration:none;word-break:break-all;max-width:100%">🔗 <span>' + escapeHtml(manual.url) + '</span></a>';
           html += '</div>';
-          html += '<div style="position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:10px;background:#fff">';
-          html += '<iframe src="' + escapeHtml(manual.url) + '" style="width:100%;height:70vh;min-height:480px;border:0;display:block" loading="lazy" referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox" title="' + escapeHtml(manual.title) + '"></iframe>';
-          html += '</div>';
-          html += '<p style="font-size:11px;color:var(--fg-muted2);margin-top:6px">埋め込み非対応サイトは空白になることがあります。上のリンクから直接開いてください。</p>';
+          html += '<div id="manual-url-preview" data-url="' + escapeHtml(manual.url) + '" style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-top:10px;background:#fff;min-height:120px"></div>';
         }
         main.innerHTML = html;
+        if (manual.url && typeof loadUrlPreview === 'function') {
+          loadUrlPreview(document.getElementById('manual-url-preview'));
+        }
       }).catch(function() {
         main.innerHTML = '<div class="empty" style="padding:80px 20px;text-align:center"><h2>読み込みに失敗しました</h2></div>';
       });
