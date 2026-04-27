@@ -3290,12 +3290,10 @@
       if (!manual) { el.innerHTML = '<p>マニュアルが見つかりません</p>'; return; }
       const project = getProject(manual.projectId);
       const assignees = getAssigneesForManual(manual.id);
-      const isHtml = /<[a-z][\s\S]*>/i.test(manual.taskRoadmap || '');
       let html = `<div class="doc-page">`;
       html += `<button class="back-float" onclick="navigate('project-detail',{id:${manual.projectId}})">${icons.arrowLeft} 戻る</button>`;
       html += `<div class="doc-layout">`;
-      html += `<aside class="doc-toc"><div class="doc-toc-title">目次</div><div id="toc-links"></div></aside>`;
-      html += `<main class="doc-main">`;
+      html += `<main class="doc-main" style="grid-column:1 / span 2">`;
       html += renderBreadcrumb();
       html += `<h1 class="doc-title">${escapeHtml(manual.title)}</h1>`;
       // Mobile-only sticky action bar (desktop shows the buttons in the right
@@ -3304,7 +3302,7 @@
         <button class="btn btn-primary btn-sm" onclick="navigate('manual-form',{editId:${manual.id}})">${icons.pencil} 編集</button>
         <button class="btn btn-outline btn-sm" onclick="showManualHistory(${manual.id})">🕐 履歴</button>
         <button class="btn btn-outline btn-sm" onclick="shareManualLink(${manual.id})">🔗 共有</button>
-        <button class="btn btn-ghost btn-sm doc-actions-panel-btn" style="margin-left:auto" onclick="toggleMobileSidePanel()" title="詳細 / 目次" aria-label="詳細と目次">📑</button>
+        <button class="btn btn-ghost btn-sm doc-actions-panel-btn" style="margin-left:auto" onclick="toggleMobileSidePanel()" title="詳細" aria-label="詳細">📑</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--destructive)" onclick="confirmDeleteManual(${manual.id})">${icons.trash}</button>
       </div>`;
       html += `<div class="doc-assignees">`;
@@ -3312,10 +3310,19 @@
         html += `<span class="badge badge-secondary">${escapeHtml(a.user?.name || '不明')} <button onclick="removeAssignee(${manual.id},${a.userId})" style="margin-left:4px;opacity:.6">${icons.x}</button></span>`;
       });
       html += `<button class="btn btn-ghost btn-sm" onclick="showAddAssigneeDialog(${manual.id})">${icons.users} 追加</button></div>`;
-      if (manual.taskRoadmap) {
-        html += `<div class="prose" id="manual-content">${isHtml ? manual.taskRoadmap : `<p style="white-space:pre-wrap">${escapeHtml(manual.taskRoadmap)}</p>`}</div>`;
+      // 外部リンク + プレビュー (リッチエディタは撤廃)
+      if (manual.url) {
+        html += `<div style="display:flex;align-items:center;gap:8px;margin:8px 0;flex-wrap:wrap">`;
+        html += `<a href="${escapeHtml(manual.url)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:var(--primary-light,#eff6ff);border:1px solid rgba(37,99,235,.2);border-radius:8px;color:var(--primary);font-size:13px;font-weight:500;text-decoration:none;word-break:break-all;max-width:100%">${icons.external} <span>${escapeHtml(manual.url)}</span></a>`;
+        html += `</div>`;
+        // 埋め込みプレビュー (X-Frame-Options で拒否されると空白になるので、
+        // 「新しいタブで開く」ボタンを別途表示)
+        html += `<div style="position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:8px;background:#fff">`;
+        html += `<iframe src="${escapeHtml(manual.url)}" style="width:100%;height:70vh;min-height:480px;border:0;display:block" loading="lazy" referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox" title="${escapeHtml(manual.title)}"></iframe>`;
+        html += `</div>`;
+        html += `<p style="font-size:11px;color:var(--fg-muted2);margin-top:6px">埋め込みを許可していないサイトは空白になることがあります。その場合は上のリンクから新しいタブで開いてください。</p>`;
       } else {
-        html += `<p style="color:var(--fg-muted2);font-style:italic">TODO が未設定です</p>`;
+        html += `<p style="color:var(--fg-muted2);font-style:italic">外部リンクが未設定です</p>`;
       }
       html += `</main>`;
       // Right aside: action buttons (top-right, original position) + manual meta info
@@ -3349,46 +3356,12 @@
       html += `<div class="mobile-side-backdrop" onclick="closeMobileSidePanel()"></div>`;
       html += `<aside class="mobile-side-panel">`;
       html += `<button class="mobile-side-close" onclick="closeMobileSidePanel()" aria-label="閉じる">×</button>`;
-      html += `<div class="mobile-toc"><div class="mobile-toc-title">目次</div><div id="toc-links-mobile"></div></div>`;
       html += `<div class="info-card">`;
       html += renderInfoSections();
       html += `</div></aside>`;
 
       html += `</div>`; // close doc-page
       el.innerHTML = html;
-      setTimeout(() => {
-        const content = document.getElementById('manual-content');
-        const tocLinks = document.getElementById('toc-links');
-        const tocLinksMobile = document.getElementById('toc-links-mobile');
-        if (!content) return;
-        // Decorate copy/code blocks with コピー button on the viewer side too (no delete buttons in view mode)
-        if (typeof decorateCopyBlocks === 'function') decorateCopyBlocks(content);
-        const headings = content.querySelectorAll('h1,h2,h3');
-        const makeTocLink = function(h, i) {
-          const a = document.createElement('a');
-          a.href = `#heading-${i}`;
-          a.textContent = h.textContent;
-          a.style.paddingLeft = h.tagName === 'H3' ? '16px' : (h.tagName === 'H2' ? '0' : '0');
-          a.style.fontWeight = h.tagName === 'H1' ? '600' : '400';
-          return a;
-        };
-        headings.forEach((h, i) => {
-          h.id = `heading-${i}`;
-          if (tocLinks) tocLinks.appendChild(makeTocLink(h, i));
-          if (tocLinksMobile) {
-            const aMobile = makeTocLink(h, i);
-            aMobile.addEventListener('click', function(e){
-              e.preventDefault();
-              document.getElementById(`heading-${i}`).scrollIntoView({behavior:'smooth',block:'start'});
-              closeMobileSidePanel();
-            });
-            tocLinksMobile.appendChild(aMobile);
-          }
-        });
-        if (tocLinksMobile && headings.length === 0) {
-          tocLinksMobile.innerHTML = '<div style="font-size:12px;color:var(--fg-muted2);padding:4px 8px">見出しはありません</div>';
-        }
-      }, 50);
     }
 
     // Mobile side panel controls
@@ -3444,7 +3417,6 @@
           main.innerHTML = '<div class="empty" style="padding:80px 20px;text-align:center"><h2>マニュアルが見つかりません</h2><p style="font-size:13px;color:var(--fg-muted);margin-top:12px">ID: ' + mid + ' / 登録件数: ' + manuals.length + '</p></div>';
           return;
         }
-        var isHtml = /<[a-z][\s\S]*>/i.test(manual.taskRoadmap || '');
         var html = '';
         html += '<h1 class="doc-title" style="font-size:28px;font-weight:700;margin-bottom:16px">' + escapeHtml(manual.title) + '</h1>';
         html += '<div class="info-card">';
@@ -3466,8 +3438,14 @@
           html += '<div class="info-section"><div class="info-section-label">📤 <span>OUTPUT</span></div><p class="text-sm" style="white-space:pre-wrap">' + escapeHtml(manual.output) + '</p></div>';
         }
         html += '</div>';
-        if (manual.taskRoadmap) {
-          html += '<div class="prose" style="margin-top:24px">' + (isHtml ? manual.taskRoadmap : '<p style="white-space:pre-wrap">' + escapeHtml(manual.taskRoadmap) + '</p>') + '</div>';
+        if (manual.url) {
+          html += '<div style="margin-top:20px;display:flex;gap:8px;flex-wrap:wrap">';
+          html += '<a href="' + escapeHtml(manual.url) + '" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:#eff6ff;border:1px solid rgba(37,99,235,.2);border-radius:8px;color:var(--primary);font-size:13px;font-weight:500;text-decoration:none;word-break:break-all;max-width:100%">🔗 <span>' + escapeHtml(manual.url) + '</span></a>';
+          html += '</div>';
+          html += '<div style="position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:10px;background:#fff">';
+          html += '<iframe src="' + escapeHtml(manual.url) + '" style="width:100%;height:70vh;min-height:480px;border:0;display:block" loading="lazy" referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox" title="' + escapeHtml(manual.title) + '"></iframe>';
+          html += '</div>';
+          html += '<p style="font-size:11px;color:var(--fg-muted2);margin-top:6px">埋め込み非対応サイトは空白になることがあります。上のリンクから直接開いてください。</p>';
         }
         main.innerHTML = html;
       }).catch(function() {
@@ -3505,80 +3483,21 @@
         html += `<div class="flex gap-2" style="margin-top:16px;align-items:center"><button class="btn btn-primary" onclick="submitManualForm(null,${pageParams.projectId || 'null'})">作成</button><button class="btn btn-outline" onclick="navigate('project-detail',{id:${pageParams.projectId}})">キャンセル</button></div>`;
       }
       html += `</aside>`;
-      // Right main: manual content editor (big)
+      // Right main: 外部URL入力欄のみ (旧リッチエディタは撤廃)
       html += `<main>`;
-      html += `<div class="form-group"><label class="label label-icon">${icons.book} TODO</label>
-      <div class="memo-toolbar sticky">
-        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('undo')" title="戻す (Cmd+Z)">↶</button>
-        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('redo')" title="進む (Cmd+Shift+Z)">↷</button>
-        <div class="memo-toolbar-sep"></div>
-        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('h1')" title="見出し1">H1</button>
-        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('h2')" title="見出し2">H2</button>
-        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('h3')" title="見出し3">H3</button>
-        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('p')" title="本文に戻す">本文</button>
-        <div class="memo-toolbar-sep"></div>
-        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('bold')" title="太字"><b>B</b></button>
-        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('italic')" title="イタリック"><i>I</i></button>
-        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('strike')" title="取り消し線"><s>S</s></button>
-        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('color', this)" title="文字色"><span style="border-bottom:3px solid #ef4444;padding-bottom:1px">A</span></button>
-        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('highlight', this)" title="ハイライト"><span style="background:#FEF08A;padding:0 3px;border-radius:2px">H</span></button>
-        <div class="memo-toolbar-sep"></div>
-        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('ul')" title="箇条書き">• リスト</button>
-        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('ol')" title="番号リスト">1. リスト</button>
-        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('indent')" title="インデント">→</button>
-        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('outdent')" title="アウトデント">←</button>
-        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('quote')" title="引用">❮ 引用</button>
-        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('callout', this)" title="コールアウト">💡 コールアウト</button>
-        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('code')" title="コード">&lt;/&gt; コード</button>
-        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('collapse')" title="折りたたみ">▸ 折りたたみ</button>
-        <button type="button" class="memo-toolbar-btn" onclick="manualFormExecCmd('hr')" title="水平線">─ 線</button>
-      </div>
-      <div class="manual-rich-editor" id="f-roadmap-editor" contenteditable="true" data-placeholder="TODO の内容を記述できます（見出し・太字・リストなどが使えます）" oninput="updateManualFormToc()"></div>
+      html += `<div class="form-group">
+        <label class="label label-icon" style="font-weight:600">${icons.link} 外部リンク</label>
+        <input class="input" id="f-url" type="url" value="${escapeHtml(existing?.url || '')}" placeholder="https://...">
+        <div style="font-size:11px;color:var(--fg-muted2);margin-top:4px">マニュアル詳細画面で開けるリンクを入力してください</div>
       </div>`;
       html += `</main>`;
-      // Right aside: table of contents
-      html += `<aside><div class="manual-toc"><div class="manual-toc-title">📑 目次</div><div id="manual-form-toc"><div class="manual-toc-empty">見出しを追加すると目次が表示されます</div></div></div></aside>`;
       html += `</div>`;
-      // Load existing content into rich editor after render
-      if (isEdit && existing && existing.taskRoadmap) {
-        window._pendingManualContent = existing.taskRoadmap;
-      } else {
-        window._pendingManualContent = '';
-      }
       setTimeout(function() {
-        var editor = document.getElementById('f-roadmap-editor');
-        if (editor && window._pendingManualContent) {
-          editor.innerHTML = window._pendingManualContent;
-        }
-        updateManualFormToc();
-        // Decorate existing blockquotes / callouts / code / copy / details with buttons
-        if (editor) {
-          decorateBlockquotes(editor);
-          decorateCopyBlocks(editor);
-          decorateBlockDelete(editor);
-          // Re-decorate + autosave on any edit
-          editor.addEventListener('input', function() { decorateBlockquotes(editor); decorateCopyBlocks(editor); decorateBlockDelete(editor); autoSaveManualForm(); });
-          // Blur = force flush immediately (no 300ms window where reload loses data)
-          editor.addEventListener('blur', flushManualFormNow);
-          // Hook autosave to all other form fields + blur-flush
-          ['f-title','f-trigger','f-frequency','f-purpose','f-input','f-est-time','f-output'].forEach(function(id) {
-            var el = document.getElementById(id);
-            if (el) { el.addEventListener('input', autoSaveManualForm); el.addEventListener('blur', flushManualFormNow); }
-          });
-          // Tab / Shift+Tab for list nesting
-          editor.addEventListener('keydown', function(e) {
-            if (e.key === 'Tab') {
-              var sel = window.getSelection();
-              if (sel.rangeCount > 0) {
-                var node = sel.anchorNode;
-                while (node && node !== editor) {
-                  if (node.nodeName === 'LI') { e.preventDefault(); document.execCommand(e.shiftKey ? 'outdent' : 'indent'); return; }
-                  node = node.parentNode;
-                }
-              }
-            }
-          });
-        }
+        // Hook autosave to title / 6 fields / url
+        ['f-title','f-trigger','f-frequency','f-purpose','f-input','f-est-time','f-output','f-url'].forEach(function(id) {
+          var el = document.getElementById(id);
+          if (el) { el.addEventListener('input', autoSaveManualForm); el.addEventListener('blur', flushManualFormNow); }
+        });
       }, 50);
       el.innerHTML = html;
     }
@@ -4067,46 +3986,31 @@
       var input = (document.getElementById('f-input')||{value:''}).value.trim();
       var estimatedTime = (document.getElementById('f-est-time')||{value:''}).value.trim();
       var output = (document.getElementById('f-output')||{value:''}).value.trim();
-      // フォームから外したフィールド (権限 / 旧ペースタグ / 対応スピード) は既存値を保持
+      var url = (document.getElementById('f-url')||{value:''}).value.trim();
+      // フォームから外したフィールドは既存値をそのまま保持 (preserve existing data)
       var existingForPreserve = pageParams.editId ? getManual(pageParams.editId) : null;
       var authority = existingForPreserve ? (existingForPreserve.authority || '') : '';
       var paceTagId = existingForPreserve ? (existingForPreserve.paceTagId || null) : null;
       var paceSchedule = existingForPreserve ? (existingForPreserve.paceSchedule || null) : null;
       var speed = existingForPreserve ? (existingForPreserve.responseSpeed || '') : '';
-      var roadmapEditor = document.getElementById('f-roadmap-editor');
-      var roadmap = '';
-      if (roadmapEditor) {
-        var clone = roadmapEditor.cloneNode(true);
-        clone.querySelectorAll('.bq-delete, .copy-block-btn, .code-block-btn, .block-delete').forEach(function(b) { b.remove(); });
-        var fixed = true;
-        while (fixed) {
-          fixed = false;
-          clone.querySelectorAll('ul > ul, ul > ol, ol > ul, ol > ol').forEach(function(nested) {
-            var prev = nested.previousElementSibling;
-            if (prev && prev.tagName === 'LI') { prev.appendChild(nested); fixed = true; }
-          });
-        }
-        roadmap = clone.innerHTML;
-      }
+      var roadmap = existingForPreserve ? (existingForPreserve.taskRoadmap || '') : '';
       if (!title) { setManualFormSaveStatus('タイトル未入力'); return false; }
       var editId = pageParams.editId;
       if (!editId) return false;
       var m = getManual(editId);
       if (!m) return false;
-      var prev = { title: m.title, purpose: m.purpose, authority: m.authority, paceTagId: m.paceTagId, paceSchedule: m.paceSchedule, operationPace: m.operationPace, responseSpeed: m.responseSpeed, taskRoadmap: m.taskRoadmap, trigger: m.trigger, frequency: m.frequency, input: m.input, estimatedTime: m.estimatedTime, output: m.output };
-      var contentChanged = prev.title !== title || prev.purpose !== purpose || prev.taskRoadmap !== roadmap
+      var prev = { title: m.title, purpose: m.purpose, authority: m.authority, paceTagId: m.paceTagId, paceSchedule: m.paceSchedule, operationPace: m.operationPace, responseSpeed: m.responseSpeed, taskRoadmap: m.taskRoadmap, trigger: m.trigger, frequency: m.frequency, input: m.input, estimatedTime: m.estimatedTime, output: m.output, url: m.url };
+      var contentChanged = prev.title !== title || prev.purpose !== purpose
         || (prev.trigger || '') !== trigger || (prev.frequency || '') !== frequency
         || (prev.input || '') !== input || (prev.estimatedTime || '') !== estimatedTime
-        || (prev.output || '') !== output;
+        || (prev.output || '') !== output || (prev.url || '') !== url;
       if (!contentChanged) { setManualFormSaveStatus(''); return false; }
       if (!m.history) m.history = [];
-      // Throttle history entries: one snapshot per 3 seconds of active editing.
-      // Keystrokes still write to localStorage immediately via the main Object.assign.
       var lastHist = m.history.length ? (m.history[m.history.length-1].ts || 0) : 0;
       if (Date.now() - lastHist >= 3000) {
         m.history.push(Object.assign({ ts: bumpModTs(m._modTs) }, prev));
       }
-      Object.assign(m, { title: title, purpose: purpose, authority: authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap, trigger: trigger, frequency: frequency, input: input, estimatedTime: estimatedTime, output: output, _modTs: bumpModTs(m._modTs) });
+      Object.assign(m, { title: title, purpose: purpose, authority: authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap, trigger: trigger, frequency: frequency, input: input, estimatedTime: estimatedTime, output: output, url: url, _modTs: bumpModTs(m._modTs) });
       markDirty('manuals', m.id);
       saveData();
       _manualFormLastSavedAt = Date.now();
@@ -4144,51 +4048,23 @@
       const input = (document.getElementById('f-input')||{value:''}).value.trim();
       const estimatedTime = (document.getElementById('f-est-time')||{value:''}).value.trim();
       const output = (document.getElementById('f-output')||{value:''}).value.trim();
-      // フォームから外したフィールド (権限 / 旧ペースタグ / 対応スピード) は既存値を保持
+      const url = (document.getElementById('f-url')||{value:''}).value.trim();
+      // フォームから外したフィールドは既存値を保持
       const _existingPreserve = editId ? getManual(editId) : null;
       const authority = _existingPreserve ? (_existingPreserve.authority || '') : '';
       const paceTagId = _existingPreserve ? (_existingPreserve.paceTagId || null) : null;
       const paceSchedule = _existingPreserve ? (_existingPreserve.paceSchedule || null) : null;
       const speed = _existingPreserve ? (_existingPreserve.responseSpeed || '') : '';
-      const roadmapEditor = document.getElementById('f-roadmap-editor');
-      // Clone editor and strip transient UI elements (bq-delete buttons) before saving
-      let roadmap = '';
-      if (roadmapEditor) {
-        const clone = roadmapEditor.cloneNode(true);
-        clone.querySelectorAll('.bq-delete').forEach(function(b) { b.remove(); });
-        clone.querySelectorAll('.copy-block-btn').forEach(function(b) { b.remove(); });
-        clone.querySelectorAll('.code-block-btn').forEach(function(b) { b.remove(); });
-        clone.querySelectorAll('.block-delete').forEach(function(b) { b.remove(); });
-        // Strip legacy copy buttons that may have been embedded from older versions
-        clone.querySelectorAll('.block-copy-btn, .code-textbox-copy-btn').forEach(function(b) { b.remove(); });
-        // Fix invalid nested lists: <ul>...<ul>Y</ul> should be <ul>...<li>...<ul>Y</ul></li></ul>
-        function fixNestedLists(root) {
-          var fixed = true;
-          while (fixed) {
-            fixed = false;
-            var invalidNested = root.querySelectorAll('ul > ul, ul > ol, ol > ul, ol > ol');
-            invalidNested.forEach(function(nested) {
-              var prev = nested.previousElementSibling;
-              if (prev && prev.tagName === 'LI') {
-                prev.appendChild(nested);
-                fixed = true;
-              }
-            });
-          }
-        }
-        fixNestedLists(clone);
-        roadmap = clone.innerHTML;
-      }
+      const roadmap = _existingPreserve ? (_existingPreserve.taskRoadmap || '') : '';
       if (!title || !purpose) { toast('タイトルと目的は必須です'); return; }
       if (editId) {
         const m = getManual(editId);
         if (m) {
-          // Save snapshot to history before overwriting
           if (!m.history) m.history = [];
-          var changed = m.title !== title || m.purpose !== purpose || m.taskRoadmap !== roadmap
+          var changed = m.title !== title || m.purpose !== purpose
             || (m.trigger || '') !== trigger || (m.frequency || '') !== frequency
             || (m.input || '') !== input || (m.estimatedTime || '') !== estimatedTime
-            || (m.output || '') !== output;
+            || (m.output || '') !== output || (m.url || '') !== url;
           if (changed) {
             m.history.push({
               ts: Date.now(),
@@ -4197,18 +4073,18 @@
               operationPace: m.operationPace, responseSpeed: m.responseSpeed,
               taskRoadmap: m.taskRoadmap,
               trigger: m.trigger, frequency: m.frequency,
-              input: m.input, estimatedTime: m.estimatedTime, output: m.output
+              input: m.input, estimatedTime: m.estimatedTime, output: m.output,
+              url: m.url
             });
-            // History is NEVER purged
           }
-          Object.assign(m, { title, purpose, authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap, trigger: trigger, frequency: frequency, input: input, estimatedTime: estimatedTime, output: output, _modTs: bumpModTs(m._modTs) });
+          Object.assign(m, { title, purpose, authority, paceTagId: paceTagId, paceSchedule: paceSchedule, responseSpeed: speed, taskRoadmap: roadmap, trigger: trigger, frequency: frequency, input: input, estimatedTime: estimatedTime, output: output, url: url, _modTs: bumpModTs(m._modTs) });
           saveData();
           if (typeof pushSyncNow === 'function') pushSyncNow();
           toast('マニュアルを更新しました'); navigate('manual-detail', { id: editId });
         }
       } else {
         const id = data.nextManualId++;
-        data.manuals.push({ id, projectId, title, purpose, authority, paceTagId: paceTagId, paceSchedule: paceSchedule, operationPace: '', responseSpeed: speed, taskRoadmap: roadmap, trigger: trigger, frequency: frequency, input: input, estimatedTime: estimatedTime, output: output, history: [], createdBy: 0, _modTs: bumpModTs(0) });
+        data.manuals.push({ id, projectId, title, purpose, authority, paceTagId: paceTagId, paceSchedule: paceSchedule, operationPace: '', responseSpeed: speed, taskRoadmap: roadmap, trigger: trigger, frequency: frequency, input: input, estimatedTime: estimatedTime, output: output, url: url, history: [], createdBy: 0, _modTs: bumpModTs(0) });
         markDirty('manuals', id);
         saveData();
         if (typeof pushSyncNow === 'function') pushSyncNow();
