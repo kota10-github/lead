@@ -3987,6 +3987,10 @@
       var estimatedTime = (document.getElementById('f-est-time')||{value:''}).value.trim();
       var output = (document.getElementById('f-output')||{value:''}).value.trim();
       var url = (document.getElementById('f-url')||{value:''}).value.trim();
+      // プロトコル抜きの URL は自動で https:// を補完
+      if (url && !/^[a-z][a-z0-9+.\-]*:\/\//i.test(url) && !/^mailto:/i.test(url)) {
+        url = 'https://' + url;
+      }
       // フォームから外したフィールドは既存値をそのまま保持 (preserve existing data)
       var existingForPreserve = pageParams.editId ? getManual(pageParams.editId) : null;
       var authority = existingForPreserve ? (existingForPreserve.authority || '') : '';
@@ -4048,7 +4052,10 @@
       const input = (document.getElementById('f-input')||{value:''}).value.trim();
       const estimatedTime = (document.getElementById('f-est-time')||{value:''}).value.trim();
       const output = (document.getElementById('f-output')||{value:''}).value.trim();
-      const url = (document.getElementById('f-url')||{value:''}).value.trim();
+      let url = (document.getElementById('f-url')||{value:''}).value.trim();
+      if (url && !/^[a-z][a-z0-9+.\-]*:\/\//i.test(url) && !/^mailto:/i.test(url)) {
+        url = 'https://' + url;
+      }
       // フォームから外したフィールドは既存値を保持
       const _existingPreserve = editId ? getManual(editId) : null;
       const authority = _existingPreserve ? (_existingPreserve.authority || '') : '';
