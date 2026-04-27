@@ -1406,6 +1406,26 @@
     }
     window.setTaskMatrixQ = setTaskMatrixQ;
     // Map: "+ ボタン" → 3 択ポップアップ (マニュアル / タスク / サブプロジェクト)
+    // 並列 (sibling) タブを作るためのヘルパ。
+    // 親タブ直下の + ボタンから呼ばれる。
+    function addSiblingProject(projectId) {
+      var p = getProject(projectId);
+      if (!p) return;
+      // 同じ parentId を持つプロジェクトを作る (top-level なら null)
+      showProjectDialog(p.parentId || null);
+    }
+    window.addSiblingProject = addSiblingProject;
+    function addSiblingTask(taskId) {
+      var t = (data.projectTasks || []).find(function(x){ return isLive(x) && x.id === taskId; });
+      if (!t) return;
+      if (t.parentTaskId) {
+        showAddChildTask(t.parentTaskId);   // 同じ親タスクを持つ兄弟タスク
+      } else {
+        showAddProjectTask(t.projectId);    // top-level タスクの兄弟
+      }
+    }
+    window.addSiblingTask = addSiblingTask;
+
     function showAddOptionsPopup(anchorBtn, projectId, kind) {
       // Close any existing popups
       document.querySelectorAll('.add-popup').forEach(function(p){ p.remove(); });
@@ -2519,7 +2539,7 @@
           }
           html += `</div>`; // close node-project-standalone
           // 親タブの直下に + ボタンを置く
-          html += `<button class="map-add-plus map-add-plus-below" title="追加" onclick="event.stopPropagation();showAddOptionsPopup(this,${proj.projectId},'project')">+</button>`;
+          html += `<button class="map-add-plus map-add-plus-below" title="同階層に追加" onclick="event.stopPropagation();addSiblingProject(${proj.projectId})">+</button>`;
           html += `</div>`; // close proj-col-wrap
           // Manuals, tasks, and sub-projects branch to the right
           html += `<div class="sub-tree-children" data-parent="proj-${proj.projectId}">`;
@@ -2553,7 +2573,7 @@
           html += `<div class="node-manual" data-node="sp-${sp.projectId}" draggable="true" ondragstart="handleProjectDragStart(event,${sp.projectId})" ondragend="handleProjectDragEnd(event)" ondragover="handleProjectDragOver(event,${sp.projectId})" ondragleave="this.classList.remove('drop-target','drop-before','drop-after')" ondrop="handleProjectDrop(event,${sp.projectId})" onclick="navigate('project-detail',{id:${sp.projectId}})" style="border-left:3px solid ${sc.bg};background:${sc.light}"><div class="node-manual-title" style="color:${sc.bg};display:flex;align-items:center;gap:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:.7"><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7-4H4a2 2 0 0 0-2 2v14z"/></svg><span>${escapeHtml(sp.projectName)}</span>${spToggle}</div>`;
           html += `<div class="node-manual-purpose">${sp.subProjects.length > 0 ? '<span style="opacity:.6;font-size:10px">' + sp.subProjects.length + '件のサブ</span>' : ''}${spTasks.length > 0 ? '<span style="opacity:.6;font-size:10px;margin-left:4px">' + spTasks.filter(function(t){return t.done}).length + '/' + spTasks.length + ' タスク</span>' : ''}</div></div>`;
           // 親タブの直下に + ボタンを置く
-          html += '<button class="sub-add-plus sub-add-plus-below" title="追加" onclick="event.stopPropagation();showAddOptionsPopup(this,' + sp.projectId + ',\'subproject\')">+</button>';
+          html += '<button class="sub-add-plus sub-add-plus-below" title="同階層に追加" onclick="event.stopPropagation();addSiblingProject(' + sp.projectId + ')">+</button>';
           html += '</div>'; // close sub-tree-card-wrap
           // Tasks and children to the right
           html += '<div class="sub-tree-children">';
@@ -2599,7 +2619,7 @@
           html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>' + dueBadgeHtml(t) + taskToggle;
           html += '</div></div>';
           // 親タブの直下に + ボタンを置く
-          html += '<button class="sub-add-plus sub-add-plus-below" title="子タスクを追加" onclick="event.stopPropagation();showAddChildTask(' + t.id + ')">+</button>';
+          html += '<button class="sub-add-plus sub-add-plus-below" title="同階層にタスクを追加" onclick="event.stopPropagation();addSiblingTask(' + t.id + ')">+</button>';
           html += '</div>'; // close sub-tree-card-wrap
           // Right side: 子タスク
           html += '<div class="sub-tree-children">';
