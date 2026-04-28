@@ -2588,7 +2588,10 @@
           }
           html += `</div>`; // close node-project-standalone
           // 右側 + (子要素を追加: マニュアル / タスク / サブプロジェクト)
-          html += `<button class="map-add-plus map-add-plus-right" title="子を追加" onclick="event.stopPropagation();showAddOptionsPopup(this,${proj.projectId},'project')">+</button>`;
+          // 子がある場合は右+ を非表示 (子の下+ から追加できる)
+          if (!projHasChildren) {
+            html += `<button class="map-add-plus map-add-plus-right" title="子を追加" onclick="event.stopPropagation();showAddOptionsPopup(this,${proj.projectId},'project')">+</button>`;
+          }
           // 下 + (同階層 = 兄弟プロジェクト)
           html += `<button class="map-add-plus map-add-plus-below" title="同階層に追加" onclick="event.stopPropagation();addSiblingProject(${proj.projectId})">+</button>`;
           html += `</div>`; // close proj-col-wrap
@@ -2624,9 +2627,14 @@
           html += `<div class="node-manual" data-node="sp-${sp.projectId}" draggable="true" ondragstart="handleProjectDragStart(event,${sp.projectId})" ondragend="handleProjectDragEnd(event)" ondragover="handleProjectDragOver(event,${sp.projectId})" ondragleave="this.classList.remove('drop-target','drop-before','drop-after')" ondrop="handleProjectDrop(event,${sp.projectId})" onclick="navigate('project-detail',{id:${sp.projectId}})" style="border-left:3px solid ${sc.bg};background:${sc.light}"><div class="node-manual-title" style="color:${sc.bg};display:flex;align-items:center;gap:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:.7"><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7-4H4a2 2 0 0 0-2 2v14z"/></svg><span>${escapeHtml(sp.projectName)}</span>${spToggle}</div>`;
           html += `<div class="node-manual-purpose">${sp.subProjects.length > 0 ? '<span style="opacity:.6;font-size:10px">' + sp.subProjects.length + '件のサブ</span>' : ''}${spTasks.length > 0 ? '<span style="opacity:.6;font-size:10px;margin-left:4px">' + spTasks.filter(function(t){return t.done}).length + '/' + spTasks.length + ' タスク</span>' : ''}</div></div>`;
           // 右側 + (子要素を追加: マニュアル / タスク / 孫サブプロジェクト)
-          html += '<button class="sub-add-plus sub-add-plus-right" title="子を追加" onclick="event.stopPropagation();showAddOptionsPopup(this,' + sp.projectId + ',\'subproject\')">+</button>';
-          // 下 + (同階層 = 兄弟サブプロジェクト)
-          html += '<button class="sub-add-plus sub-add-plus-below" title="同階層に追加" onclick="event.stopPropagation();addSiblingProject(' + sp.projectId + ')">+</button>';
+          // 子がある場合は右+ を非表示 (子の下+ から追加できる)
+          if (!spHasChildren) {
+            html += '<button class="sub-add-plus sub-add-plus-right" title="子を追加" onclick="event.stopPropagation();showAddOptionsPopup(this,' + sp.projectId + ',\'subproject\')">+</button>';
+          }
+          // 下 + (同階層 = 親プロジェクト直下に サブ/タスク/マニュアル を追加)
+          var _spReal = getProject(sp.projectId);
+          var spParentId = _spReal ? _spReal.parentId : null;
+          html += '<button class="sub-add-plus sub-add-plus-below" title="同階層に追加" onclick="event.stopPropagation();' + (spParentId != null ? 'showAddOptionsPopup(this,' + spParentId + ',\'project\')' : 'addSiblingProject(' + sp.projectId + ')') + '">+</button>';
           html += '</div>'; // close sub-tree-card-wrap
           // Tasks and children to the right
           html += '<div class="sub-tree-children">';
@@ -2672,9 +2680,20 @@
           html += '<span style="' + (t.done ? 'text-decoration:line-through' : '') + '">' + escapeHtml(t.title) + '</span>' + dueBadgeHtml(t) + taskToggle;
           html += '</div></div>';
           // 右側 + (子タスクを追加)
-          html += '<button class="sub-add-plus sub-add-plus-right" title="子タスクを追加" onclick="event.stopPropagation();showAddChildTask(' + t.id + ')">+</button>';
-          // 下 + (同階層 = 兄弟タスク)
-          html += '<button class="sub-add-plus sub-add-plus-below" title="同階層にタスクを追加" onclick="event.stopPropagation();addSiblingTask(' + t.id + ')">+</button>';
+          // 子がある場合は右+ を非表示 (子の下+ から追加できる)
+          if (!taskHasChildren) {
+            html += '<button class="sub-add-plus sub-add-plus-right" title="子タスクを追加" onclick="event.stopPropagation();showAddChildTask(' + t.id + ')">+</button>';
+          }
+          // 下 + (同階層に追加)
+          // - 親タスクなしのトップレベルタスク → プロジェクト直下に サブ/タスク/マニュアル
+          // - 子タスク (parentTaskId あり) → 兄弟子タスク
+          var taskBottomOnclick;
+          if (t.parentTaskId) {
+            taskBottomOnclick = 'addSiblingTask(' + t.id + ')';
+          } else {
+            taskBottomOnclick = 'showAddOptionsPopup(this,' + t.projectId + ',\'project\')';
+          }
+          html += '<button class="sub-add-plus sub-add-plus-below" title="同階層に追加" onclick="event.stopPropagation();' + taskBottomOnclick + '">+</button>';
           html += '</div>'; // close sub-tree-card-wrap
           // Right side: 子タスク
           html += '<div class="sub-tree-children">';
