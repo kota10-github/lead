@@ -142,6 +142,9 @@
     .mindmap-viewport:active{cursor:grabbing}
     .mindmap-svg{position:absolute;top:0;left:0;pointer-events:none;z-index:1;transform-origin:top left}
     .mindmap-inner{display:flex;align-items:flex-start;gap:24px;padding:32px;min-width:max-content;transform-origin:top left;transition:transform .15s ease;position:relative;z-index:2}
+    /* マップ検索: 一致ノードを強調 / 非一致を薄く */
+    .mindmap-inner.searching .search-dim{opacity:.2}
+    .mindmap-inner.searching .search-match{outline:2px solid #fbbf24;outline-offset:2px;box-shadow:0 0 0 4px rgba(251,191,36,.25)}
     .node-root{padding:10px 20px;border-radius:12px;background:linear-gradient(135deg,#1e293b,#334155);color:#fff;font-weight:600;font-size:13px;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.15);user-select:none}
     .node-user{padding:8px 16px;border-radius:8px;font-weight:500;font-size:13px;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.1);cursor:pointer;transition:all .15s;white-space:nowrap;user-select:none}
     .node-user:hover{transform:scale(1.05);box-shadow:0 4px 12px rgba(0,0,0,.15)}
@@ -2525,11 +2528,33 @@
       el.innerHTML = html;
     }
 
+    var _mapSearch = '';
+    function onMapSearchInput(val) {
+      _mapSearch = (val || '').trim().toLowerCase();
+      applyMapSearchHighlight();
+    }
+    window.onMapSearchInput = onMapSearchInput;
+    function applyMapSearchHighlight() {
+      var inner = document.getElementById('mindmap-inner');
+      if (!inner) return;
+      var q = _mapSearch;
+      inner.classList.toggle('searching', !!q);
+      // data-node が付いてないサブプロジェクト配下のマニュアルもカバー
+      var nodes = inner.querySelectorAll('[data-node], .node-manual, .node-project-standalone, .node-root');
+      nodes.forEach(function(n){
+        if (!q) { n.classList.remove('search-match','search-dim'); return; }
+        var text = (n.textContent || '').toLowerCase();
+        var matches = text.indexOf(q) >= 0;
+        n.classList.toggle('search-match', matches);
+        n.classList.toggle('search-dim', !matches);
+      });
+    }
     function renderDesktopHome(el) {
         const projects = getProjectMap();
         let html = `<div class="page-header"><h1 class="page-title">マップ</h1>
         <div class="zoom-controls"><button onclick="changeMapZoom(-0.1)">-</button><span id="zoom-level">${Math.round(mapZoom*100)}%</span><button onclick="changeMapZoom(0.1)">+</button></div></div>`;
         html += `<div class="breadcrumb"><span class="breadcrumb-item" onclick="navigate('home')">マップ</span></div>`;
+        html += `<div style="margin:12px 0"><input class="input" id="map-search-input" type="search" placeholder="プロジェクト・マニュアル・タスク名で検索" value="${escapeHtml(_mapSearch)}" oninput="onMapSearchInput(this.value)" style="max-width:480px"></div>`;
         html += `<div class="mindmap-viewport" id="mindmap-viewport"><svg class="mindmap-svg" id="mindmap-svg"></svg>`;
         html += `<div class="mindmap-inner" id="mindmap-inner" style="transform:scale(${mapZoom})">`;
         (function(){
@@ -2667,7 +2692,7 @@
         viewport.addEventListener('mouseleave', function() { isDragging = false; viewport.style.cursor = 'grab'; });
         viewport.addEventListener('mouseup', function() { isDragging = false; viewport.style.cursor = 'grab'; });
         viewport.addEventListener('mousemove', function(e) { if (!isDragging) return; e.preventDefault(); viewport.scrollLeft = scrollLeft - (e.pageX - viewport.offsetLeft - startX); viewport.scrollTop = scrollTop - (e.pageY - viewport.offsetTop - startY); });
-        requestAnimationFrame(() => requestAnimationFrame(() => drawMindmapLines(projects)));
+        requestAnimationFrame(() => requestAnimationFrame(() => { drawMindmapLines(projects); applyMapSearchHighlight(); }));
       }
       function isDescendantProject(ancestorId, candidateId) {
         if (!candidateId) return false;
@@ -4792,10 +4817,69 @@
     window.matrixCellDragOver = matrixCellDragOver;
     window.matrixCellDrop = matrixCellDrop;
 
+    var _todosSearch = '';
+    function onTodosSearchInput(val) {
+      _todosSearch = val || '';
+      _renderTodosBody();
+    }
+    window.onTodosSearchInput = onTodosSearchInput;
     function renderTodos(el) {
+      var html = '';
+      html += '<div style="margin-bottom:12px"><input class="input" id="todos-search-input" type="search" placeholder="タスク名・プロジェクト名で検索" value="' + escapeHtml(_todosSearch) + '" oninput="onTodosSearchInput(this.value)" style="max-width:480px"></div>';
+      html += '<div id="todos-body"></div>';
+      el.innerHTML = html;
+      _renderTodosBody();
+    }
+    function _renderTodosBody() {
+      var body = document.getElementById('todos-body');
+      if (!body) return;
       var collapsed = _loadCollapsed();
       var tasks = (data.projectTasks || []).filter(isLive);
       var projects = (data.projects || []).filter(function(p){ return p && !p._deleted; });
+
+      // 検索フィルタ: タスク title / プロジェクト名 / 親プロジェクト名チェーンでマッチ
+      var q = (_todosSearch || '').trim().toLowerCase();
+      var matchProjIds = {};
+      var matchTaskIds = {};
+      if (q) {
+        // 直接マッチするプロジェクト
+        projects.forEach(function(p){
+          if ((p.name || '').toLowerCase().indexOf(q) >= 0) matchProjIds[p.id] = true;
+        });
+        // 直接マッチするタスク
+        tasks.forEach(function(t){
+          if ((t.title || '').toLowerCase().indexOf(q) >= 0) matchTaskIds[t.id] = true;
+        });
+        // タスクの親 (祖先タスク + プロジェクト) も表示対象に
+        var taskById = {}; tasks.forEach(function(t){ taskById[t.id] = t; });
+        Object.keys(matchTaskIds).forEach(function(tid){
+          var cur = taskById[tid];
+          while (cur) {
+            matchTaskIds[cur.id] = true;
+            if (cur.projectId) matchProjIds[cur.projectId] = true;
+            cur = cur.parentTaskId ? taskById[cur.parentTaskId] : null;
+          }
+        });
+        // プロジェクトの先祖も表示対象に
+        var projById = {}; projects.forEach(function(p){ projById[p.id] = p; });
+        Object.keys(matchProjIds).slice().forEach(function(pid){
+          var cur = projById[pid];
+          while (cur && cur.parentId) {
+            matchProjIds[cur.parentId] = true;
+            cur = projById[cur.parentId];
+          }
+        });
+        // マッチしたプロジェクト直下のタスクは全部見せる (ヒットしたプロジェクトのタスク)
+        tasks.forEach(function(t){
+          var c = t;
+          while (c) {
+            if (matchTaskIds[c.id]) { matchTaskIds[t.id] = true; break; }
+            c = c.parentTaskId ? taskById[c.parentTaskId] : null;
+          }
+        });
+      }
+      function shouldShowProject(p) { return !q || matchProjIds[p.id]; }
+      function shouldShowTask(t) { return !q || matchTaskIds[t.id]; }
 
       // project.id -> tasks (grouped once)
       var tasksByProject = {};
@@ -4829,11 +4913,12 @@
 
       // --- プロジェクト階層 (root projects → sub-projects recursively) ---
       function renderProjectNode(project, depth) {
+        if (!shouldShowProject(project)) return;
         var projKey = 'proj:' + project.id;
         var projOpen = !collapsed.has(projKey);
         var color = getProjectColor(project.id);
-        var projTasks = (tasksByProject[project.id] || []);
-        var subProjects = projects.filter(function(p){ return p.parentId === project.id; });
+        var projTasks = (tasksByProject[project.id] || []).filter(shouldShowTask);
+        var subProjects = projects.filter(function(p){ return p.parentId === project.id && shouldShowProject(p); });
         var hasChildren = projTasks.length > 0 || subProjects.length > 0 || !!project.description;
         var indent = depth * 18 + 8;
         html += '<div class="tree-node project-node" style="padding:8px;padding-left:' + indent + 'px;display:flex;align-items:flex-start;gap:6px;margin:6px 0">';
@@ -4883,16 +4968,19 @@
       } else {
         rootProjects.forEach(function(p){ renderProjectNode(p, 0); });
         // Tasks without project (fallback)
-        var orphanTasks = tasks.filter(function(t){ return !t.projectId || !getProject(t.projectId); });
+        var orphanTasks = tasks.filter(function(t){ return (!t.projectId || !getProject(t.projectId)) && shouldShowTask(t); });
         if (orphanTasks.length > 0) {
           html += '<div style="margin-top:16px;padding-top:8px;border-top:1px solid var(--border-light)"><div style="font-size:11px;color:var(--fg-muted2);padding:4px 8px">その他</div></div>';
           var orphanSet = {}; orphanTasks.forEach(function(t){ orphanSet[t.id] = true; });
           var topOrphans = orphanTasks.filter(function(t){ return !t.parentTaskId || !orphanSet[t.parentTaskId]; });
           topOrphans.forEach(function(t){ renderTaskNode(t, 0, orphanTasks); });
         }
+        if (q && html === '') {
+          html += '<div class="empty" style="padding:24px 0"><p>該当する項目がありません</p></div>';
+        }
       }
 
-      el.innerHTML = html;
+      body.innerHTML = html;
     }
 
     function renderCalendar() {
