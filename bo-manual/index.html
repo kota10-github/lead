@@ -3285,6 +3285,25 @@
     }
 
     // MANUAL DETAIL (fullscreen)
+    // 外部URL を iframe 埋め込み用に正規化する
+    // - Google Docs / Sheets / Slides: /edit?... → /preview に変換
+    //   (preview 形式は X-Frame-Options を返さないので埋め込み可)
+    // - Notion: notion.site のページはそのまま埋め込み可
+    function normalizeEmbedUrl(url) {
+      if (!url) return url;
+      try {
+        var u = new URL(url);
+        if (u.hostname === 'docs.google.com') {
+          // /document/d/ID/edit → /document/d/ID/preview
+          u.pathname = u.pathname.replace(/\/edit(\/.*)?$/, '/preview');
+          u.search = ''; // ?usp=sharing 等は preview には不要
+          return u.toString();
+        }
+        return url;
+      } catch(e) { return url; }
+    }
+    window.normalizeEmbedUrl = normalizeEmbedUrl;
+
     // 外部URL の OGプレビュー (microlink.io 経由 / localStorage で 24h キャッシュ)
     var URL_PREVIEW_CACHE_KEY = 'bo-url-preview-cache-v1';
     function _readUrlPreviewCache() {
@@ -3380,13 +3399,16 @@
         html += `<span class="badge badge-secondary">${escapeHtml(a.user?.name || '不明')} <button onclick="removeAssignee(${manual.id},${a.userId})" style="margin-left:4px;opacity:.6">${icons.x}</button></span>`;
       });
       html += `<button class="btn btn-ghost btn-sm" onclick="showAddAssigneeDialog(${manual.id})">${icons.users} 追加</button></div>`;
-      // 外部リンク + OG プレビューカード (iframe は X-Frame-Options で
-      // 拒否するサイトが多いので撤廃)
+      // 外部リンク + iframe プレビュー (Google Docs は /preview に正規化)
       if (manual.url) {
+        var embedUrl = normalizeEmbedUrl(manual.url);
         html += `<div style="display:flex;align-items:center;gap:8px;margin:8px 0;flex-wrap:wrap">`;
         html += `<a href="${escapeHtml(manual.url)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:var(--primary-light,#eff6ff);border:1px solid rgba(37,99,235,.2);border-radius:8px;color:var(--primary);font-size:13px;font-weight:500;text-decoration:none;word-break:break-all;max-width:100%">${icons.external} <span>${escapeHtml(manual.url)}</span></a>`;
         html += `</div>`;
-        html += `<div id="manual-url-preview" data-url="${escapeHtml(manual.url)}" style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-top:8px;background:#fff;min-height:120px"></div>`;
+        html += `<div style="position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:8px;background:#fff">`;
+        html += `<iframe src="${escapeHtml(embedUrl)}" style="width:100%;height:70vh;min-height:480px;border:0;display:block" loading="lazy" allow="fullscreen" title="${escapeHtml(manual.title)}"></iframe>`;
+        html += `</div>`;
+        html += `<p style="font-size:11px;color:var(--fg-muted2);margin-top:6px">埋め込み非対応サイトは空白になることがあります。上のリンクから直接開いてください。</p>`;
       } else {
         html += `<p style="color:var(--fg-muted2);font-style:italic">外部リンクが未設定です</p>`;
       }
@@ -3508,15 +3530,16 @@
         }
         html += '</div>';
         if (manual.url) {
+          var embedUrl = normalizeEmbedUrl(manual.url);
           html += '<div style="margin-top:20px;display:flex;gap:8px;flex-wrap:wrap">';
           html += '<a href="' + escapeHtml(manual.url) + '" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:#eff6ff;border:1px solid rgba(37,99,235,.2);border-radius:8px;color:var(--primary);font-size:13px;font-weight:500;text-decoration:none;word-break:break-all;max-width:100%">🔗 <span>' + escapeHtml(manual.url) + '</span></a>';
           html += '</div>';
-          html += '<div id="manual-url-preview" data-url="' + escapeHtml(manual.url) + '" style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-top:10px;background:#fff;min-height:120px"></div>';
+          html += '<div style="position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:10px;background:#fff">';
+          html += '<iframe src="' + escapeHtml(embedUrl) + '" style="width:100%;height:70vh;min-height:480px;border:0;display:block" loading="lazy" allow="fullscreen" title="' + escapeHtml(manual.title) + '"></iframe>';
+          html += '</div>';
+          html += '<p style="font-size:11px;color:var(--fg-muted2);margin-top:6px">埋め込み非対応サイトは空白になることがあります。上のリンクから直接開いてください。</p>';
         }
         main.innerHTML = html;
-        if (manual.url && typeof loadUrlPreview === 'function') {
-          loadUrlPreview(document.getElementById('manual-url-preview'));
-        }
       }).catch(function() {
         main.innerHTML = '<div class="empty" style="padding:80px 20px;text-align:center"><h2>読み込みに失敗しました</h2></div>';
       });
