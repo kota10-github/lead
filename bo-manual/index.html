@@ -2579,7 +2579,7 @@
         let html = `<div class="page-header"><h1 class="page-title">マップ</h1>
         <div class="zoom-controls"><button onclick="changeMapZoom(-0.1)">-</button><span id="zoom-level">${Math.round(mapZoom*100)}%</span><button onclick="changeMapZoom(0.1)">+</button></div></div>`;
         html += `<div class="breadcrumb"><span class="breadcrumb-item" onclick="navigate('home')">マップ</span></div>`;
-        html += `<div style="margin:12px 0"><input class="input" id="map-search-input" type="search" placeholder="プロジェクト・マニュアル・タスク名で検索" value="${escapeHtml(_mapSearch)}" oninput="onMapSearchInput(this.value)" style="max-width:480px"></div>`;
+        html += `<div style="position:sticky;top:0;z-index:20;background:var(--bg,#eef1f5);padding:8px 0;margin-bottom:8px"><input class="input" id="map-search-input" type="search" placeholder="プロジェクト・マニュアル・タスク名で検索" value="${escapeHtml(_mapSearch)}" oninput="onMapSearchInput(this.value)" style="max-width:480px"></div>`;
         html += `<div class="mindmap-viewport" id="mindmap-viewport"><svg class="mindmap-svg" id="mindmap-svg"></svg>`;
         html += `<div class="mindmap-inner" id="mindmap-inner" style="transform:scale(${mapZoom})">`;
         (function(){
