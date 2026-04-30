@@ -1435,6 +1435,31 @@
     // Map: "+ ボタン" → 3 択ポップアップ (マニュアル / タスク / サブプロジェクト)
     // 並列 (sibling) タブを作るためのヘルパ。
     // 親タブ直下の + ボタンから呼ばれる。
+    // 「次の兄弟として挿入」ヒント — 下+ をクリックしてから新規作成までの間、
+    // 一時的にどのアイテムの直後に挿入したいかを記憶しておく。
+    // 作成完了後 applyAddAfter() がこのヒントを消費して位置を調整する。
+    window._addAfterHint = null;
+    function setAddAfter(kind, id) { window._addAfterHint = { kind: kind, id: id }; }
+    function applyAddAfter(kind, newId) {
+      var h = window._addAfterHint;
+      if (!h || h.kind !== kind) return;
+      window._addAfterHint = null;
+      var arr;
+      if (kind === 'project') arr = data.projects;
+      else if (kind === 'task') arr = data.projectTasks;
+      else if (kind === 'manual') arr = data.manuals;
+      if (!Array.isArray(arr)) return;
+      var newIdx = arr.findIndex(function(x){ return x && x.id === newId; });
+      var afterIdx = arr.findIndex(function(x){ return x && x.id === h.id; });
+      if (newIdx < 0 || afterIdx < 0 || newIdx === afterIdx) return;
+      var item = arr.splice(newIdx, 1)[0];
+      if (newIdx < afterIdx) afterIdx--;
+      arr.splice(afterIdx + 1, 0, item);
+      try { saveData(); } catch(e) {}
+    }
+    window.setAddAfter = setAddAfter;
+    window.applyAddAfter = applyAddAfter;
+
     function addSiblingProject(projectId) {
       var p = getProject(projectId);
       if (!p) return;
@@ -2595,8 +2620,8 @@
           if (!projHasTabChildren) {
             html += `<button class="map-add-plus map-add-plus-right" title="子を追加" onclick="event.stopPropagation();showAddOptionsPopup(this,${proj.projectId},'project')">+</button>`;
           }
-          // 下 + (同階層 = 兄弟プロジェクト)
-          html += `<button class="map-add-plus map-add-plus-below" title="同階層に追加" onclick="event.stopPropagation();addSiblingProject(${proj.projectId})">+</button>`;
+          // 下 + (同階層 = 兄弟プロジェクト) — 元タブの直下に挿入されるよう hint をセット
+          html += `<button class="map-add-plus map-add-plus-below" title="同階層に追加" onclick="event.stopPropagation();setAddAfter('project',${proj.projectId});addSiblingProject(${proj.projectId})">+</button>`;
           html += `</div>`; // close proj-col-wrap
           // Manuals, tasks, and sub-projects branch to the right
           html += `<div class="sub-tree-children" data-parent="proj-${proj.projectId}">`;
@@ -2637,9 +2662,11 @@
             html += '<button class="sub-add-plus sub-add-plus-right" title="子を追加" onclick="event.stopPropagation();showAddOptionsPopup(this,' + sp.projectId + ',\'subproject\')">+</button>';
           }
           // 下 + (同階層 = 親プロジェクト直下に サブ/タスク/マニュアル を追加)
+          // hint: 同種を選んだ時、新しい sub-project が sp の直下に来るように
           var _spReal = getProject(sp.projectId);
           var spParentId = _spReal ? _spReal.parentId : null;
-          html += '<button class="sub-add-plus sub-add-plus-below" title="同階層に追加" onclick="event.stopPropagation();' + (spParentId != null ? 'showAddOptionsPopup(this,' + spParentId + ',\'project\')' : 'addSiblingProject(' + sp.projectId + ')') + '">+</button>';
+          var spBelowOnclick = 'setAddAfter(\'project\',' + sp.projectId + ');' + (spParentId != null ? 'showAddOptionsPopup(this,' + spParentId + ',\'project\')' : 'addSiblingProject(' + sp.projectId + ')');
+          html += '<button class="sub-add-plus sub-add-plus-below" title="同階層に追加" onclick="event.stopPropagation();' + spBelowOnclick + '">+</button>';
           html += '</div>'; // close sub-tree-card-wrap
           // Tasks and children to the right
           html += '<div class="sub-tree-children">';
@@ -2690,13 +2717,12 @@
             html += '<button class="sub-add-plus sub-add-plus-right" title="子タスクを追加" onclick="event.stopPropagation();showAddChildTask(' + t.id + ')">+</button>';
           }
           // 下 + (同階層に追加)
-          // - 親タスクなしのトップレベルタスク → プロジェクト直下に サブ/タスク/マニュアル
-          // - 子タスク (parentTaskId あり) → 兄弟子タスク
-          var taskBottomOnclick;
+          // hint: 新しいタスクが t の直下に来るように
+          var taskBottomOnclick = 'setAddAfter(\'task\',' + t.id + ');';
           if (t.parentTaskId) {
-            taskBottomOnclick = 'addSiblingTask(' + t.id + ')';
+            taskBottomOnclick += 'addSiblingTask(' + t.id + ')';
           } else {
-            taskBottomOnclick = 'showAddOptionsPopup(this,' + t.projectId + ',\'project\')';
+            taskBottomOnclick += 'showAddOptionsPopup(this,' + t.projectId + ',\'project\')';
           }
           html += '<button class="sub-add-plus sub-add-plus-below" title="同階層に追加" onclick="event.stopPropagation();' + taskBottomOnclick + '">+</button>';
           html += '</div>'; // close sub-tree-card-wrap
@@ -4287,6 +4313,7 @@
       } else {
         const id = data.nextManualId++;
         data.manuals.push({ id, projectId, title, purpose, authority, paceTagId: paceTagId, paceSchedule: paceSchedule, operationPace: '', responseSpeed: speed, taskRoadmap: roadmap, trigger: trigger, frequency: frequency, input: input, estimatedTime: estimatedTime, output: output, url: url, history: [], createdBy: 0, _modTs: bumpModTs(0) });
+        applyAddAfter('manual', id);
         markDirty('manuals', id);
         saveData();
         if (typeof pushSyncNow === 'function') pushSyncNow();
@@ -6014,6 +6041,7 @@
           var due = document.getElementById('d-pt-due').value;
           if (due) task.dueDate = due;
           data.projectTasks.push(task);
+          applyAddAfter('task', task.id);
           saveData(); toast('タスクを追加しました'); o.remove(); render();
         }}
       ]);
@@ -6035,6 +6063,7 @@
           var due = document.getElementById('d-ct-due').value;
           if (due) task.dueDate = due;
           data.projectTasks.push(task);
+          applyAddAfter('task', task.id);
           saveData(); toast('子タスクを追加しました'); o.remove(); render();
         }}
       ]);
@@ -6470,6 +6499,7 @@
             } else {
               var newProjId = data.nextProjectId++;
               data.projects.push({ id: newProjId, name: name, description: desc, createdBy: 0, memo: '', files: [], parentId: parentId || null, tagId: tagId, _modTs: bumpModTs(0) });
+              applyAddAfter('project', newProjId);
               markDirty('projects', newProjId);
               toast('プロジェクトを作成しました');
             }
