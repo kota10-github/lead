@@ -138,7 +138,13 @@
     .toast{padding:12px 20px;border-radius:var(--radius);background:#1e293b;color:#f8fafc;font-size:13px;margin-top:8px;animation:toastIn .3s;box-shadow:0 4px 12px rgba(0,0,0,.2)}
     @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
     /* MindMap */
-    .mindmap-viewport{position:relative;width:100%;overflow:auto;border:1px solid rgba(226,232,240,.3);border-radius:var(--radius);background:var(--bg-muted);min-height:calc(100vh - 160px);cursor:grab}
+    .mindmap-viewport{position:relative;width:100%;overflow:auto;border:1px solid rgba(226,232,240,.3);border-radius:var(--radius);background:var(--bg-muted);height:calc(100vh - 220px);min-height:300px;cursor:grab}
+    /* マップページ: 親 main-area を flex column にして、ビューポートが
+       残り空間を埋める。ページ全体はスクロールせず、ビューポート内
+       (= マップ本体) だけがスクロール / ドラッグできる */
+    body.map-page{margin:0;overflow:hidden}
+    body.map-page .main-area{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+    body.map-page .mindmap-viewport{flex:1 1 auto;height:auto;min-height:0}
     .mindmap-viewport:active{cursor:grabbing}
     .mindmap-svg{position:absolute;top:0;left:0;pointer-events:none;z-index:1;transform-origin:top left}
     .mindmap-inner{display:flex;align-items:flex-start;gap:24px;padding:32px;min-width:max-content;transform-origin:top left;transition:transform .15s ease;position:relative;z-index:2}
@@ -1644,6 +1650,9 @@
     // RENDER
     function render() {
       const main = document.getElementById('main-area');
+      // マップページだけ body にフラグを付与して、main-area を flex 縦割りに
+      // → ビューポート内のみスクロールするレイアウトを CSS 側で適用
+      document.body.classList.toggle('map-page', currentPage === 'home' && window.innerWidth > 768);
       switch (currentPage) {
         case 'dashboard': renderMobileHome(main); break;
         case 'home': renderHome(main); break;
