@@ -1653,6 +1653,13 @@
       // マップページだけ body にフラグを付与して、main-area を flex 縦割りに
       // → ビューポート内のみスクロールするレイアウトを CSS 側で適用
       document.body.classList.toggle('map-page', currentPage === 'home' && window.innerWidth > 768);
+      // マップビューポートのスクロール位置を保存 (再描画後に復元する)
+      var _mapScrollSaved = null;
+      if (currentPage === 'home') {
+        var _vp = document.getElementById('mindmap-viewport');
+        if (_vp) _mapScrollSaved = { left: _vp.scrollLeft, top: _vp.scrollTop };
+      }
+      window._restoreMapScrollAfterRender = _mapScrollSaved;
       switch (currentPage) {
         case 'dashboard': renderMobileHome(main); break;
         case 'home': renderHome(main); break;
@@ -2761,7 +2768,17 @@
         viewport.addEventListener('mouseleave', function() { isDragging = false; viewport.style.cursor = 'grab'; });
         viewport.addEventListener('mouseup', function() { isDragging = false; viewport.style.cursor = 'grab'; });
         viewport.addEventListener('mousemove', function(e) { if (!isDragging) return; e.preventDefault(); viewport.scrollLeft = scrollLeft - (e.pageX - viewport.offsetLeft - startX); viewport.scrollTop = scrollTop - (e.pageY - viewport.offsetTop - startY); });
-        requestAnimationFrame(() => requestAnimationFrame(() => { drawMindmapLines(projects); applyMapSearchHighlight(); }));
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          drawMindmapLines(projects);
+          applyMapSearchHighlight();
+          // 再描画前のスクロール位置を復元 (新規タブ追加後でも視点が戻らない)
+          var saved = window._restoreMapScrollAfterRender;
+          if (saved) {
+            var vp = document.getElementById('mindmap-viewport');
+            if (vp) { vp.scrollLeft = saved.left; vp.scrollTop = saved.top; }
+            window._restoreMapScrollAfterRender = null;
+          }
+        }));
       }
       function isDescendantProject(ancestorId, candidateId) {
         if (!candidateId) return false;
