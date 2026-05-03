@@ -1490,9 +1490,9 @@
       var opts;
       if (kind === 'project' || kind === 'subproject') {
         opts = [
+          { label: '📁 サブプロジェクト', click: function(){ showProjectDialog(projectId); } },
           { label: '📖 マニュアル', click: function(){ navigate('manual-form',{projectId:projectId}); } },
-          { label: '✓ タスク', click: function(){ showAddProjectTask(projectId); } },
-          { label: '📁 サブプロジェクト', click: function(){ showProjectDialog(projectId); } }
+          { label: '✓ タスク', click: function(){ showAddProjectTask(projectId); } }
         ];
       } else {
         return;
