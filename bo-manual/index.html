@@ -6238,6 +6238,9 @@
         e.clipboardData.setData('text/plain', htmlToMarkdown(container));
         range.deleteContents();
         e.preventDefault();
+        // 切り取った内容が DOM から消えただけだと autosave が走らないので
+        // 明示的に input イベントを発火して保存をトリガする
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
       });
     }
     function updateTaskDueDate(taskId) {
@@ -6807,6 +6810,8 @@
         e.clipboardData.setData('text/plain', md);
         range.deleteContents();
         e.preventDefault();
+        // 切り取った内容を autosave に伝えるため input イベントを発火
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
       });
     }
 
