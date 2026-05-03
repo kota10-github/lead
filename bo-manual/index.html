@@ -6242,7 +6242,48 @@
         // 明示的に input イベントを発火して保存をトリガする
         editor.dispatchEvent(new Event('input', { bubbles: true }));
       });
+      autoLinkifyOnKey(editor);
     }
+    // URL 自動リンク化: スペース or Enter キー押下時に、直前の URL を <a> でラップする
+    function autoLinkifyOnKey(editor) {
+      editor.addEventListener('keydown', function(e) {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        var sel = window.getSelection();
+        if (!sel.rangeCount || !sel.isCollapsed) return;
+        var range = sel.getRangeAt(0);
+        var node = range.startContainer;
+        if (!node || node.nodeType !== 3) return;
+        // すでに <a> の中ならスキップ
+        var p = node.parentNode;
+        while (p && p !== editor) {
+          if (p.nodeName === 'A') return;
+          p = p.parentNode;
+        }
+        var offset = range.startOffset;
+        var before = node.textContent.substring(0, offset);
+        var m = before.match(/(https?:\/\/[^\s<>"　]+)$/);
+        if (!m) return;
+        var url = m[0];
+        var startIdx = offset - url.length;
+        try {
+          var r = document.createRange();
+          r.setStart(node, startIdx);
+          r.setEnd(node, offset);
+          var anchor = document.createElement('a');
+          anchor.href = url;
+          anchor.target = '_blank';
+          anchor.rel = 'noopener noreferrer';
+          r.surroundContents(anchor);
+          // カーソルを <a> の直後に移動して、ユーザーが押した space/enter は通常入力として処理させる
+          var newRange = document.createRange();
+          newRange.setStartAfter(anchor);
+          newRange.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+        } catch(err) {}
+      });
+    }
+    window.autoLinkifyOnKey = autoLinkifyOnKey;
     function updateTaskDueDate(taskId) {
       var task = (data.projectTasks || []).find(function(t) { return isLive(t) && t.id === taskId; });
       var el = document.getElementById('task-due-input');
@@ -6813,6 +6854,7 @@
         // 切り取った内容を autosave に伝えるため input イベントを発火
         editor.dispatchEvent(new Event('input', { bubbles: true }));
       });
+      if (typeof autoLinkifyOnKey === 'function') autoLinkifyOnKey(editor);
     }
 
     
