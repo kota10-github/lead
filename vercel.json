@@ -1,5 +1,5 @@
 {
   "rewrites": [
-    { "source": "/", "destination": "/bo-management/index.html" }
+    { "source": "/", "destination": "/backoffice/index.html" }
   ]
 }
