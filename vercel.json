@@ -1,5 +1,5 @@
 {
   "rewrites": [
-    { "source": "/", "destination": "/backoffice/index.html" }
+    { "source": "/", "destination": "/ever-dashboard/index.html" }
   ]
 }
