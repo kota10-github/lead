@@ -3279,6 +3279,18 @@
           <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('h2')" title="見出し2">H2</button>
           <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('h3')" title="見出し3">H3</button>
           <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('p')" title="本文に戻す">本文</button>
+          <select class="memo-toolbar-btn" onchange="memoExecCmd('fontSize', this)" title="文字サイズ" style="cursor:pointer">
+            <option value="">サイズ</option>
+            <option value="10px">10px</option>
+            <option value="12px">12px</option>
+            <option value="14px">14px</option>
+            <option value="16px">16px</option>
+            <option value="18px">18px</option>
+            <option value="20px">20px</option>
+            <option value="24px">24px</option>
+            <option value="28px">28px</option>
+            <option value="32px">32px</option>
+          </select>
           <div class="memo-toolbar-sep"></div>
           <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('bold')" title="太字"><b>B</b></button>
           <button type="button" class="memo-toolbar-btn" onclick="memoExecCmd('italic')" title="イタリック"><i>I</i></button>
@@ -6388,6 +6400,18 @@
       html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'h2\')" title="見出し2">H2</button>';
       html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'h3\')" title="見出し3">H3</button>';
       html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'p\')" title="本文に戻す">本文</button>';
+      html += '<select class="memo-toolbar-btn" onchange="memoExecCmd(\'fontSize\', this)" title="文字サイズ" style="cursor:pointer">';
+      html += '<option value="">サイズ</option>';
+      html += '<option value="10px">10px</option>';
+      html += '<option value="12px">12px</option>';
+      html += '<option value="14px">14px</option>';
+      html += '<option value="16px">16px</option>';
+      html += '<option value="18px">18px</option>';
+      html += '<option value="20px">20px</option>';
+      html += '<option value="24px">24px</option>';
+      html += '<option value="28px">28px</option>';
+      html += '<option value="32px">32px</option>';
+      html += '</select>';
       html += '<div class="memo-toolbar-sep"></div>';
       html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'bold\')" title="太字"><b>B</b></button>';
       html += '<button type="button" class="memo-toolbar-btn" onclick="memoExecCmd(\'italic\')" title="イタリック"><i>I</i></button>';
@@ -6718,10 +6742,21 @@
       html = html.replace(/(<li[^>]*>.*?<\/li>\n?)+/g, function(m) { return '<ul>' + m + '</ul>'; });
       // Links
       html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
-      // Paragraphs
-      html = html.replace(/\n\n/g, '</p><p>');
+      // Paragraphs (連続改行を可視的な空段落として保持)
+      // \n\n  (length 2) → </p><p><br></p><p>  (1 行の空段落 = 1 空行を可視化)
+      // \n\n\n (length 3) → </p><p><br></p><p><br></p><p>  (空段落 2 つ = 空行 2)
+      // 一般化: 連続 \n の数 - 1 個の空段落を挟む
+      // (これがないと <p>x</p><p>y</p> だけだと paragraph margin しか出ず、
+      //  contenteditable 編集中の "Enter で空行を作った" 視覚と乖離する)
+      html = html.replace(/\n{2,}/g, function(seq) {
+        var fillerCount = seq.length - 1;  // 空段落の数
+        var fillers = '';
+        for (var i = 0; i < fillerCount; i++) fillers += '<p><br></p>';
+        return '</p>' + fillers + '<p>';
+      });
       html = html.replace(/\n/g, '<br>');
       html = '<p>' + html + '</p>';
+      // 空の <p></p> は削除 (空行は <p><br></p> として既に出している)
       html = html.replace(/<p><\/p>/g, '');
       html = html.replace(/<p>(<h[1-3]>)/g, '$1');
       html = html.replace(/(<\/h[1-3]>)<\/p>/g, '$1');
@@ -6776,11 +6811,35 @@
             break;
           case 'hr': md += '\n---\n'; break;
           case 'br': md += '\n'; break;
-          case 'p': case 'div':
-            if (md.length > 0 && !md.endsWith('\n\n') && !md.endsWith('\n')) md += '\n';
-            walkChildren(node);
-            if (!md.endsWith('\n')) md += '\n';
+          case 'p': case 'div': {
+            // 空の <p>/<div> や <br> のみの中身は「空行」として保持する。
+            // これがないと連続 Enter で作った空行が trim/collapse で消える。
+            var hadContent = node.textContent && node.textContent.trim().length > 0;
+            var onlyBr = !hadContent && node.querySelector && node.querySelector('br');
+            if (md.length > 0 && !md.endsWith('\n')) md += '\n';
+            if (!hadContent && onlyBr) {
+              // 空行を表現するため追加で \n を入れる
+              md += '\n';
+            } else {
+              walkChildren(node);
+              if (!md.endsWith('\n')) md += '\n';
+            }
             break;
+          }
+          case 'span': {
+            // フォントサイズ / 色 / ハイライトを持つ span は HTML で保存
+            // (markdown は font-size を表現できないため raw HTML で round-trip)
+            var sty = node.getAttribute('style') || '';
+            var keep = /font-size|color|background/i.test(sty);
+            if (keep) {
+              md += '<span style="' + sty.replace(/"/g, '&quot;') + '">';
+              walkChildren(node);
+              md += '</span>';
+            } else {
+              walkChildren(node);
+            }
+            break;
+          }
           default: walkChildren(node); break;
         }
       }
@@ -6788,8 +6847,8 @@
         node.childNodes.forEach(walk);
       }
       walkChildren(el);
-      // Clean up extra newlines
-      md = md.replace(/\n{3,}/g, '\n\n').trim();
+      // Trailing whitespace のみ削除 (連続改行は保持)
+      md = md.replace(/[ \t]+$/gm, '').replace(/^\n+|\n+$/g, '');
       return md;
     }
 
@@ -6878,6 +6937,38 @@
         case 'h2': document.execCommand('formatBlock', false, 'h2'); break;
         case 'h3': document.execCommand('formatBlock', false, 'h3'); break;
         case 'p': document.execCommand('formatBlock', false, 'p'); break;
+        case 'fontSize': {
+          var size = anchor && anchor.value;
+          if (!size) break;
+          editor.focus();
+          var fsSel = window.getSelection();
+          if (!fsSel.rangeCount) { anchor.value = ''; break; }
+          var fsRange = fsSel.getRangeAt(0);
+          if (fsRange.collapsed) { anchor.value = ''; break; }
+          document.execCommand('styleWithCSS', false, true);
+          var span = document.createElement('span');
+          span.style.fontSize = size;
+          try {
+            var contents = fsRange.extractContents();
+            // 内側の span.fontSize を剥がしてネスト防止
+            if (contents.querySelectorAll) {
+              contents.querySelectorAll('span').forEach(function(s) {
+                if (s.style && s.style.fontSize) s.style.fontSize = '';
+                if (s.getAttribute && s.getAttribute('style') === '') s.removeAttribute('style');
+              });
+            }
+            span.appendChild(contents);
+            fsRange.insertNode(span);
+            var newRange = document.createRange();
+            newRange.selectNodeContents(span);
+            newRange.collapse(false);
+            fsSel.removeAllRanges();
+            fsSel.addRange(newRange);
+          } catch(e) { console.warn('fontSize apply failed', e); }
+          anchor.value = '';
+          editor.dispatchEvent(new Event('input', { bubbles: true }));
+          break;
+        }
         case 'bold': document.execCommand('bold'); break;
         case 'italic': document.execCommand('italic'); break;
         case 'strike': document.execCommand('strikeThrough'); break;
