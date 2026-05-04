@@ -5,9 +5,10 @@
 // そのまま温まり続け、実質的に同じ blob を使い続けられる。cold start で
 // 忘れたら最後に GET/PUT したどちらかがまた新 blob を発行する。
 const BLOB_BASE = 'https://jsonblob.com/api/jsonBlob';
-// 2026-04-21 時点でアクティブな blob id。期限切れで新 blob が発行されたら
+// 2026-05-04 時点でアクティブな blob id。期限切れで新 blob が発行されたら
 // _currentBlobId にキャッシュされ、以降そちらを使う。
-const INITIAL_BLOB_ID = '019dab81-865c-7f12-9430-d63c5af14b6c';
+// 旧: 019dab81-... (期限切れ), 019df212-... (2026-05-04 ローテート)
+const INITIAL_BLOB_ID = '019df212-1f3e-7450-b03d-ad286c5de2c5';
 let _currentBlobId = INITIAL_BLOB_ID;
 function blobUrl() { return BLOB_BASE + '/' + _currentBlobId; }
 
