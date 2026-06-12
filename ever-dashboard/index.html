@@ -467,6 +467,9 @@ function renderTabs() {
   const globalTab = mkEl('div', 'tab'+(activeTab==='__global'?' active':''), '全体入力');
   globalTab.onclick = () => switchTab('__global');
   bar.appendChild(globalTab);
+  const invTab = mkEl('div', 'tab', '請求書作成');
+  invTab.onclick = () => { window.location.href = '../invoice.html'; };
+  bar.appendChild(invTab);
   getAllDates().forEach(date => {
     const t = mkEl('div', 'tab'+(activeTab===date?' active':'')+(isToday(date)?' today-tab':''),
       fmtShort(date)+(isToday(date)?' ★':''));
